@@ -1,0 +1,25 @@
+# Environnement Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Variables d'environnement (CONTIENT TES CLÉS API)
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Fichiers de log
+*.log
+logs/
+
+# Données de tests
+tests/data/
+*.db

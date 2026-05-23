@@ -1,0 +1,17 @@
+# LLM
+openai>=1.0.0          # le SDK OpenAI fonctionne aussi avec DeepSeek (API compatible)
+
+# Validation et structure
+pydantic>=2.0.0        # pour valider les inputs/outputs JSON
+
+# Configuration
+python-dotenv>=1.0.0   # pour charger les variables d'environnement
+
+# Logging
+structlog>=24.0.0      # logging structuré (plus propre que print)
+
+# Outils OSINT basiques
+python-whois>=0.9.0    # pour le lookup WHOIS
+dnspython>=2.4.0       # pour les requêtes DNS
+# Outils de scanning réseau
+python-nmap>=0.7.1

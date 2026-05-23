@@ -1,0 +1,109 @@
+{
+  "agent": "OSINT_Agent",
+  "version": "1.1",
+  "ptes_phase": 2,
+  "attack_tactic": "TA0043",
+  "target": "techshop-vuln.rokina-sylla.me",
+  "started_at": "2026-05-23T21:22:10.111026+00:00",
+  "ended_at": "2026-05-23T21:22:32.467613+00:00",
+  "duration_seconds": 22.356587,
+  "tools_used": [
+    "whois",
+    "dns_lookup"
+  ],
+  "raw_data": {
+    "whois": {
+      "status": "success",
+      "domain": "techshop-vuln.rokina-sylla.me",
+      "registrar": "NameCheap, Inc.",
+      "creation_date": "2026-04-16T12:42:45+00:00",
+      "expiration_date": "2027-04-16T12:42:45+00:00",
+      "name_servers": [],
+      "emails": [],
+      "org": null,
+      "country": null,
+      "raw": "{\n  \"domain_id\": \"REDACTED\",\n  \"domain_name\": \"rokina-sylla.me\",\n  \"creation_date\": \"2026-04-16 12:42:45+00:00\",\n  \"updated_date\": \"2026-04-21 12:43:42+00:00\",\n  \"expiration_date\": \"2027-04-16 12:42:45+00:00\",\n  \"registrar\": \"NameCheap, Inc.\",\n  \"status\": \"clientTransferProhibited https://icann.org/epp#clientTransferProhibited\",\n  \"registrant_id\": \"REDACTED\",\n  \"registrant_name\": \"REDACTED\",\n  \"registrant_org\": \"Privacy service provided by Withheld for Privacy ehf\",\n  \"registrant_address\": null,\n  \"registrant_address2\": null,\n  \"registrant_address3\": null,\n  \"registrant_city\": \"REDACTED\",\n  \"registrant_state_province\": \"Capital Region\",\n  \"registrant_country\": null,\n  \"registrant_postal_code\": \"REDACTED\",\n  \"registrant_phone\": \"REDACTED\",\n  \"registrant_phone_ext\": null,\n  \"registrant_fax\": \"REDACTED\",\n  \"registrant_fax_ext\": null,\n  \"registrant_email\": null,\n  \"admin_id\": \"REDACTED\",\n  \"admin_name\": \"REDACTED\",\n  \"admin_org\": \"REDACTED\",\n  \"admin_address\": null,\n  \"admin_address2\": null,\n  \"admin_address3\": null,\n  \"admin_city\": \"REDACTED\",\n  \"admin_state_province\": \"REDACTED\",\n  \"admin_country\": null,\n  \"admin_postal_code\": \"REDACTED\",\n  \"admin_phone\": \"REDACTED\",\n  \"admin_phone_ext\": null,\n  \"admin_fax\": \"REDACTED\",\n  \"admin_fax_ext\": null,\n  \"admin_email\": null,\n  \"tech_id\": \"REDACTED\",\n  \"tech_name\": \"REDACTED\",\n  \"tech_org\": \"REDACTED\",\n  \"tech_address\": null,\n  \"tech_address2\": null,\n  \"tech_address3\": null,\n  \"tech_city\": \"REDACTED\",\n  \"tech_state_province\": \"REDACTED\",\n  \"tech_country\": null,\n  \"tech_postal_code\": \"REDACTED\",\n  \"tech_phone\": \"REDACTED\",\n  \"tech_phone_ext\": null,\n  \"tech_fax\": \"REDACTED\",\n  \"tech_fax_ext\": null,\n  \"tech_email\": null,\n  \"name_servers\": null\n}",
+      "error": null
+    },
+    "dns": {
+      "status": "success",
+      "domain": "techshop-vuln.rokina-sylla.me",
+      "records": {
+        "A": [
+          "216.24.57.251",
+          "216.24.57.7"
+        ],
+        "CNAME": [
+          "techshop-vuln.onrender.com."
+        ]
+      },
+      "errors": {},
+      "inferred_hosting": "Render.com"
+    }
+  },
+  "analysis": {
+    "summary": "Le domaine 'techshop-vuln.rokina-sylla.me' est un sous-domaine récent (créé le 16 avril 2026) avec un service de confidentialité activé chez NameCheap. Les enregistrements DNS révèlent un CNAME pointant vers 'techshop-vuln.onrender.com', indiquant un hébergement sur Render.com, avec deux adresses IP A (216.24.57.251 et 216.24.57.7). Le WHOIS ne fournit pas de serveurs de noms ni d'emails, ce qui est cohérent avec l'utilisation d'un sous-domaine.",
+    "key_findings": [
+      {
+        "type": "registrar",
+        "value": "NameCheap, Inc.",
+        "significance": "NameCheap est un registrar courant ; le domaine est récent (moins de 2 mois), ce qui peut indiquer un environnement de test ou une cible fraîchement déployée.",
+        "attack_mapping": "T1590.002",
+        "source_tool": "whois"
+      },
+      {
+        "type": "privacy_service",
+        "value": "Privacy service provided by Withheld for Privacy ehf",
+        "significance": "Les informations du registrant sont masquées, rendant l'identification directe du propriétaire difficile. Cela peut indiquer une tentative de dissimulation, mais n'empêche pas l'analyse technique.",
+        "attack_mapping": "T1590.002",
+        "source_tool": "whois"
+      },
+      {
+        "type": "infrastructure",
+        "value": "Render.com (via CNAME)",
+        "significance": "L'hébergement est identifié comme Render.com, une plateforme PaaS. Cela permet de cibler des vulnérabilités spécifiques à Render (ex: configurations par défaut, sous-domaines partagés).",
+        "attack_mapping": "T1590.005",
+        "source_tool": "dns"
+      },
+      {
+        "type": "dns",
+        "value": "CNAME vers techshop-vuln.onrender.com",
+        "significance": "Le CNAME révèle le nom exact du service Render, ce qui peut être utilisé pour des attaques de sous-domaine ou pour identifier des services associés.",
+        "attack_mapping": "T1590.002",
+        "source_tool": "dns"
+      },
+      {
+        "type": "dns",
+        "value": "Adresses IP A : 216.24.57.251 et 216.24.57.7",
+        "significance": "Ces IP sont probablement des reverse proxies ou des load balancers de Render. Leur analyse peut révéler des plages IP partagées avec d'autres clients, augmentant la surface d'attaque.",
+        "attack_mapping": "T1590.005",
+        "source_tool": "dns"
+      },
+      {
+        "type": "anomaly",
+        "value": "Absence de serveurs de noms dans WHOIS",
+        "significance": "Le WHOIS ne liste pas de serveurs de noms, ce qui est normal pour un sous-domaine (les NS sont définis au niveau du domaine parent). Cela confirme que 'techshop-vuln' est un sous-domaine de 'rokina-sylla.me'.",
+        "attack_mapping": "T1590.002",
+        "source_tool": "whois"
+      }
+    ],
+    "infrastructure_summary": {
+      "hosting_provider": "Render.com",
+      "ip_addresses": [
+        "216.24.57.251",
+        "216.24.57.7"
+      ],
+      "name_servers": [],
+      "mail_servers": []
+    },
+    "recommendations_for_next_agents": [
+      "Effectuer un scan de ports sur les IP 216.24.57.251 et 216.24.57.7 pour identifier les services exposés (HTTP/HTTPS, autres).",
+      "Analyser le sous-domaine 'techshop-vuln.onrender.com' directement pour détecter des configurations Render par défaut ou des vulnérabilités de sous-domaine.",
+      "Vérifier la présence d'en-têtes de sécurité HTTP et de certificats TLS sur le domaine cible.",
+      "Rechercher des informations supplémentaires sur 'rokina-sylla.me' (domaine parent) pour identifier d'autres sous-domaines ou services associés.",
+      "Tester des endpoints communs de Render (ex: /health, /status) pour recueillir des informations sur l'infrastructure."
+    ],
+    "confidence": 0.85
+  },
+  "executive_summary": "🎯 CIBLE\nSous-domaine récent (avril 2026) de `rokina-sylla.me`, hébergé sur Render.com, probablement un environnement de test ou une cible fraîchement déployée.\n\n🏗️ INFRASTRUCTURE\n- Hébergeur : Render.com (PaaS), via un CNAME vers `techshop-vuln.onrender.com`\n- Adresses IP : 216.24.57.251 et 216.24.57.7 (reverse proxies/load balancers Render)\n- Registrar : NameCheap, avec service de confidentialité activé (registrant masqué)\n\n🔍 OBSERVATIONS CLÉS\n- Le CNAME expose le nom exact du service Render, ouvrant la voie à des attaques de sous-domaine ou à l’identification de services associés.\n- Les IP sont probablement partagées avec d’autres clients Render, ce qui élargit la surface d’attaque potentielle.\n- Aucun serveur de noms ou mail n’est listé (normal pour un sous-domaine).\n\n⚠️ POINTS D’ATTENTION\n- Le domaine parent (`rokina-sylla.me`) n’a pas été analysé : il pourrait héberger d’autres sous-domaines ou services.\n- L’absence d’en-têtes de sécurité et de certificats TLS doit être vérifiée rapidement.\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Scanner les IP 216.24.57.251 et 216.24.57.7 pour identifier les services exposés (HTTP/HTTPS, etc.).\n2. Analyser directement `techshop-vuln.onrender.com` pour détecter des configurations Render par défaut ou des vulnérabilités.\n3. Tester des endpoints communs Render (ex: /health, /status) et vérifier les en-têtes de sécurité HTTP."
+}

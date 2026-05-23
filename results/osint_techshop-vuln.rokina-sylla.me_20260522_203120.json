@@ -1,0 +1,101 @@
+{
+  "agent": "OSINT_Agent",
+  "version": "1.1",
+  "ptes_phase": 2,
+  "attack_tactic": "TA0043",
+  "target": "techshop-vuln.rokina-sylla.me",
+  "started_at": "2026-05-22T20:30:59.496989",
+  "ended_at": "2026-05-22T20:31:20.904644",
+  "duration_seconds": 21.407655,
+  "tools_used": [
+    "whois",
+    "dns_lookup"
+  ],
+  "raw_data": {
+    "whois": {
+      "status": "success",
+      "domain": "techshop-vuln.rokina-sylla.me",
+      "registrar": "NAMECHEAP INC",
+      "creation_date": "2026-04-16T12:42:45+00:00",
+      "expiration_date": "2027-04-16T12:42:45+00:00",
+      "name_servers": [],
+      "emails": [],
+      "org": null,
+      "country": null,
+      "raw": "{\n  \"domain_id\": [\n    \"REDACTED\",\n    \"e98e924701034756842edb06aaebbf31-DONUTS\"\n  ],\n  \"domain_name\": \"rokina-sylla.me\",\n  \"creation_date\": [\n    \"2026-04-16 12:42:45+00:00\",\n    \"2026-04-16 12:42:45.870000+00:00\"\n  ],\n  \"updated_date\": [\n    \"2026-04-21 12:43:42+00:00\",\n    \"0001-01-01 00:00:00+00:00\"\n  ],\n  \"expiration_date\": \"2027-04-16 12:42:45+00:00\",\n  \"registrar\": \"NAMECHEAP INC\",\n  \"status\": [\n    \"clientTransferProhibited https://icann.org/epp#clientTransferProhibited\",\n    \"addPeriod https://icann.org/epp#addPeriod\"\n  ],\n  \"registrant_id\": \"REDACTED\",\n  \"registrant_name\": [\n    \"REDACTED\",\n    \"Redacted for Privacy\"\n  ],\n  \"registrant_org\": \"Privacy service provided by Withheld for Privacy ehf\",\n  \"registrant_address\": null,\n  \"registrant_address2\": null,\n  \"registrant_address3\": null,\n  \"registrant_city\": [\n    \"REDACTED\",\n    \"Reykjavik\"\n  ],\n  \"registrant_state_province\": \"Capital Region\",\n  \"registrant_country\": null,\n  \"registrant_postal_code\": [\n    \"REDACTED\",\n    \"101\"\n  ],\n  \"registrant_phone\": [\n    \"REDACTED\",\n    \"+354.4212434\"\n  ],\n  \"registrant_phone_ext\": null,\n  \"registrant_fax\": \"REDACTED\",\n  \"registrant_fax_ext\": null,\n  \"registrant_email\": null,\n  \"admin_id\": \"REDACTED\",\n  \"admin_name\": [\n    \"REDACTED\",\n    \"Redacted for Privacy\"\n  ],\n  \"admin_org\": [\n    \"REDACTED\",\n    \"Privacy service provided by Withheld for Privacy ehf\"\n  ],\n  \"admin_address\": null,\n  \"admin_address2\": null,\n  \"admin_address3\": null,\n  \"admin_city\": [\n    \"REDACTED\",\n    \"Reykjavik\"\n  ],\n  \"admin_state_province\": [\n    \"REDACTED\",\n    \"Capital Region\"\n  ],\n  \"admin_country\": null,\n  \"admin_postal_code\": [\n    \"REDACTED\",\n    \"101\"\n  ],\n  \"admin_phone\": [\n    \"REDACTED\",\n    \"+354.4212434\"\n  ],\n  \"admin_phone_ext\": null,\n  \"admin_fax\": \"REDACTED\",\n  \"admin_fax_ext\": null,\n  \"admin_email\": null,\n  \"tech_id\": \"REDACTED\",\n  \"tech_name\": [\n    \"REDACTED\",\n    \"Redacted for Privacy\"\n  ],\n  \"tech_org\": [\n    \"REDACTED\",\n    \"Privacy service provided by Withheld for Privacy ehf\"\n  ],\n  \"tech_address\": null,\n  \"tech_address2\": null,\n  \"tech_address3\": null,\n  \"tech_city\": [\n    \"REDACTED\",\n    \"Reykjavik\"\n  ],\n  \"tech_state_province\": [\n    \"REDACTED\",\n    \"Capital Region\"\n  ],\n  \"tech_country\": null,\n  \"tech_postal_code\": [\n    \"REDACTED\",\n    \"101\"\n  ],\n  \"tech_phone\": [\n    \"REDACTED\",\n    \"+354.4212434\"\n  ],\n  \"tech_phone_ext\": null,\n  \"tech_fax\": \"REDACTED\",\n  \"tech_fax_ext\": null,\n  \"tech_email\": null,\n  \"name_servers\": null\n}",
+      "error": null
+    },
+    "dns": {
+      "status": "success",
+      "domain": "techshop-vuln.rokina-sylla.me",
+      "records": {
+        "A": [
+          "216.24.57.251",
+          "216.24.57.7"
+        ],
+        "CNAME": [
+          "techshop-vuln.onrender.com."
+        ]
+      },
+      "errors": {},
+      "inferred_hosting": "Render.com"
+    }
+  },
+  "analysis": {
+    "summary": "Le domaine 'techshop-vuln.rokina-sylla.me' est un sous-domaine récent (créé le 16 avril 2026) pointant vers l'infrastructure de Render.com via un enregistrement CNAME. Le WHOIS révèle un service de protection de la vie privée (Withheld for Privacy ehf) via Namecheap, masquant les informations du propriétaire. Les enregistrements DNS montrent deux adresses IP A (216.24.57.251 et 216.24.57.7) et un CNAME pointant vers 'techshop-vuln.onrender.com', indiquant que l'application est hébergée sur Render.com.",
+    "key_findings": [
+      {
+        "type": "infrastructure",
+        "value": "Hébergement sur Render.com via CNAME vers techshop-vuln.onrender.com",
+        "significance": "L'application est hébergée sur Render.com, une plateforme PaaS. Cela implique que l'infrastructure sous-jacente est gérée par Render, mais l'application elle-même est vulnérable aux attaques au niveau applicatif. Le sous-domaine 'onrender.com' peut être une cible pour des attaques de sous-domaine ou de configuration.",
+        "attack_mapping": "T1590.002 - Gather Victim Network Information: DNS",
+        "source_tool": "dns"
+      },
+      {
+        "type": "hosting",
+        "value": "Render.com",
+        "significance": "Render.com est un fournisseur PaaS. Les applications hébergées sur Render peuvent être vulnérables à des attaques de type Server-Side Request Forgery (SSRF) si elles utilisent des services internes, ou à des problèmes de configuration de déploiement. Les adresses IP (216.24.57.251 et 216.24.57.7) sont probablement des IP partagées ou des reverse proxies de Render.",
+        "attack_mapping": "T1590.005 - Gather Victim Network Information: Network Topology",
+        "source_tool": "dns"
+      },
+      {
+        "type": "anomaly",
+        "value": "Deux adresses IP A différentes pour le même sous-domaine",
+        "significance": "La présence de deux adresses IP (216.24.57.251 et 216.24.57.7) peut indiquer un équilibrage de charge, une redondance, ou une configuration DNS incorrecte. Cela mérite une investigation plus approfondie lors de la phase de scanning pour identifier les services ouverts sur chaque IP.",
+        "attack_mapping": "T1590.002 - Gather Victim Network Information: DNS",
+        "source_tool": "dns"
+      },
+      {
+        "type": "registrar",
+        "value": "NAMECHEAP INC",
+        "significance": "Namecheap est un registrar populaire. Le domaine est récent (avril 2026) et en période 'addPeriod' (protection contre les transferts). Cela indique que le domaine est encore dans sa phase initiale de configuration, ce qui pourrait signifier que l'application est encore en développement ou récemment déployée.",
+        "attack_mapping": "T1590.001 - Gather Victim Network Information: Domain Properties",
+        "source_tool": "whois"
+      },
+      {
+        "type": "privacy",
+        "value": "Privacy service provided by Withheld for Privacy ehf",
+        "significance": "L'utilisation d'un service de protection de la vie privée (Withheld for Privacy ehf, basé en Islande) masque les informations personnelles du propriétaire. Cela réduit la surface d'attaque pour l'ingénierie sociale mais n'empêche pas l'analyse technique de l'infrastructure.",
+        "attack_mapping": "T1590.001 - Gather Victim Network Information: Domain Properties",
+        "source_tool": "whois"
+      }
+    ],
+    "infrastructure_summary": {
+      "hosting_provider": "Render.com",
+      "ip_addresses": [
+        "216.24.57.251",
+        "216.24.57.7"
+      ],
+      "name_servers": [],
+      "mail_servers": []
+    },
+    "recommendations_for_next_agents": [
+      "Scanner les deux adresses IP (216.24.57.251 et 216.24.57.7) pour identifier les ports ouverts et les services (Nmap).",
+      "Effectuer un scan de l'application web sur le sous-domaine 'techshop-vuln.rokina-sylla.me' pour identifier les endpoints, les technologies utilisées et les vulnérabilités potentielles (OWASP ZAP, Burp Suite).",
+      "Vérifier la configuration du sous-domaine 'techshop-vuln.onrender.com' pour détecter d'éventuelles prises de contrôle de sous-domaine (subdomain takeover).",
+      "Analyser les en-têtes HTTP et les cookies de l'application pour identifier les faiblesses de sécurité (XSS, CSRF, etc.).",
+      "Rechercher des informations supplémentaires sur le domaine 'rokina-sylla.me' et ses autres sous-domaines via des techniques de brute-force DNS ou des sources OSINT (crt.sh, SecurityTrails)."
+    ],
+    "confidence": 0.85
+  }
+}
