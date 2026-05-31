@@ -21,14 +21,15 @@ from typing import Any
 
 from pentagon.core.llm_client import LLMClient
 from pentagon.tools.nmap_tool import run_nmap_scan
-
+from pentagon.tools.whatweb_tool import run_whatweb_scan
 
 SCANNING_SYSTEM_PROMPT = """Tu es l'Agent Scanning & Enumeration de PENTAGON, un système \
 multi-agent de test d'intrusion automatisé.
 
 Ton rôle :
 - Tu effectues la phase 3 du PTES (Threat Modeling) et le début de la phase 4
-- Tu analyses les résultats de scan Nmap pour identifier la surface d'attaque
+- Tu analyses les résultats de scan Nmap (ports/services) et WhatWeb (technologies web) pour identifier la surface d'attaque
+- Tu corrèles les deux sources pour reconstituer l'architecture complète de la cible
 - Tu identifies les services exposés, leurs versions, et leurs implications de sécurité
 - Tu mappes tes observations à MITRE ATT&CK (tactique TA0007 - Discovery)
 - Tu rappelles que tes actions sont actives et tracées
@@ -142,7 +143,7 @@ class ScanningAgent:
         print(f"[{self.name}] Démarrage du scan sur '{target}' (profil: {scan_profile})")
         print(f"[{self.name}] ⚠️  Trafic actif émis vers la cible")
         
-        # 1. Exécution du scan Nmap
+        # 1. Exécution du scan Nmap (ports/services)
         print(f"[{self.name}] Invocation de Nmap...")
         nmap_data = run_nmap_scan(target=target, profile=scan_profile)
         
@@ -155,9 +156,18 @@ class ScanningAgent:
                 "error": nmap_data["error"],
             }
         
-        # 2. Analyse par le LLM
+        # 2. Exécution du scan WhatWeb (technologies web)
+        # WhatWeb a besoin d'une URL complète (avec https://)
+        whatweb_url = target if target.startswith("http") else f"https://{target}"
+        print(f"[{self.name}] Invocation de WhatWeb...")
+        whatweb_data = run_whatweb_scan(target_url=whatweb_url, aggression="polite")
+        
+        if whatweb_data["status"] == "error":
+            print(f"[{self.name}] ⚠️  WhatWeb échoué (on continue avec Nmap seul) : {whatweb_data['error']}")
+        
+        # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des résultats du scan...")
-        analysis = self._analyze_with_llm(target, nmap_data)
+        analysis = self._analyze_with_llm(target, nmap_data, whatweb_data)
         
         # 3. Construction du résultat final
         ended_at = datetime.now(timezone.utc)
@@ -174,9 +184,10 @@ class ScanningAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["nmap"],
+            "tools_used": ["nmap", "whatweb"],
             "raw_data": {
                 "nmap": nmap_data,
+                "whatweb": whatweb_data,
             },
             "analysis": analysis,
         }
@@ -192,34 +203,42 @@ class ScanningAgent:
         self,
         target: str,
         nmap_data: dict[str, Any],
+        whatweb_data: dict[str, Any],
     ) -> dict[str, Any]:
         """
-        Demande au LLM d'analyser les résultats du scan Nmap.
+        Demande au LLM d'analyser les résultats corrélés de Nmap et WhatWeb.
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
         user_prompt = f"""Date actuelle : {current_date}
 
-Analyse les résultats du scan Nmap effectué sur la cible '{target}'.
+Analyse les résultats de scan effectués sur la cible '{target}'.
 
-=== DONNÉES NMAP ===
+=== DONNÉES NMAP (ports et services) ===
 ```json
 {json.dumps(nmap_data, indent=2, ensure_ascii=False, default=str)}
+```
+
+=== DONNÉES WHATWEB (technologies web) ===
+```json
+{json.dumps(whatweb_data, indent=2, ensure_ascii=False, default=str)}
 ```
 
 Produis une analyse de scanning structurée selon le format JSON défini dans tes instructions.
 
 Sois particulièrement attentif à :
+- La CORRÉLATION entre Nmap et WhatWeb (ex: Nmap voit Cloudflare sur les ports, WhatWeb confirme via headers)
 - L'identification des couches de défense (WAF, CDN, reverse proxy)
-- La déduction de l'architecture (ex: application derrière Cloudflare, hébergée sur PaaS)
+- La déduction de l'architecture complète (frontend, backend, hébergement)
+- Les signaux d'hébergement révélés par WhatWeb (ex: header rndr-id = Render.com)
 - Les implications pour les agents en aval (quels tests applicatifs sont pertinents ?)
-- Les anomalies (ports inhabituels, services obsolètes)"""
+- Les anomalies ou expositions sensibles"""
         
         response_text = self.llm.chat(
             system_prompt=SCANNING_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0.2,
-            max_tokens=2000,
+            max_tokens=4000,
         )
         
         return self._parse_llm_response(response_text)
@@ -257,7 +276,8 @@ Produis le résumé exécutif selon le format défini dans tes instructions."""
     
     def _parse_llm_response(self, response_text: str) -> dict[str, Any]:
         """
-        Parse la réponse du LLM en JSON, avec gestion d'erreurs robuste.
+        Parse la réponse du LLM en JSON, avec gestion d'erreurs robuste
+        et tentative de récupération si le JSON est tronqué.
         """
         text = response_text.strip()
         if text.startswith("```json"):
@@ -268,10 +288,55 @@ Produis le résumé exécutif selon le format défini dans tes instructions."""
             text = text[:-3]
         text = text.strip()
         
+        # Tentative 1 : parsing direct
         try:
             return json.loads(text)
-        except json.JSONDecodeError as e:
-            return {
-                "error": f"JSON parsing failed: {e}",
-                "raw_response": response_text,
-            }
+        except json.JSONDecodeError:
+            pass
+        
+        # Tentative 2 : récupération d'un JSON tronqué
+        # On essaie de fermer proprement les structures ouvertes
+        repaired = self._attempt_json_repair(text)
+        if repaired is not None:
+            repaired["_note"] = "JSON récupéré après troncature (réponse LLM coupée)"
+            return repaired
+        
+        # Échec total : on retourne le texte brut
+        return {
+            "error": "JSON parsing failed",
+            "raw_response": response_text,
+        }
+    
+    def _attempt_json_repair(self, text: str) -> dict[str, Any] | None:
+        """
+        Tente de réparer un JSON tronqué en fermant les structures ouvertes.
+        
+        Stratégie : on coupe au dernier objet/élément complet, puis on
+        ferme les crochets et accolades restés ouverts.
+        """
+        import re
+        
+        # Cherche la dernière accolade fermante d'un élément complet
+        # suivie d'une virgule ou d'un retour à la ligne
+        last_complete = text.rfind("},")
+        if last_complete == -1:
+            last_complete = text.rfind("}")
+        
+        if last_complete == -1:
+            return None
+        
+        # Tronque après le dernier élément complet
+        candidate = text[:last_complete + 1]
+        
+        # Compte les structures ouvertes pour les fermer
+        open_braces = candidate.count("{") - candidate.count("}")
+        open_brackets = candidate.count("[") - candidate.count("]")
+        
+        # Ferme les tableaux puis les objets
+        candidate += "]" * open_brackets
+        candidate += "}" * open_braces
+        
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            return None

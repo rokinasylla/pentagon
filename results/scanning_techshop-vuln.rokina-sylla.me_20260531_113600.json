@@ -1,0 +1,375 @@
+{
+  "agent": "Scanning_Agent",
+  "version": "1.0",
+  "ptes_phase": 3,
+  "attack_tactic": "TA0007",
+  "risk_level": "active",
+  "target": "techshop-vuln.rokina-sylla.me",
+  "scan_profile": "web_focused",
+  "started_at": "2026-05-31T11:35:06.671215+00:00",
+  "ended_at": "2026-05-31T11:35:57.249644+00:00",
+  "duration_seconds": 50.578429,
+  "tools_used": [
+    "nmap",
+    "whatweb"
+  ],
+  "raw_data": {
+    "nmap": {
+      "status": "success",
+      "target": "techshop-vuln.rokina-sylla.me",
+      "profile_used": "web_focused",
+      "profile_description": "Scan ciblé sur les ports web avec scripts par défaut",
+      "scan_start": "2026-05-31T11:35:06.673000+00:00",
+      "scan_end": "2026-05-31T11:35:32.167863+00:00",
+      "duration_seconds": 25.494863,
+      "hosts": {
+        "216.24.57.7": {
+          "state": "up",
+          "hostnames": [
+            "techshop-vuln.rokina-sylla.me"
+          ],
+          "addresses": {
+            "ipv4": "216.24.57.7"
+          },
+          "ports": [
+            {
+              "port": 80,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "http",
+              "product": "Cloudflare http proxy",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 443,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "http",
+              "product": "Cloudflare http proxy",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 3000,
+              "protocol": "tcp",
+              "state": "filtered",
+              "service": "ppp",
+              "product": "",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 5000,
+              "protocol": "tcp",
+              "state": "filtered",
+              "service": "upnp",
+              "product": "",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 8000,
+              "protocol": "tcp",
+              "state": "filtered",
+              "service": "http-alt",
+              "product": "",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 8080,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "http",
+              "product": "Cloudflare http proxy",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 8081,
+              "protocol": "tcp",
+              "state": "filtered",
+              "service": "blackice-icecap",
+              "product": "",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 8443,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "http",
+              "product": "Cloudflare http proxy",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 8888,
+              "protocol": "tcp",
+              "state": "filtered",
+              "service": "sun-answerbook",
+              "product": "",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            },
+            {
+              "port": 9000,
+              "protocol": "tcp",
+              "state": "filtered",
+              "service": "cslistener",
+              "product": "",
+              "version": "",
+              "extra_info": "",
+              "cpe": ""
+            }
+          ]
+        }
+      },
+      "summary": {
+        "hosts_scanned": 1,
+        "hosts_up": 1,
+        "open_ports_total": 4,
+        "services_detected": [
+          "http"
+        ]
+      },
+      "error": null
+    },
+    "whatweb": {
+      "status": "success",
+      "target_url": "https://techshop-vuln.rokina-sylla.me",
+      "aggression_level": 3,
+      "http_status": 200,
+      "technologies": [
+        {
+          "name": "Country",
+          "values": [
+            "UNITED STATES",
+            "US"
+          ]
+        },
+        {
+          "name": "HTML5",
+          "values": []
+        },
+        {
+          "name": "HTTPServer",
+          "values": [
+            "cloudflare"
+          ]
+        },
+        {
+          "name": "IP",
+          "values": [
+            "216.24.57.251"
+          ]
+        },
+        {
+          "name": "Script",
+          "values": [
+            "module"
+          ]
+        },
+        {
+          "name": "Title",
+          "values": [
+            "TechShop — Votre boutique tech au Sénégal"
+          ]
+        },
+        {
+          "name": "UncommonHeaders",
+          "values": [
+            "cf-cache-status,rndr-id,x-content-type-options,cf-ray,alt-svc"
+          ]
+        }
+      ],
+      "categories": {
+        "metadata": [
+          {
+            "name": "Country",
+            "values": [
+              "UNITED STATES",
+              "US"
+            ]
+          },
+          {
+            "name": "HTML5",
+            "values": []
+          },
+          {
+            "name": "IP",
+            "values": [
+              "216.24.57.251"
+            ]
+          },
+          {
+            "name": "Script",
+            "values": [
+              "module"
+            ]
+          },
+          {
+            "name": "Title",
+            "values": [
+              "TechShop — Votre boutique tech au Sénégal"
+            ]
+          }
+        ],
+        "server": [
+          {
+            "name": "HTTPServer",
+            "values": [
+              "cloudflare"
+            ]
+          }
+        ],
+        "headers": [
+          {
+            "name": "UncommonHeaders",
+            "values": [
+              "cf-cache-status,rndr-id,x-content-type-options,cf-ray,alt-svc"
+            ]
+          }
+        ]
+      },
+      "sensitive_findings": [
+        {
+          "name": "HTTPServer",
+          "values": [
+            "cloudflare"
+          ],
+          "reason": "Révèle des informations techniques détaillées"
+        },
+        {
+          "name": "IP",
+          "values": [
+            "216.24.57.251"
+          ],
+          "reason": "Version exacte exposée (utile pour corrélation CVE)"
+        }
+      ],
+      "inferred_stack": {
+        "frontend": null,
+        "backend": null,
+        "server": [
+          "HTTPServer"
+        ],
+        "cdn_waf": null,
+        "hosting_signals": [
+          "Render.com (via rndr-id header)"
+        ]
+      },
+      "duration_seconds": 11.679999,
+      "error": null
+    }
+  },
+  "analysis": {
+    "summary": "La cible 'techshop-vuln.rokina-sylla.me' est une boutique tech sénégalaise protégée par Cloudflare (CDN/WAF) et hébergée sur Render.com. Quatre ports HTTP sont ouverts (80, 443, 8080, 8443) mais tous sont masqués par Cloudflare, ce qui limite la visibilité directe sur l'infrastructure réelle. La présence de ports filtrés (3000, 5000, 8000, 8081, 8888, 9000) suggère des services internes potentiellement exposés. L'architecture semble être une application web statique ou dynamique derrière un CDN, avec un backend potentiel sur Render.com.",
+    "key_findings": [
+      {
+        "type": "defense_layer",
+        "value": "Cloudflare CDN/WAF sur ports 80, 443, 8080, 8443",
+        "significance": "Cloudflare masque l'IP réelle du serveur, filtre le trafic malveillant et peut cacher des vulnérabilités. Les attaquants doivent contourner ou identifier l'IP d'origine.",
+        "attack_mapping": "T1590.005 - Gather Victim Network Information: IP Addresses",
+        "severity": "medium"
+      },
+      {
+        "type": "hosting_signal",
+        "value": "Render.com (via header 'rndr-id')",
+        "significance": "L'application est hébergée sur Render.com, un PaaS. Cela implique une architecture conteneurisée et potentiellement des configurations par défaut exploitables.",
+        "attack_mapping": "T1592.002 - Gather Victim Host Information: Software",
+        "severity": "medium"
+      },
+      {
+        "type": "open_port",
+        "value": "Ports 8080 et 8443 ouverts (HTTP via Cloudflare)",
+        "significance": "Ces ports alternatifs sont souvent utilisés pour des services de développement, des API ou des tableaux de bord. Leur exposition via Cloudflare peut indiquer des endpoints sensibles.",
+        "attack_mapping": "T1046 - Network Service Discovery",
+        "severity": "medium"
+      },
+      {
+        "type": "filtered_port",
+        "value": "Ports 3000, 5000, 8000, 8081, 8888, 9000 filtrés",
+        "significance": "Ces ports sont probablement des services internes (Node.js, API, bases de données) qui ne sont pas accessibles directement mais pourraient être exposés via des redirections ou des vulnérabilités SSRF.",
+        "attack_mapping": "T1046 - Network Service Discovery",
+        "severity": "low"
+      },
+      {
+        "type": "technology",
+        "value": "HTML5 et Script module",
+        "significance": "L'application utilise des fonctionnalités modernes (ES modules), ce qui suggère une application web dynamique (React, Vue, etc.) plutôt qu'un site statique simple.",
+        "attack_mapping": "T1592.002 - Gather Victim Host Information: Software",
+        "severity": "info"
+      },
+      {
+        "type": "anomaly",
+        "value": "IP différente entre Nmap (216.24.57.7) et WhatWeb (216.24.57.251)",
+        "significance": "L'IP Nmap est celle du CDN Cloudflare, tandis que WhatWeb a probablement résolu l'IP réelle du serveur d'origine (Render.com). Cela confirme la présence d'un proxy inverse.",
+        "attack_mapping": "T1590.005 - Gather Victim Network Information: IP Addresses",
+        "severity": "high"
+      },
+      {
+        "type": "defense_layer",
+        "value": "En-têtes de sécurité : x-content-type-options, cf-cache-status, cf-ray",
+        "significance": "Cloudflare ajoute des en-têtes de sécurité standard, mais l'absence d'en-têtes comme CSP ou X-Frame-Options pourrait être exploitée.",
+        "attack_mapping": "T1592.002 - Gather Victim Host Information: Software",
+        "severity": "low"
+      }
+    ],
+    "attack_surface": {
+      "exposed_ports": [
+        {
+          "port": 80,
+          "service": "http",
+          "version": "Cloudflare http proxy"
+        },
+        {
+          "port": 443,
+          "service": "http",
+          "version": "Cloudflare http proxy"
+        },
+        {
+          "port": 8080,
+          "service": "http",
+          "version": "Cloudflare http proxy"
+        },
+        {
+          "port": 8443,
+          "service": "http",
+          "version": "Cloudflare http proxy"
+        }
+      ],
+      "detected_technologies": [
+        "Cloudflare CDN",
+        "Render.com (PaaS)",
+        "HTML5",
+        "JavaScript (ES modules)"
+      ],
+      "defense_layers": [
+        "Cloudflare WAF/CDN",
+        "Reverse proxy (Cloudflare)",
+        "Hébergement PaaS (Render.com)"
+      ],
+      "architecture_inference": "Application web dynamique (probablement React/Vue) hébergée sur Render.com, protégée par Cloudflare en tant que CDN et WAF. Les ports 8080 et 8443 sont des endpoints alternatifs (API, admin, dev) également protégés par Cloudflare. Les ports filtrés (3000, 5000, 8000, 8081, 8888, 9000) sont des services internes (Node.js, API, bases de données) non accessibles directement mais potentiellement vulnérables à des attaques SSRF."
+    },
+    "recommendations_for_next_agents": [
+      "Agent Web App : Tester les endpoints sur les ports 8080 et 8443 (admin, API, dev). Vérifier les vulnérabilités XSS, CSRF, IDOR, et les failles d'authentification. Analyser les en-têtes de sécurité manquants (CSP, X-Frame-Options).",
+      "Agent Vuln Analysis : Rechercher des CVE pour Cloudflare (contournement WAF) et Render.com (configuration par défaut). Tester les attaques SSRF pour accéder aux ports filtrés (3000, 5000, 8000, 8081, 8888, 9000).",
+      "Agent Infrastructure : Tenter de découvrir l'IP réelle du serveur d'origine (Render.com) via des techniques de contournement Cloudflare (ex: historique DNS, shodan, censys).",
+      "Agent Web App : Analyser le JavaScript (modules ES) pour trouver des endpoints cachés, des clés API, ou des commentaires sensibles.",
+      "Agent Vuln Analysis : Tester les vulnérabilités de type 'path traversal' ou 'local file inclusion' sur les endpoints HTTP."
+    ],
+    "confidence": 0.85
+  },
+  "executive_summary": "🎯 SURFACE D'ATTAQUE\nApplication web e-commerce sénégalaise protégée par Cloudflare (CDN/WAF) et hébergée sur Render.com. Quatre ports HTTP ouverts mais masqués par le CDN. Plusieurs ports filtrés suggèrent des services internes potentiellement exposables.\n\n🟢 PORTS ET SERVICES\n- 80, 443, 8080, 8443 : HTTP (tous via Cloudflare)\n- Ports filtrés : 3000, 5000, 8000, 8081, 8888, 9000 (services internes probables)\n\n🛡️ DÉFENSES IDENTIFIÉES\nCloudflare (WAF + CDN + reverse proxy), hébergement PaaS Render.com, en-têtes de sécurité standards (X-Content-Type-Options, cache headers)\n\n🔍 OBSERVATIONS CLÉS\n- Application dynamique (ES modules JavaScript, probablement React/Vue)\n- Deux IP différentes détectées : IP Cloudflare (216.24.57.7) vs IP réelle Render.com (216.24.57.251)\n- Ports 8080/8443 ouverts : endpoints alternatifs (API, admin, dev)\n\n⚠️ POINTS D'ATTENTION\n- Absence d'en-têtes CSP et X-Frame-Options\n- Ports filtrés (3000, 5000, 8000, 8081, 8888, 9000) vulnérables aux attaques SSRF\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Agent Web App : Tester endpoints 8080/8443 (XSS, CSRF, IDOR, auth flaws) + analyser JS pour endpoints cachés et clés API\n2. Agent Vuln Analysis : Tester SSRF pour accéder aux ports filtrés + rechercher CVE Cloudflare/Render.com\n3. Agent Infrastructure : Découvrir IP réelle Render.com via historique DNS, Shodan, Censys"
+}
