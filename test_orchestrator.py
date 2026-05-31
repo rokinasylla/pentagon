@@ -48,6 +48,20 @@ def main():
         print("RÉSUMÉ SCANNING")
         print(f"{'─' * 70}")
         print(state.scanning_result.get("executive_summary", "N/A"))
+
+    if state.web_app_result:
+        print(f"\n{'─' * 70}")
+        print("RÉSUMÉ WEB APP")
+        print(f"{'─' * 70}")
+        print(state.web_app_result.get("executive_summary", "N/A"))
+        
+        # Compte les vulnérabilités par sévérité
+        vulns = state.web_app_result.get("analysis", {}).get("vulnerabilities", [])
+        if vulns:
+            from collections import Counter
+            severity_counts = Counter(v.get("severity", "info") for v in vulns)
+            print(f"\n  📊 Vulnérabilités : {dict(severity_counts)}")
+            print(f"  ⚠️  Risque global : {state.web_app_result.get('analysis', {}).get('overall_risk', 'N/A')}")
     
     print(f"\n  📂 Campagne complète sauvegardée : {output_file}")
     print("=" * 70)

@@ -1,3 +1,4 @@
+
 """
 État partagé de PENTAGON (PentagonState).
 
@@ -36,6 +37,7 @@ class PentagonState:
     # Chaque agent dépose son résultat complet ici
     osint_result: dict[str, Any] | None = None
     scanning_result: dict[str, Any] | None = None
+    web_app_result: dict[str, Any] | None = None
     
     # === Contexte consolidé (extrait des résultats pour usage inter-agents) ===
     # Ces champs sont remplis par l'orchestrateur à partir des résultats bruts
@@ -79,6 +81,7 @@ class PentagonState:
             "discovered_infrastructure": self.discovered_infrastructure,
             "osint_result": self.osint_result,
             "scanning_result": self.scanning_result,
+            "web_app_result": self.web_app_result,
             "execution_log": self.execution_log,
             "errors": self.errors,
         }

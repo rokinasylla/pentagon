@@ -20,7 +20,7 @@ from pentagon.core.state import PentagonState
 from pentagon.core.llm_client import LLMClient
 from pentagon.agents.osint_agent import OSINTAgent
 from pentagon.agents.scanning_agent import ScanningAgent
-
+from pentagon.agents.web_app_agent import WebAppAgent
 
 class Orchestrator:
     """
@@ -42,7 +42,7 @@ class Orchestrator:
         # Instanciation des agents
         self.osint_agent = OSINTAgent(llm=self.llm)
         self.scanning_agent = ScanningAgent(llm=self.llm)
-    
+        self.web_app_agent = WebAppAgent(llm=self.llm)
     def run_campaign(
         self,
         target: str,
@@ -71,6 +71,8 @@ class Orchestrator:
         
         # === PHASE 2 : SCANNING (PTES phase 3) ===
         self._run_scanning_phase(state, target, scan_profile)
+         # === PHASE 3 : WEB APP (PTES phase 4) ===
+        self._run_web_app_phase(state, target)
         
         # === Clôture de la campagne ===
         state.ended_at = datetime.now(timezone.utc).isoformat()
@@ -142,7 +144,46 @@ class Orchestrator:
             error_msg = f"{type(e).__name__}: {str(e)}"
             state.log_error("Scanning_Agent", error_msg)
             print(f"❌ Erreur Scanning : {error_msg}")
-    
+
+    def _run_web_app_phase(self, state: PentagonState, target: str) -> None:
+        """Exécute l'agent Web App avec le contexte des agents précédents."""
+        print(f"\n{'─' * 70}")
+        print(f"PHASE 3 — Web Application Testing")
+        print(f"{'─' * 70}")
+        
+        state.log_event("orchestrator", "phase_start", "WebApp")
+        
+        # Prépare les contextes des agents précédents
+        osint_context = state.discovered_infrastructure if state.discovered_infrastructure else None
+        
+        # Extrait un résumé du contexte scanning si disponible
+        scanning_context = None
+        if state.scanning_result:
+            scanning_analysis = state.scanning_result.get("analysis", {})
+            scanning_context = {
+                "attack_surface": scanning_analysis.get("attack_surface", {}),
+                "summary": scanning_analysis.get("summary", ""),
+            }
+        
+        if osint_context or scanning_context:
+            print(f"[Orchestrator] Transmission du contexte (OSINT + Scanning) à l'agent Web App")
+        
+        try:
+            web_app_result = self.web_app_agent.run(
+                target=target,
+                osint_context=osint_context,
+                scanning_context=scanning_context,
+            )
+            state.web_app_result = web_app_result
+            state.agents_executed.append("WebApp_Agent")
+            
+            vulns = web_app_result.get("analysis", {}).get("vulnerabilities", [])
+            state.log_event("WebApp_Agent", "completed", f"{len(vulns)} vulnérabilités")
+        
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            state.log_error("WebApp_Agent", error_msg)
+            print(f"❌ Erreur Web App : {error_msg}")
     def _extract_osint_infrastructure(
         self,
         state: PentagonState,
