@@ -127,6 +127,7 @@ class ScanningAgent:
         self,
         target: str,
         scan_profile: str = "web_focused",
+        osint_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Exécute l'agent Scanning sur une cible.
@@ -167,7 +168,7 @@ class ScanningAgent:
         
         # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des résultats du scan...")
-        analysis = self._analyze_with_llm(target, nmap_data, whatweb_data)
+        analysis = self._analyze_with_llm(target, nmap_data, whatweb_data, osint_context)
         
         # 3. Construction du résultat final
         ended_at = datetime.now(timezone.utc)
@@ -204,17 +205,31 @@ class ScanningAgent:
         target: str,
         nmap_data: dict[str, Any],
         whatweb_data: dict[str, Any],
+        osint_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Demande au LLM d'analyser les résultats corrélés de Nmap et WhatWeb.
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
+        # Prépare la section contexte OSINT si disponible
+        osint_section = ""
+        if osint_context:
+            osint_section = f"""=== CONTEXTE OSINT (découvert par l'agent précédent) ===
+```json
+{json.dumps(osint_context, indent=2, ensure_ascii=False, default=str)}
+```
+
+Utilise ce contexte OSINT comme source de vérité confirmée. Par exemple, si \
+l'hébergeur a déjà été identifié par l'OSINT, ne le devine pas — utilise l'information confirmée.
+
+"""
+        
         user_prompt = f"""Date actuelle : {current_date}
 
 Analyse les résultats de scan effectués sur la cible '{target}'.
 
-=== DONNÉES NMAP (ports et services) ===
+{osint_section}=== DONNÉES NMAP (ports et services) ===
 ```json
 {json.dumps(nmap_data, indent=2, ensure_ascii=False, default=str)}
 ```
