@@ -1,0 +1,1017 @@
+{
+  "campaign_id": "e1cb5982-849c-472f-8016-6ae92805ad8e",
+  "target": "techshop-vuln.rokina-sylla.me",
+  "started_at": "2026-06-02T19:00:52.260906+00:00",
+  "ended_at": "2026-06-02T19:03:18.519730+00:00",
+  "agents_executed": [
+    "OSINT_Agent",
+    "Scanning_Agent",
+    "WebApp_Agent"
+  ],
+  "discovered_infrastructure": {
+    "hosting_provider": "Render.com",
+    "ip_addresses": [
+      "216.24.57.251",
+      "216.24.57.7"
+    ],
+    "osint_summary": "🎯 CIBLE\nApplication web « techshop-vuln.rokina-sylla.me », hébergée sur Render.com, domaine créé le 16/04/2026 (période initiale de 5 jours).\n\n🏗️ INFRASTRUCTURE\n- Hébergement : Render.com (PaaS) via CNAME vers techshop-vuln.onrender.com\n- Adresses IP : 216.24.57.251 et 216.24.57.7 (probables reverse proxies partagés)\n- Registraire : Namecheap, avec protection de la vie privée (Withheld for Privacy ehf, Islande)\n- Aucun serveur de noms listé dans le WHOIS (à vérifier)\n\n🔍 OBSERVATIONS CLÉS\n- Domaine très récent, probablement créé pour ce test d’intrusion\n- Deux IP identifiées, suggérant une redondance ou un load balancing\n- Informations personnelles masquées, mais pays et téléphone (+354.4212434) révélés\n\n⚠️ POINTS D’ATTENTION\n- Absence de serveurs de noms dans le WHOIS : vérifier la délégation DNS réelle\n- Infrastructure PaaS partagée : risque de fuite via configuration par défaut (variables d’environnement, endpoints /health, /env)\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Scanner les IP 216.24.57.251 et 216.24.57.7 pour identifier les services exposés\n2. Analyser l’application web : tester les vulnérabilités classiques (XSS, SQLi, CSRF) et les configurations Render par défaut\n3. Rechercher les IP sur Shodan/Censys pour détecter d’autres services ou historiques malveillants"
+  },
+  "osint_result": {
+    "agent": "OSINT_Agent",
+    "version": "1.1",
+    "ptes_phase": 2,
+    "attack_tactic": "TA0043",
+    "target": "techshop-vuln.rokina-sylla.me",
+    "started_at": "2026-06-02T19:00:52.272225+00:00",
+    "ended_at": "2026-06-02T19:01:24.032977+00:00",
+    "duration_seconds": 31.760752,
+    "tools_used": [
+      "whois",
+      "dns_lookup"
+    ],
+    "raw_data": {
+      "whois": {
+        "status": "success",
+        "domain": "techshop-vuln.rokina-sylla.me",
+        "registrar": "NAMECHEAP INC",
+        "creation_date": "2026-04-16T12:42:45+00:00",
+        "expiration_date": "2027-04-16T12:42:45+00:00",
+        "name_servers": [],
+        "emails": [],
+        "org": null,
+        "country": null,
+        "raw": "{\n  \"domain_id\": [\n    \"REDACTED\",\n    \"e98e924701034756842edb06aaebbf31-DONUTS\"\n  ],\n  \"domain_name\": \"rokina-sylla.me\",\n  \"creation_date\": [\n    \"2026-04-16 12:42:45+00:00\",\n    \"2026-04-16 12:42:45.870000+00:00\"\n  ],\n  \"updated_date\": [\n    \"2026-04-21 12:43:42+00:00\",\n    \"0001-01-01 00:00:00+00:00\"\n  ],\n  \"expiration_date\": \"2027-04-16 12:42:45+00:00\",\n  \"registrar\": \"NAMECHEAP INC\",\n  \"status\": [\n    \"clientTransferProhibited https://icann.org/epp#clientTransferProhibited\",\n    \"addPeriod https://icann.org/epp#addPeriod\"\n  ],\n  \"registrant_id\": \"REDACTED\",\n  \"registrant_name\": [\n    \"REDACTED\",\n    \"Redacted for Privacy\"\n  ],\n  \"registrant_org\": \"Privacy service provided by Withheld for Privacy ehf\",\n  \"registrant_address\": null,\n  \"registrant_address2\": null,\n  \"registrant_address3\": null,\n  \"registrant_city\": [\n    \"REDACTED\",\n    \"Reykjavik\"\n  ],\n  \"registrant_state_province\": \"Capital Region\",\n  \"registrant_country\": null,\n  \"registrant_postal_code\": [\n    \"REDACTED\",\n    \"101\"\n  ],\n  \"registrant_phone\": [\n    \"REDACTED\",\n    \"+354.4212434\"\n  ],\n  \"registrant_phone_ext\": null,\n  \"registrant_fax\": \"REDACTED\",\n  \"registrant_fax_ext\": null,\n  \"registrant_email\": null,\n  \"admin_id\": \"REDACTED\",\n  \"admin_name\": [\n    \"REDACTED\",\n    \"Redacted for Privacy\"\n  ],\n  \"admin_org\": [\n    \"REDACTED\",\n    \"Privacy service provided by Withheld for Privacy ehf\"\n  ],\n  \"admin_address\": null,\n  \"admin_address2\": null,\n  \"admin_address3\": null,\n  \"admin_city\": [\n    \"REDACTED\",\n    \"Reykjavik\"\n  ],\n  \"admin_state_province\": [\n    \"REDACTED\",\n    \"Capital Region\"\n  ],\n  \"admin_country\": null,\n  \"admin_postal_code\": [\n    \"REDACTED\",\n    \"101\"\n  ],\n  \"admin_phone\": [\n    \"REDACTED\",\n    \"+354.4212434\"\n  ],\n  \"admin_phone_ext\": null,\n  \"admin_fax\": \"REDACTED\",\n  \"admin_fax_ext\": null,\n  \"admin_email\": null,\n  \"tech_id\": \"REDACTED\",\n  \"tech_name\": [\n    \"REDACTED\",\n    \"Redacted for Privacy\"\n  ],\n  \"tech_org\": [\n    \"REDACTED\",\n    \"Privacy service provided by Withheld for Privacy ehf\"\n  ],\n  \"tech_address\": null,\n  \"tech_address2\": null,\n  \"tech_address3\": null,\n  \"tech_city\": [\n    \"REDACTED\",\n    \"Reykjavik\"\n  ],\n  \"tech_state_province\": [\n    \"REDACTED\",\n    \"Capital Region\"\n  ],\n  \"tech_country\": null,\n  \"tech_postal_code\": [\n    \"REDACTED\",\n    \"101\"\n  ],\n  \"tech_phone\": [\n    \"REDACTED\",\n    \"+354.4212434\"\n  ],\n  \"tech_phone_ext\": null,\n  \"tech_fax\": \"REDACTED\",\n  \"tech_fax_ext\": null,\n  \"tech_email\": null,\n  \"name_servers\": null\n}",
+        "error": null
+      },
+      "dns": {
+        "status": "success",
+        "domain": "techshop-vuln.rokina-sylla.me",
+        "records": {
+          "A": [
+            "216.24.57.251",
+            "216.24.57.7"
+          ],
+          "CNAME": [
+            "techshop-vuln.onrender.com."
+          ]
+        },
+        "errors": {},
+        "inferred_hosting": "Render.com"
+      }
+    },
+    "analysis": {
+      "summary": "Le domaine 'techshop-vuln.rokina-sylla.me' est un sous-domaine récent (créé le 2026-04-16) pointant vers une application hébergée sur Render.com via un enregistrement CNAME. Le domaine parent 'rokina-sylla.me' utilise un service de protection de la vie privée (Withheld for Privacy ehf) via Namecheap, masquant les informations personnelles du propriétaire. L'infrastructure révèle deux adresses IP (216.24.57.251 et 216.24.57.7) qui semblent être des reverse proxies ou des points d'entrée partagés de Render.",
+      "key_findings": [
+        {
+          "type": "infrastructure",
+          "value": "Hébergement sur Render.com via CNAME techshop-vuln.onrender.com",
+          "significance": "L'application est hébergée sur une plateforme PaaS (Render). Cela implique des contraintes de sécurité spécifiques : partage d'IP, configuration de déploiement, variables d'environnement, et potentiellement des vulnérabilités liées à la configuration Render.",
+          "attack_mapping": "T1590.002 - Gather Victim Network Information: DNS",
+          "source_tool": "dns"
+        },
+        {
+          "type": "infrastructure",
+          "value": "Adresses IP révélées : 216.24.57.251 et 216.24.57.7",
+          "significance": "Ces IP sont probablement des reverse proxies de Render. Elles peuvent être utilisées pour des scans de ports (phase suivante) et pour identifier d'autres services hébergés sur les mêmes IP. La présence de deux IP suggère une possible redondance ou un load balancing.",
+          "attack_mapping": "T1590.005 - Gather Victim Network Information: Network Topology",
+          "source_tool": "dns"
+        },
+        {
+          "type": "anomaly",
+          "value": "Aucun serveur de noms (name_servers) listé dans WHOIS",
+          "significance": "Cela peut indiquer que le domaine utilise des serveurs de noms par défaut de Namecheap ou que la configuration DNS est gérée ailleurs. À vérifier avec une résolution DNS directe pour confirmer la délégation.",
+          "attack_mapping": "T1590.002 - Gather Victim Network Information: DNS",
+          "source_tool": "whois"
+        },
+        {
+          "type": "privacy",
+          "value": "Service de protection de la vie privée : Withheld for Privacy ehf (Islande)",
+          "significance": "Les informations personnelles du propriétaire sont masquées. Cependant, le pays (Islande) et le numéro de téléphone (+354.4212434) sont révélés. Cela peut être utilisé pour des attaques de social engineering ou pour identifier le propriétaire via d'autres sources OSINT.",
+          "attack_mapping": "T1590.001 - Gather Victim Network Information: Domain Properties",
+          "source_tool": "whois"
+        },
+        {
+          "type": "registrar",
+          "value": "Namecheap Inc.",
+          "significance": "Namecheap est un registrar populaire. La date de création récente (2026-04-16) indique un domaine jeune, potentiellement créé spécifiquement pour ce projet de pentest. Le statut 'addPeriod' confirme que le domaine est dans sa période initiale de 5 jours après création.",
+          "attack_mapping": "T1590.001 - Gather Victim Network Information: Domain Properties",
+          "source_tool": "whois"
+        }
+      ],
+      "infrastructure_summary": {
+        "hosting_provider": "Render.com",
+        "ip_addresses": [
+          "216.24.57.251",
+          "216.24.57.7"
+        ],
+        "name_servers": [],
+        "mail_servers": []
+      },
+      "recommendations_for_next_agents": [
+        "Agent Scanning : Effectuer un scan de ports sur les IP 216.24.57.251 et 216.24.57.7 pour identifier les services exposés (HTTP, HTTPS, SSH, etc.). Vérifier si les IP sont partagées avec d'autres domaines (reverse IP lookup).",
+        "Agent Web App : Analyser l'application hébergée sur Render.com via le CNAME. Vérifier les configurations Render par défaut (variables d'environnement, fichiers de configuration exposés, endpoints /health, /env). Tester les vulnérabilités Web classiques (XSS, SQLi, CSRF) en tenant compte du contexte PaaS.",
+        "Agent Vulnerability Analysis : Rechercher des vulnérabilités connues liées à Render.com ou à des applications déployées sur cette plateforme. Vérifier les en-têtes de sécurité HTTP et les configurations TLS.",
+        "Agent OSINT (complément) : Effectuer une recherche sur les IP 216.24.57.251 et 216.24.57.7 dans des bases de données de menaces (Shodan, Censys) pour identifier d'autres services ou historiques malveillants."
+      ],
+      "confidence": 0.85
+    },
+    "executive_summary": "🎯 CIBLE\nApplication web « techshop-vuln.rokina-sylla.me », hébergée sur Render.com, domaine créé le 16/04/2026 (période initiale de 5 jours).\n\n🏗️ INFRASTRUCTURE\n- Hébergement : Render.com (PaaS) via CNAME vers techshop-vuln.onrender.com\n- Adresses IP : 216.24.57.251 et 216.24.57.7 (probables reverse proxies partagés)\n- Registraire : Namecheap, avec protection de la vie privée (Withheld for Privacy ehf, Islande)\n- Aucun serveur de noms listé dans le WHOIS (à vérifier)\n\n🔍 OBSERVATIONS CLÉS\n- Domaine très récent, probablement créé pour ce test d’intrusion\n- Deux IP identifiées, suggérant une redondance ou un load balancing\n- Informations personnelles masquées, mais pays et téléphone (+354.4212434) révélés\n\n⚠️ POINTS D’ATTENTION\n- Absence de serveurs de noms dans le WHOIS : vérifier la délégation DNS réelle\n- Infrastructure PaaS partagée : risque de fuite via configuration par défaut (variables d’environnement, endpoints /health, /env)\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Scanner les IP 216.24.57.251 et 216.24.57.7 pour identifier les services exposés\n2. Analyser l’application web : tester les vulnérabilités classiques (XSS, SQLi, CSRF) et les configurations Render par défaut\n3. Rechercher les IP sur Shodan/Censys pour détecter d’autres services ou historiques malveillants"
+  },
+  "scanning_result": {
+    "agent": "Scanning_Agent",
+    "version": "1.0",
+    "ptes_phase": 3,
+    "attack_tactic": "TA0007",
+    "risk_level": "active",
+    "target": "techshop-vuln.rokina-sylla.me",
+    "scan_profile": "web_focused",
+    "started_at": "2026-06-02T19:01:28.083248+00:00",
+    "ended_at": "2026-06-02T19:02:38.066676+00:00",
+    "duration_seconds": 69.983428,
+    "tools_used": [
+      "nmap",
+      "whatweb"
+    ],
+    "raw_data": {
+      "nmap": {
+        "status": "success",
+        "target": "techshop-vuln.rokina-sylla.me",
+        "profile_used": "web_focused",
+        "profile_description": "Scan ciblé sur les ports web avec scripts par défaut",
+        "scan_start": "2026-06-02T19:01:28.083289+00:00",
+        "scan_end": "2026-06-02T19:02:03.188533+00:00",
+        "duration_seconds": 35.105244,
+        "hosts": {
+          "216.24.57.7": {
+            "state": "up",
+            "hostnames": [
+              "techshop-vuln.rokina-sylla.me"
+            ],
+            "addresses": {
+              "ipv4": "216.24.57.7"
+            },
+            "ports": [
+              {
+                "port": 80,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 443,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 3000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "ppp",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 5000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "upnp",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "http-alt",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8080,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8081,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "blackice-icecap",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8443,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8888,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "sun-answerbook",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 9000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "cslistener",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              }
+            ]
+          }
+        },
+        "summary": {
+          "hosts_scanned": 1,
+          "hosts_up": 1,
+          "open_ports_total": 4,
+          "services_detected": [
+            "http"
+          ]
+        },
+        "error": null
+      },
+      "whatweb": {
+        "status": "success",
+        "target_url": "https://techshop-vuln.rokina-sylla.me",
+        "aggression_level": 3,
+        "http_status": 200,
+        "technologies": [
+          {
+            "name": "Country",
+            "values": [
+              "UNITED STATES",
+              "US"
+            ]
+          },
+          {
+            "name": "HTML5",
+            "values": []
+          },
+          {
+            "name": "HTTPServer",
+            "values": [
+              "cloudflare"
+            ]
+          },
+          {
+            "name": "IP",
+            "values": [
+              "216.24.57.251"
+            ]
+          },
+          {
+            "name": "Script",
+            "values": [
+              "module"
+            ]
+          },
+          {
+            "name": "Title",
+            "values": [
+              "TechShop — Votre boutique tech au Sénégal"
+            ]
+          },
+          {
+            "name": "UncommonHeaders",
+            "values": [
+              "cf-cache-status,rndr-id,x-content-type-options,cf-ray,alt-svc"
+            ]
+          }
+        ],
+        "categories": {
+          "metadata": [
+            {
+              "name": "Country",
+              "values": [
+                "UNITED STATES",
+                "US"
+              ]
+            },
+            {
+              "name": "HTML5",
+              "values": []
+            },
+            {
+              "name": "IP",
+              "values": [
+                "216.24.57.251"
+              ]
+            },
+            {
+              "name": "Script",
+              "values": [
+                "module"
+              ]
+            },
+            {
+              "name": "Title",
+              "values": [
+                "TechShop — Votre boutique tech au Sénégal"
+              ]
+            }
+          ],
+          "server": [
+            {
+              "name": "HTTPServer",
+              "values": [
+                "cloudflare"
+              ]
+            }
+          ],
+          "headers": [
+            {
+              "name": "UncommonHeaders",
+              "values": [
+                "cf-cache-status,rndr-id,x-content-type-options,cf-ray,alt-svc"
+              ]
+            }
+          ]
+        },
+        "sensitive_findings": [
+          {
+            "name": "HTTPServer",
+            "values": [
+              "cloudflare"
+            ],
+            "reason": "Révèle des informations techniques détaillées"
+          },
+          {
+            "name": "IP",
+            "values": [
+              "216.24.57.251"
+            ],
+            "reason": "Version exacte exposée (utile pour corrélation CVE)"
+          }
+        ],
+        "inferred_stack": {
+          "frontend": null,
+          "backend": null,
+          "server": [
+            "HTTPServer"
+          ],
+          "cdn_waf": null,
+          "hosting_signals": [
+            "Render.com (via rndr-id header)"
+          ]
+        },
+        "duration_seconds": 18.747563,
+        "error": null
+      }
+    },
+    "analysis": {
+      "summary": "La cible 'techshop-vuln.rokina-sylla.me' est une application web hébergée sur Render.com (PaaS), protégée par Cloudflare (CDN/WAF). Le scan Nmap révèle 4 ports HTTP ouverts (80, 443, 8080, 8443) tous derrière Cloudflare, tandis que WhatWeb confirme la présence de Cloudflare et expose l'infrastructure Render via l'en-tête 'rndr-id'. L'architecture est typique d'une application Node.js/React derrière un reverse proxy Cloudflare, avec un backend potentiellement exposé sur Render. La surface d'attaque est limitée aux services web, mais les configurations par défaut de Render et les endpoints sensibles (/health, /env) constituent des cibles prioritaires.",
+      "key_findings": [
+        {
+          "type": "open_port",
+          "value": "Port 80 (HTTP) - Cloudflare http proxy",
+          "significance": "Port HTTP standard, mais derrière Cloudflare, ce qui masque l'IP réelle du serveur d'origine. Toute tentative d'attaque directe sur ce port sera filtrée par le WAF de Cloudflare.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "info"
+        },
+        {
+          "type": "open_port",
+          "value": "Port 443 (HTTPS) - Cloudflare http proxy",
+          "significance": "Port HTTPS standard, également derrière Cloudflare. Le trafic est chiffré entre le client et Cloudflare, mais pas nécessairement entre Cloudflare et le serveur d'origine (Render).",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "info"
+        },
+        {
+          "type": "open_port",
+          "value": "Port 8080 (HTTP) - Cloudflare http proxy",
+          "significance": "Port HTTP alternatif, souvent utilisé pour des services de développement ou d'administration. Sa présence derrière Cloudflare suggère qu'il pourrait s'agir d'un endpoint d'API ou d'un service interne exposé.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "medium"
+        },
+        {
+          "type": "open_port",
+          "value": "Port 8443 (HTTPS) - Cloudflare http proxy",
+          "significance": "Port HTTPS alternatif, souvent utilisé pour des interfaces d'administration (ex: cPanel, Webmin) ou des API sécurisées. Sa présence derrière Cloudflare est inhabituelle et pourrait indiquer un service sensible exposé.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "high"
+        },
+        {
+          "type": "filtered_port",
+          "value": "Ports 3000, 5000, 8000, 8081, 8888, 9000 filtrés",
+          "significance": "Ces ports sont filtrés par Cloudflare ou un pare-feu réseau. Ils pourraient correspondre à des services internes (ex: Node.js sur 3000, Flask sur 5000) qui ne sont pas accessibles depuis l'extérieur.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "info"
+        },
+        {
+          "type": "service_version",
+          "value": "Cloudflare http proxy (tous les ports ouverts)",
+          "significance": "Cloudflare agit comme un reverse proxy et un WAF. Il masque l'IP réelle du serveur d'origine (Render) et filtre les requêtes malveillantes. Cependant, il peut être contourné en trouvant l'IP d'origine via des techniques comme le DNS history ou les fuites de certificats SSL.",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "medium"
+        },
+        {
+          "type": "technology",
+          "value": "Render.com (PaaS) - identifié via l'en-tête 'rndr-id'",
+          "significance": "L'en-tête 'rndr-id' est un identifiant unique de Render, confirmant que l'application est hébergée sur cette plateforme. Render expose souvent des endpoints par défaut comme /health, /env, /metrics qui peuvent divulguer des informations sensibles.",
+          "attack_mapping": "T1592 - Gather Victim Host Information",
+          "severity": "high"
+        },
+        {
+          "type": "technology",
+          "value": "HTML5, Script (module), Title: 'TechShop — Votre boutique tech au Sénégal'",
+          "significance": "L'application utilise HTML5 et des modules JavaScript, suggérant une architecture moderne (probablement React, Vue.js ou Angular). Le titre indique qu'il s'agit d'une boutique e-commerce, ce qui implique des fonctionnalités sensibles (paiement, authentification, gestion de stock).",
+          "attack_mapping": "T1592 - Gather Victim Host Information",
+          "severity": "info"
+        },
+        {
+          "type": "defense_layer",
+          "value": "Cloudflare (CDN + WAF)",
+          "significance": "Cloudflare protège l'application contre les attaques DDoS et les injections courantes (XSS, SQLi). Cependant, il peut être contourné en trouvant l'IP d'origine ou en exploitant des vulnérabilités dans la configuration (ex: règles WAF trop permissives).",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "medium"
+        },
+        {
+          "type": "anomaly",
+          "value": "Deux IP différentes pour le même domaine (216.24.57.251 et 216.24.57.7)",
+          "significance": "Le scan Nmap a résolu le domaine sur 216.24.57.7, tandis que WhatWeb a détecté 216.24.57.251. Cela suggère un load balancing ou un failover entre deux IP de Cloudflare. L'IP réelle du serveur Render est masquée.",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "info"
+        },
+        {
+          "type": "sensitive_finding",
+          "value": "En-têtes HTTP inhabituels : cf-cache-status, rndr-id, x-content-type-options, cf-ray, alt-svc",
+          "significance": "L'en-tête 'rndr-id' est particulièrement sensible car il identifie l'instance Render. L'en-tête 'cf-cache-status' peut révéler si le contenu est mis en cache par Cloudflare, ce qui pourrait être exploité pour des attaques de cache poisoning.",
+          "attack_mapping": "T1592 - Gather Victim Host Information",
+          "severity": "high"
+        }
+      ],
+      "attack_surface": {
+        "exposed_ports": [
+          {
+            "port": 80,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          },
+          {
+            "port": 443,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          },
+          {
+            "port": 8080,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          },
+          {
+            "port": 8443,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          }
+        ],
+        "detected_technologies": [
+          "Cloudflare (CDN/WAF)",
+          "Render.com (PaaS)",
+          "HTML5",
+          "JavaScript (modules)",
+          "En-têtes HTTP : cf-cache-status, rndr-id, x-content-type-options, cf-ray, alt-svc"
+        ],
+        "defense_layers": [
+          "Cloudflare (CDN + WAF)",
+          "Pare-feu réseau (ports filtrés)",
+          "Reverse proxy (Cloudflare)"
+        ],
+        "architecture_inference": "L'application est hébergée sur Render.com (PaaS) et protégée par Cloudflare (CDN/WAF). L'architecture est typique d'une application web moderne : un frontend (probablement React/Vue.js) servi via Cloudflare, et un backend (Node.js, Python ou autre) exécuté sur Render. Les ports 8080 et 8443 pourraient être des endpoints d'API ou d'administration. Les ports filtrés (3000, 5000, 8000) suggèrent des services internes non exposés."
+      },
+      "recommendations_for_next_agents": [
+        "Agent Web App : Tester les endpoints Render par défaut (/health, /env, /metrics) sur les ports 80, 443, 8080 et 8443. Vérifier la présence de fichiers de configuration sensibles (/.env, /config, /debug). Analyser les en-têtes HTTP pour détecter des fuites d'informations (ex: version de framework, chemins internes).",
+        "Agent Web App : Effectuer un scan de répertoires et de fichiers (dirb, gobuster) pour découvrir des endpoints cachés (admin, api, backup).",
+        "Agent Web App : Tester les vulnérabilités classiques (XSS, SQLi, CSRF) sur les formulaires de la boutique e-commerce (connexion, inscription, recherche, paiement).",
+        "Agent Vuln Analysis : Rechercher des CVE associées à Cloudflare (ex: contournement de WAF, cache poisoning) et à Render.com (ex: fuite de variables d'environnement, exécution de code à distance).",
+        "Agent Vuln Analysis : Tenter de trouver l'IP réelle du serveur Render via des techniques de DNS history (SecurityTrails, VirusTotal) ou des fuites de certificats SSL (crt.sh). Une fois l'IP d'origine identifiée, scanner directement les ports pour contourner Cloudflare.",
+        "Agent Web App : Analyser le comportement de l'application sur les ports 8080 et 8443, qui pourraient héberger des services distincts (API, admin panel)."
+      ],
+      "confidence": 0.95
+    },
+    "executive_summary": "🎯 SURFACE D’ATTAQUE\nApplication e-commerce hébergée sur Render.com (PaaS), protégée par Cloudflare (CDN/WAF). Quatre ports HTTP ouverts, tous filtrés par Cloudflare, masquant l’IP réelle du serveur.\n\n🟢 PORTS ET SERVICES\n- 80 (HTTP), 443 (HTTPS) – Cloudflare proxy\n- 8080 (HTTP), 8443 (HTTPS) – Cloudflare proxy (endpoints potentiellement sensibles)\n\n🛡️ DÉFENSES IDENTIFIÉES\nCloudflare (WAF + CDN), pare-feu réseau filtrant les ports internes (3000, 5000, 8000…), reverse proxy.\n\n🔍 OBSERVATIONS CLÉS\n- Technos : Cloudflare, Render.com (en-tête `rndr-id`), HTML5, JavaScript modulaire (React/Vue probable)\n- Architecture : frontend via Cloudflare, backend Node.js sur Render\n- Endpoints Render par défaut (/health, /env, /metrics) potentiellement exposés\n\n⚠️ POINTS D’ATTENTION\n- Ports 8080 et 8443 ouverts derrière Cloudflare : possible administration ou API exposée\n- En-tête `rndr-id` divulgué : identifiant Render sensible, fuite d’information\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Tester les endpoints Render par défaut (/health, /env, /metrics) sur les 4 ports ouverts\n2. Scanner les répertoires cachés (admin, api, backup) avec gobuster/dirb\n3. Tenter de trouver l’IP réelle du serveur via DNS history (SecurityTrails, crt.sh) pour contourner Cloudflare"
+  },
+  "web_app_result": {
+    "agent": "WebApp_Agent",
+    "version": "1.0",
+    "ptes_phase": 4,
+    "attack_technique": "T1190",
+    "risk_level": "active",
+    "target": "https://techshop-vuln.rokina-sylla.me",
+    "started_at": "2026-06-02T19:02:41.792313+00:00",
+    "ended_at": "2026-06-02T19:03:15.916677+00:00",
+    "duration_seconds": 34.124364,
+    "tools_used": [
+      "js_analyzer",
+      "api_prober",
+      "security_headers"
+    ],
+    "raw_data": {
+      "js_analysis": {
+        "status": "success",
+        "target_url": "https://techshop-vuln.rokina-sylla.me",
+        "bundles_found": [
+          "https://techshop-vuln.rokina-sylla.me/assets/index-C5zfjJs0.js"
+        ],
+        "bundles_analyzed": 1,
+        "api_endpoints": [],
+        "app_routes": [
+          "/admin",
+          "/auth/forgot-password",
+          "/auth/login",
+          "/auth/register",
+          "/cart",
+          "/checkout",
+          "/comments",
+          "/forgot-password",
+          "/login",
+          "/orders",
+          "/products",
+          "/profile",
+          "/register",
+          "/users",
+          "/users/me"
+        ],
+        "backend_urls": [
+          "https://techshop-backend-cc1t.onrender.com/api"
+        ],
+        "sensitive_keywords": {
+          "token": 24,
+          "password": 23,
+          "secret": 4,
+          "bearer": 1,
+          "authorization": 5,
+          "credential": 11,
+          "admin": 11
+        },
+        "potential_secrets": [],
+        "duration_seconds": 1.264167,
+        "error": null
+      },
+      "api_probe": {
+        "status": "success",
+        "base_url": "https://techshop-backend-cc1t.onrender.com/api",
+        "endpoints_tested": 15,
+        "results": [
+          {
+            "endpoint": "/admin",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/admin",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/auth/forgot-password",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/auth/forgot-password",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/auth/login",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/auth/login",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/auth/register",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/auth/register",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/cart",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/cart",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/checkout",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/checkout",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/comments",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/comments",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/forgot-password",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/forgot-password",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/login",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/login",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/orders",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/orders",
+            "status_code": 200,
+            "content_type": "application/json",
+            "returns_json": true,
+            "response_size": 436,
+            "sensitive_fields_found": [],
+            "record_count": 4,
+            "error": null
+          },
+          {
+            "endpoint": "/products",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/products",
+            "status_code": 200,
+            "content_type": "application/json",
+            "returns_json": true,
+            "response_size": 1681,
+            "sensitive_fields_found": [],
+            "record_count": 8,
+            "error": null
+          },
+          {
+            "endpoint": "/profile",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/profile",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/register",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/register",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          },
+          {
+            "endpoint": "/users",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+            "status_code": 200,
+            "content_type": "application/json",
+            "returns_json": true,
+            "response_size": 998,
+            "sensitive_fields_found": [
+              "creditCard",
+              "password",
+              "resetToken"
+            ],
+            "record_count": 5,
+            "error": null
+          },
+          {
+            "endpoint": "/users/me",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users/me",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "error": null
+          }
+        ],
+        "access_control_findings": [
+          {
+            "endpoint": "/orders",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/orders",
+            "status_code": 200,
+            "reason": "Endpoint JSON accessible sans authentification",
+            "owasp": "A01:2021 Broken Access Control"
+          },
+          {
+            "endpoint": "/products",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/products",
+            "status_code": 200,
+            "reason": "Endpoint JSON accessible sans authentification",
+            "owasp": "A01:2021 Broken Access Control"
+          },
+          {
+            "endpoint": "/users",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+            "status_code": 200,
+            "reason": "Endpoint JSON accessible sans authentification",
+            "owasp": "A01:2021 Broken Access Control"
+          }
+        ],
+        "data_exposure_findings": [
+          {
+            "endpoint": "/users",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+            "sensitive_fields": [
+              "creditCard",
+              "password",
+              "resetToken"
+            ],
+            "reason": "Champs sensibles exposés dans la réponse",
+            "owasp": "A01:2021 / A02:2021"
+          }
+        ],
+        "summary": {
+          "accessible_without_auth": 3,
+          "protected": 12,
+          "errors": 0,
+          "sensitive_data_exposed": 1
+        },
+        "duration_seconds": 17.923086,
+        "error": null
+      },
+      "security_headers": {
+        "status": "success",
+        "target_url": "https://techshop-vuln.rokina-sylla.me",
+        "http_status": 200,
+        "missing_security_headers": [
+          {
+            "header": "content-security-policy",
+            "severity": "high",
+            "description": "Protège contre XSS et injection de contenu",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "strict-transport-security",
+            "severity": "high",
+            "description": "Force HTTPS, protège contre les attaques downgrade",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "x-frame-options",
+            "severity": "medium",
+            "description": "Protège contre le clickjacking",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "referrer-policy",
+            "severity": "low",
+            "description": "Contrôle les informations de referrer transmises",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "permissions-policy",
+            "severity": "low",
+            "description": "Restreint l'accès aux API du navigateur",
+            "owasp": "A05:2021"
+          }
+        ],
+        "present_security_headers": [
+          {
+            "header": "x-content-type-options",
+            "value": "nosniff"
+          }
+        ],
+        "info_disclosure_headers": [
+          {
+            "header": "server",
+            "value": "cloudflare",
+            "description": "Révèle le serveur web et parfois sa version"
+          }
+        ],
+        "cookie_issues": [],
+        "all_headers": {
+          "Date": "Tue, 02 Jun 2026 19:03:03 GMT",
+          "Content-Type": "text/html; charset=utf-8",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "cache-control": "public, max-age=0, s-maxage=300",
+          "Age": "43",
+          "cf-cache-status": "HIT",
+          "last-modified": "Tue, 02 Jun 2026 18:55:59 UTC",
+          "rndr-id": "2c79e933-dff0-40f3",
+          "Server": "cloudflare",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "x-content-type-options": "nosniff",
+          "etag": "W/\"4754eba39cb9283111d2f47069f6d145\"",
+          "Content-Encoding": "gzip",
+          "CF-RAY": "a058b745e897d4f5-DKR",
+          "alt-svc": "h3=\":443\"; ma=86400"
+        },
+        "security_score": 35,
+        "summary": {
+          "missing_count": 5,
+          "info_leaks_count": 1,
+          "cookie_issues_count": 0
+        },
+        "duration_seconds": 0.477584,
+        "error": null
+      }
+    },
+    "analysis": {
+      "summary": "L'application web 'techshop-vuln.rokina-sylla.me' présente une vulnérabilité critique de contrôle d'accès : l'endpoint /api/users expose sans authentification les données personnelles de 5 utilisateurs, incluant mots de passe (probablement en clair ou faiblement hashés), numéros de carte bancaire et tokens de réinitialisation. De plus, les endpoints /api/orders et /api/products sont accessibles sans authentification, exposant des données métier. L'application manque également de plusieurs headers de sécurité essentiels (CSP, HSTS, X-Frame-Options), ce qui augmente la surface d'attaque. La posture de sécurité est globalement faible, avec un risque immédiat de compromission des comptes utilisateurs et de fraude financière.",
+      "vulnerabilities": [
+        {
+          "title": "Exposition massive de données sensibles via l'API /api/users sans authentification",
+          "severity": "critical",
+          "owasp_top10": "A01:2021 Broken Access Control",
+          "cwe": "CWE-862",
+          "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "description": "L'endpoint /api/users est accessible sans aucune authentification et expose les données personnelles de 5 utilisateurs, incluant des champs sensibles tels que 'creditCard', 'password' et 'resetToken'. Cela permet à un attaquant non authentifié de récupérer l'intégralité des comptes utilisateurs, leurs mots de passe (potentiellement en clair ou faiblement hashés) et leurs informations de paiement.",
+          "evidence": "Requête GET sur /api/users retourne un tableau JSON de 5 objets utilisateur contenant les champs 'creditCard', 'password' et 'resetToken'. Aucun token d'authentification n'est requis.",
+          "remediation": "1. Restreindre l'accès à l'endpoint /api/users aux seuls administrateurs authentifiés via un middleware de vérification de rôle. 2. Ne jamais exposer les mots de passe, même hashés, dans les réponses API. 3. Ne pas stocker ni exposer les numéros de carte bancaire complets ; utiliser un token de paiement (ex: Stripe). 4. Implémenter un contrôle d'accès basé sur les rôles (RBAC) pour tous les endpoints.",
+          "confidence": 1.0
+        },
+        {
+          "title": "Exposition des commandes clients via /api/orders sans authentification",
+          "severity": "high",
+          "owasp_top10": "A01:2021 Broken Access Control",
+          "cwe": "CWE-862",
+          "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/orders",
+          "description": "L'endpoint /api/orders est accessible sans authentification et expose les commandes de 4 clients. Cela permet à un attaquant de consulter l'historique des commandes, les détails des achats et potentiellement des informations personnelles associées.",
+          "evidence": "Requête GET sur /api/orders retourne un tableau JSON de 4 commandes sans nécessité de token d'authentification.",
+          "remediation": "Restreindre l'accès à /api/orders aux utilisateurs authentifiés, en filtrant les résultats pour n'afficher que les commandes de l'utilisateur connecté (ou toutes pour les administrateurs).",
+          "confidence": 1.0
+        },
+        {
+          "title": "Absence de Content Security Policy (CSP)",
+          "severity": "high",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-1021",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+          "description": "L'en-tête Content-Security-Policy est absent, exposant l'application à des attaques XSS et d'injection de contenu. Un attaquant pourrait injecter des scripts malveillants dans les pages.",
+          "evidence": "L'en-tête HTTP 'content-security-policy' est absent de la réponse du serveur.",
+          "remediation": "Ajouter un en-tête Content-Security-Policy strict, par exemple : default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;",
+          "confidence": 1.0
+        },
+        {
+          "title": "Absence de Strict-Transport-Security (HSTS)",
+          "severity": "high",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-523",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+          "description": "L'en-tête Strict-Transport-Security est absent, ce qui expose les utilisateurs à des attaques de downgrade HTTPS vers HTTP (SSL stripping).",
+          "evidence": "L'en-tête HTTP 'strict-transport-security' est absent de la réponse du serveur.",
+          "remediation": "Ajouter l'en-tête : Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
+          "confidence": 1.0
+        },
+        {
+          "title": "Absence de X-Frame-Options",
+          "severity": "medium",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-1021",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+          "description": "L'en-tête X-Frame-Options est absent, rendant l'application vulnérable au clickjacking. Un attaquant pourrait intégrer l'application dans une iframe malveillante.",
+          "evidence": "L'en-tête HTTP 'x-frame-options' est absent de la réponse du serveur.",
+          "remediation": "Ajouter l'en-tête : X-Frame-Options: DENY ou SAMEORIGIN",
+          "confidence": 1.0
+        },
+        {
+          "title": "Divulgation d'informations via l'en-tête Server",
+          "severity": "low",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-200",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+          "description": "L'en-tête 'Server: cloudflare' divulgue la technologie utilisée, facilitant la cartographie de l'infrastructure par un attaquant.",
+          "evidence": "L'en-tête HTTP 'Server: cloudflare' est présent dans la réponse.",
+          "remediation": "Supprimer ou masquer l'en-tête Server dans la configuration du serveur web.",
+          "confidence": 1.0
+        }
+      ],
+      "false_positives_filtered": [
+        "Endpoint /products accessible sans authentification : catalogue de produits public, comportement normal pour une boutique en ligne.",
+        "Endpoint /orders accessible sans authentification : bien que problématique, il pourrait s'agir d'une fonctionnalité de suivi de commande publique (mais ici c'est une vraie vulnérabilité car expose toutes les commandes).",
+        "Absence de headers Referrer-Policy et Permissions-Policy : faibles impacts seuls, mais contribuent à la note de sécurité globale."
+      ],
+      "attack_surface_summary": {
+        "endpoints_discovered": 15,
+        "endpoints_accessible_without_auth": 3,
+        "backend_architecture": "Application web front-end statique (JavaScript) hébergée sur Render.com, avec un backend API Node.js/Express sur Render.com. Utilisation de Cloudflare comme CDN/WAF. Détection d'un bundle JS avec routes SPA et endpoints API REST."
+      },
+      "recommendations_for_next_agents": [
+        "Tenter d'exploiter l'endpoint /api/users pour récupérer les mots de passe et tenter de les casser (si hashés) ou de les utiliser directement (si en clair).",
+        "Tester les tokens de réinitialisation exposés pour prendre le contrôle des comptes utilisateurs.",
+        "Vérifier si les numéros de carte bancaire exposés sont valides et peuvent être utilisés pour des transactions frauduleuses.",
+        "Tester l'endpoint /api/orders pour extraire des informations personnelles supplémentaires.",
+        "Tenter une escalade de privilèges via les endpoints protégés (/admin, /profile) en utilisant les identifiants récupérés."
+      ],
+      "overall_risk": "critical",
+      "confidence": 1.0
+    },
+    "executive_summary": "🎯 APPLICATION\nBoutique en ligne avec front-end statique (JavaScript) et backend API Node.js/Express, hébergée sur Render.com derrière Cloudflare.\n\n🔴 VULNÉRABILITÉS CRITIQUES\n- **/api/users** accessible sans authentification : expose mots de passe, numéros de carte bancaire et tokens de réinitialisation de 5 utilisateurs.\n- **/api/orders** accessible sans authentification : expose l'historique des commandes de 4 clients.\n- Absence de CSP et HSTS, exposant aux attaques XSS et SSL stripping.\n\n🟠 PROBLÈMES SECONDAIRES\n- Absence de X-Frame-Options (risque de clickjacking).\n- En-tête Server divulguant Cloudflare.\n\n✅ POINTS POSITIFS\n- Utilisation de Cloudflare comme WAF.\n- Architecture séparée front-end/back-end.\n\n➡️ ACTIONS PRIORITAIRES\n1. Restreindre immédiatement l’accès à **/api/users** et **/api/orders** avec authentification et RBAC.\n2. Ne plus exposer mots de passe et données bancaires dans les réponses API.\n3. Ajouter les en-têtes de sécurité manquants (CSP, HSTS, X-Frame-Options)."
+  },
+  "execution_log": [
+    {
+      "timestamp": "2026-06-02T19:00:52.271931+00:00",
+      "agent": "orchestrator",
+      "event": "phase_start",
+      "details": "OSINT"
+    },
+    {
+      "timestamp": "2026-06-02T19:01:28.082811+00:00",
+      "agent": "OSINT_Agent",
+      "event": "completed",
+      "details": "5 findings"
+    },
+    {
+      "timestamp": "2026-06-02T19:01:28.083184+00:00",
+      "agent": "orchestrator",
+      "event": "phase_start",
+      "details": "Scanning"
+    },
+    {
+      "timestamp": "2026-06-02T19:02:41.789242+00:00",
+      "agent": "Scanning_Agent",
+      "event": "completed",
+      "details": "11 findings"
+    },
+    {
+      "timestamp": "2026-06-02T19:02:41.789332+00:00",
+      "agent": "orchestrator",
+      "event": "phase_start",
+      "details": "WebApp"
+    },
+    {
+      "timestamp": "2026-06-02T19:03:18.519695+00:00",
+      "agent": "WebApp_Agent",
+      "event": "completed",
+      "details": "6 vulnérabilités"
+    },
+    {
+      "timestamp": "2026-06-02T19:03:18.519740+00:00",
+      "agent": "orchestrator",
+      "event": "campaign_completed",
+      "details": "3 agents exécutés"
+    }
+  ],
+  "errors": []
+}
