@@ -1,0 +1,651 @@
+{
+  "agent": "WebApp_Agent",
+  "version": "1.0",
+  "ptes_phase": 4,
+  "attack_technique": "T1190",
+  "risk_level": "active",
+  "target": "https://techshop-vuln.rokina-sylla.me",
+  "started_at": "2026-06-02T22:01:40.301805+00:00",
+  "ended_at": "2026-06-02T22:02:12.212636+00:00",
+  "duration_seconds": 31.910831,
+  "tools_used": [
+    "js_analyzer",
+    "api_prober",
+    "security_headers",
+    "data_analyzer"
+  ],
+  "raw_data": {
+    "js_analysis": {
+      "status": "success",
+      "target_url": "https://techshop-vuln.rokina-sylla.me",
+      "bundles_found": [
+        "https://techshop-vuln.rokina-sylla.me/assets/index-C5zfjJs0.js"
+      ],
+      "bundles_analyzed": 1,
+      "api_endpoints": [],
+      "app_routes": [
+        "/admin",
+        "/auth/forgot-password",
+        "/auth/login",
+        "/auth/register",
+        "/cart",
+        "/checkout",
+        "/comments",
+        "/forgot-password",
+        "/login",
+        "/orders",
+        "/products",
+        "/profile",
+        "/register",
+        "/users",
+        "/users/me"
+      ],
+      "backend_urls": [
+        "https://techshop-backend-cc1t.onrender.com/api"
+      ],
+      "sensitive_keywords": {
+        "token": 24,
+        "password": 23,
+        "secret": 4,
+        "bearer": 1,
+        "authorization": 5,
+        "credential": 11,
+        "admin": 11
+      },
+      "potential_secrets": [],
+      "duration_seconds": 0.84432,
+      "error": null
+    },
+    "api_probe": {
+      "status": "success",
+      "base_url": "https://techshop-backend-cc1t.onrender.com/api",
+      "endpoints_tested": 15,
+      "results": [
+        {
+          "endpoint": "/admin",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/admin",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/auth/forgot-password",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/auth/forgot-password",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/auth/login",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/auth/login",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/auth/register",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/auth/register",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/cart",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/cart",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/checkout",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/checkout",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/comments",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/comments",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/forgot-password",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/forgot-password",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/login",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/login",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/orders",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/orders",
+          "status_code": 200,
+          "content_type": "application/json",
+          "returns_json": true,
+          "response_size": 436,
+          "sensitive_fields_found": [],
+          "record_count": 4,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/products",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/products",
+          "status_code": 200,
+          "content_type": "application/json",
+          "returns_json": true,
+          "response_size": 1681,
+          "sensitive_fields_found": [],
+          "record_count": 8,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/profile",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/profile",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/register",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/register",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        },
+        {
+          "endpoint": "/users",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "status_code": 200,
+          "content_type": "application/json",
+          "returns_json": true,
+          "response_size": 998,
+          "sensitive_fields_found": [
+            "creditCard",
+            "password",
+            "resetToken"
+          ],
+          "record_count": 5,
+          "raw_json_data": [
+            {
+              "id": 1,
+              "username": "admin",
+              "email": "admin@techshop.sn",
+              "password": "0192023a7bbd73250516f069df18b500",
+              "role": "ADMIN",
+              "address": "123 Rue de Dakar, Sénégal",
+              "phone": "+221 77 123 45 67",
+              "resetToken": null,
+              "creditCard": "4532015112830366"
+            },
+            {
+              "id": 2,
+              "username": "alice",
+              "email": "alice@gmail.com",
+              "password": "5f4dcc3b5aa765d61d8327deb882cf99",
+              "role": "USER",
+              "address": null,
+              "phone": "+221 78 234 56 78",
+              "resetToken": null,
+              "creditCard": "4916338506082832"
+            },
+            {
+              "id": 3,
+              "username": "bob",
+              "email": "bob@gmail.com",
+              "password": "e10adc3949ba59abbe56e057f20f883e",
+              "role": "USER",
+              "address": null,
+              "phone": null,
+              "resetToken": null,
+              "creditCard": "4532756279624064"
+            },
+            {
+              "id": 4,
+              "username": "rokhaya",
+              "email": "rokhaya@uadb.edu.sn",
+              "password": "c5340280e0765c90f9e94838dab8f22d",
+              "role": "USER",
+              "address": null,
+              "phone": null,
+              "resetToken": null,
+              "creditCard": null
+            },
+            {
+              "id": 5,
+              "username": "max",
+              "email": "max@gmail.com",
+              "password": "d1696816bc1a7afe92f1c8787ac222c3",
+              "role": "USER",
+              "address": "Ucad",
+              "phone": "783149843",
+              "resetToken": null,
+              "creditCard": null
+            }
+          ],
+          "error": null
+        },
+        {
+          "endpoint": "/users/me",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/users/me",
+          "status_code": 403,
+          "content_type": "",
+          "returns_json": false,
+          "response_size": 0,
+          "sensitive_fields_found": [],
+          "record_count": null,
+          "raw_json_data": null,
+          "error": null
+        }
+      ],
+      "access_control_findings": [
+        {
+          "endpoint": "/orders",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/orders",
+          "status_code": 200,
+          "reason": "Endpoint JSON accessible sans authentification",
+          "owasp": "A01:2021 Broken Access Control"
+        },
+        {
+          "endpoint": "/products",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/products",
+          "status_code": 200,
+          "reason": "Endpoint JSON accessible sans authentification",
+          "owasp": "A01:2021 Broken Access Control"
+        },
+        {
+          "endpoint": "/users",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "status_code": 200,
+          "reason": "Endpoint JSON accessible sans authentification",
+          "owasp": "A01:2021 Broken Access Control"
+        }
+      ],
+      "data_exposure_findings": [
+        {
+          "endpoint": "/users",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "sensitive_fields": [
+            "creditCard",
+            "password",
+            "resetToken"
+          ],
+          "reason": "Champs sensibles exposés dans la réponse",
+          "owasp": "A01:2021 / A02:2021"
+        }
+      ],
+      "summary": {
+        "accessible_without_auth": 3,
+        "protected": 12,
+        "errors": 0,
+        "sensitive_data_exposed": 1
+      },
+      "duration_seconds": 12.310621,
+      "error": null
+    },
+    "security_headers": {
+      "status": "success",
+      "target_url": "https://techshop-vuln.rokina-sylla.me",
+      "http_status": 200,
+      "missing_security_headers": [
+        {
+          "header": "content-security-policy",
+          "severity": "high",
+          "description": "Protège contre XSS et injection de contenu",
+          "owasp": "A05:2021"
+        },
+        {
+          "header": "strict-transport-security",
+          "severity": "high",
+          "description": "Force HTTPS, protège contre les attaques downgrade",
+          "owasp": "A05:2021"
+        },
+        {
+          "header": "x-frame-options",
+          "severity": "medium",
+          "description": "Protège contre le clickjacking",
+          "owasp": "A05:2021"
+        },
+        {
+          "header": "referrer-policy",
+          "severity": "low",
+          "description": "Contrôle les informations de referrer transmises",
+          "owasp": "A05:2021"
+        },
+        {
+          "header": "permissions-policy",
+          "severity": "low",
+          "description": "Restreint l'accès aux API du navigateur",
+          "owasp": "A05:2021"
+        }
+      ],
+      "present_security_headers": [
+        {
+          "header": "x-content-type-options",
+          "value": "nosniff"
+        }
+      ],
+      "info_disclosure_headers": [
+        {
+          "header": "server",
+          "value": "cloudflare",
+          "description": "Révèle le serveur web et parfois sa version"
+        }
+      ],
+      "cookie_issues": [],
+      "all_headers": {
+        "Date": "Tue, 02 Jun 2026 22:01:54 GMT",
+        "Content-Type": "text/html; charset=utf-8",
+        "Transfer-Encoding": "chunked",
+        "Connection": "keep-alive",
+        "Cache-Control": "public, max-age=0, s-maxage=300",
+        "cf-cache-status": "MISS",
+        "last-modified": "Tue, 02 Jun 2026 22:01:20 UTC",
+        "rndr-id": "9a7c8ad6-90af-437a",
+        "Server": "cloudflare",
+        "vary": "Accept-Encoding, Accept-Encoding",
+        "x-content-type-options": "nosniff",
+        "etag": "W/\"4754eba39cb9283111d2f47069f6d145\"",
+        "Content-Encoding": "gzip",
+        "CF-RAY": "a059bd437d2e2575-DKR",
+        "alt-svc": "h3=\":443\"; ma=86400"
+      },
+      "security_score": 35,
+      "summary": {
+        "missing_count": 5,
+        "info_leaks_count": 1,
+        "cookie_issues_count": 0
+      },
+      "duration_seconds": 0.61256,
+      "error": null
+    },
+    "data_analysis": [
+      {
+        "endpoint": "/users",
+        "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+        "analysis": {
+          "status": "success",
+          "findings": [
+            {
+              "title": "Utilisation d'algorithmes de hash faibles (MD5)",
+              "severity": "high",
+              "owasp": "A02:2021 Cryptographic Failures",
+              "cwe": "CWE-327",
+              "count": 5,
+              "description": "Des mots de passe sont hachés avec des algorithmes cryptographiquement faibles, vulnérables aux attaques par dictionnaire et rainbow tables."
+            },
+            {
+              "title": "Mots de passe faibles cassés via dictionnaire",
+              "severity": "critical",
+              "owasp": "A02:2021 / A07:2021",
+              "cwe": "CWE-916",
+              "count": 3,
+              "description": "3 mot(s) de passe ont été retrouvés en clair à partir de leur hash, démontrant l'usage de mots de passe triviaux et de hash non salés."
+            },
+            {
+              "title": "Numéros de carte bancaire exposés",
+              "severity": "critical",
+              "owasp": "A02:2021 Cryptographic Failures",
+              "cwe": "CWE-311",
+              "count": 3,
+              "description": "3 numéro(s) de carte bancaire valide(s) (vérifiés par Luhn) exposé(s) en clair. Violation directe de PCI DSS."
+            }
+          ],
+          "weak_hashes": [
+            {
+              "field": "password",
+              "path": "[0].password",
+              "algorithm": "MD5",
+              "strength": "weak",
+              "cwe": "CWE-327"
+            },
+            {
+              "field": "password",
+              "path": "[1].password",
+              "algorithm": "MD5",
+              "strength": "weak",
+              "cwe": "CWE-327"
+            },
+            {
+              "field": "password",
+              "path": "[2].password",
+              "algorithm": "MD5",
+              "strength": "weak",
+              "cwe": "CWE-327"
+            },
+            {
+              "field": "password",
+              "path": "[3].password",
+              "algorithm": "MD5",
+              "strength": "weak",
+              "cwe": "CWE-327"
+            },
+            {
+              "field": "password",
+              "path": "[4].password",
+              "algorithm": "MD5",
+              "strength": "weak",
+              "cwe": "CWE-327"
+            }
+          ],
+          "cracked_passwords": [
+            {
+              "field": "password",
+              "path": "[0].password",
+              "hash": "0192023a...",
+              "algorithm": "MD5",
+              "plaintext": "admin123"
+            },
+            {
+              "field": "password",
+              "path": "[1].password",
+              "hash": "5f4dcc3b...",
+              "algorithm": "MD5",
+              "plaintext": "password"
+            },
+            {
+              "field": "password",
+              "path": "[2].password",
+              "hash": "e10adc39...",
+              "algorithm": "MD5",
+              "plaintext": "123456"
+            }
+          ],
+          "exposed_cards": [
+            {
+              "field": "creditCard",
+              "path": "[0].creditCard",
+              "card_type": "Visa",
+              "masked": "************0366"
+            },
+            {
+              "field": "creditCard",
+              "path": "[1].creditCard",
+              "card_type": "Visa",
+              "masked": "************2832"
+            },
+            {
+              "field": "creditCard",
+              "path": "[2].creditCard",
+              "card_type": "Visa",
+              "masked": "************4064"
+            }
+          ],
+          "summary": {
+            "weak_hash_count": 5,
+            "cracked_password_count": 3,
+            "exposed_card_count": 3
+          },
+          "duration_seconds": 0.001915,
+          "error": null
+        }
+      }
+    ]
+  },
+  "analysis": {
+    "summary": "L'application web 'techshop-vuln.rokina-sylla.me' présente une vulnérabilité critique de contrôle d'accès exposant l'intégralité des données utilisateur, incluant mots de passe hachés avec MD5 (dont 3 cassés en clair) et numéros de carte bancaire en clair, sans aucune authentification requise. La sécurité des headers HTTP est également défaillante, augmentant les risques d'attaques XSS et de downgrade. La posture de sécurité est très préoccupante.",
+    "vulnerabilities": [
+      {
+        "title": "Exposition massive de données sensibles via l'endpoint /users sans authentification",
+        "severity": "critical",
+        "owasp_top10": "A01:2021 Broken Access Control",
+        "cwe": "CWE-862",
+        "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+        "description": "L'endpoint /users est accessible sans aucune authentification et expose l'intégralité des comptes utilisateur (5 enregistrements) avec des champs sensibles : mots de passe hachés, numéros de carte bancaire en clair, emails, adresses et numéros de téléphone. Cela constitue une violation massive de la confidentialité des données et une non-conformité au RGPD et PCI DSS.",
+        "evidence": "Requête GET sur /api/users retourne 200 OK avec 5 utilisateurs complets. Champs sensibles détectés : 'creditCard', 'password', 'resetToken'.",
+        "remediation": "1. Implémenter une authentification forte (JWT, OAuth2) sur tous les endpoints d'administration. 2. Restreindre l'accès à /users aux seuls administrateurs authentifiés. 3. Ne jamais exposer les mots de passe (même hachés) ni les données de paiement dans les réponses API. 4. Mettre en place un contrôle d'accès basé sur les rôles (RBAC).",
+        "confidence": 1.0
+      },
+      {
+        "title": "Mots de passe hachés avec MD5 (algorithme cryptographiquement faible)",
+        "severity": "high",
+        "owasp_top10": "A02:2021 Cryptographic Failures",
+        "cwe": "CWE-327",
+        "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+        "description": "Les 5 mots de passe stockés utilisent l'algorithme MD5, considéré comme cassé et vulnérable aux attaques par dictionnaire et rainbow tables. Aucun sel (salt) n'est présent. Trois de ces mots de passe ont été immédiatement cassés en clair ('admin123', 'password', '123456'), démontrant la faiblesse du mécanisme.",
+        "evidence": "Hashes de 32 caractères hexadécimaux (format MD5) observés pour tous les utilisateurs. 3 hashes cassés en moins d'une seconde avec un dictionnaire standard.",
+        "remediation": "1. Remplacer MD5 par bcrypt, Argon2 ou PBKDF2 avec un sel unique par utilisateur. 2. Forcer les utilisateurs à changer leur mot de passe lors de la prochaine connexion. 3. Implémenter une politique de mots de passe forts.",
+        "confidence": 1.0
+      },
+      {
+        "title": "Numéros de carte bancaire stockés et exposés en clair",
+        "severity": "critical",
+        "owasp_top10": "A02:2021 Cryptographic Failures",
+        "cwe": "CWE-311",
+        "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+        "description": "Trois numéros de carte bancaire Visa valides (vérifiés par l'algorithme de Luhn) sont stockés en clair dans la base de données et exposés via l'API. Cela constitue une violation directe de la norme PCI DSS (exigence 3.4 : masquer ou chiffrer les numéros de carte).",
+        "evidence": "Champs 'creditCard' contenant des numéros à 16 chiffres, format Visa, valides selon l'algorithme de Luhn.",
+        "remediation": "1. Ne jamais stocker de numéros de carte bancaire en clair. 2. Utiliser un token de paiement via un prestataire PCI DSS compliant (Stripe, Adyen). 3. Supprimer immédiatement les données de carte existantes. 4. Notifier les utilisateurs concernés et les autorités de régulation.",
+        "confidence": 1.0
+      },
+      {
+        "title": "Absence de Content-Security-Policy (CSP)",
+        "severity": "high",
+        "owasp_top10": "A05:2021 Security Misconfiguration",
+        "cwe": "CWE-1021",
+        "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+        "description": "L'en-tête Content-Security-Policy est absent, exposant l'application à des attaques XSS (Cross-Site Scripting) et à l'injection de contenu malveillant.",
+        "evidence": "Header 'content-security-policy' non présent dans la réponse HTTP.",
+        "remediation": "Ajouter un en-tête CSP strict : Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';",
+        "confidence": 0.95
+      },
+      {
+        "title": "Absence de Strict-Transport-Security (HSTS)",
+        "severity": "high",
+        "owasp_top10": "A05:2021 Security Misconfiguration",
+        "cwe": "CWE-319",
+        "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+        "description": "L'en-tête Strict-Transport-Security est absent, permettant des attaques de downgrade HTTPS vers HTTP et le vol de cookies de session via un homme du milieu.",
+        "evidence": "Header 'strict-transport-security' non présent dans la réponse HTTP.",
+        "remediation": "Ajouter : Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
+        "confidence": 0.95
+      },
+      {
+        "title": "Absence de X-Frame-Options",
+        "severity": "medium",
+        "owasp_top10": "A05:2021 Security Misconfiguration",
+        "cwe": "CWE-1021",
+        "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+        "description": "L'en-tête X-Frame-Options est absent, rendant l'application vulnérable au clickjacking (intégration dans une iframe malveillante).",
+        "evidence": "Header 'x-frame-options' non présent dans la réponse HTTP.",
+        "remediation": "Ajouter : X-Frame-Options: DENY ou SAMEORIGIN",
+        "confidence": 0.9
+      },
+      {
+        "title": "Divulgation d'informations via l'en-tête Server",
+        "severity": "low",
+        "owasp_top10": "A05:2021 Security Misconfiguration",
+        "cwe": "CWE-200",
+        "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+        "description": "L'en-tête 'Server: cloudflare' révèle la technologie utilisée, facilitant la recherche de vulnérabilités ciblées.",
+        "evidence": "Header 'Server: cloudflare' présent dans la réponse HTTP.",
+        "remediation": "Supprimer ou masquer l'en-tête Server dans la configuration du serveur.",
+        "confidence": 0.8
+      }
+    ],
+    "false_positives_filtered": [
+      "Endpoint /products accessible sans authentification : catalogue public normal pour une boutique en ligne, pas une vulnérabilité.",
+      "Endpoint /orders accessible sans authentification : pourrait être normal si l'API expose des commandes publiques, mais à surveiller en contexte.",
+      "Absence de Referrer-Policy et Permissions-Policy : faibles risques seuls, non critiques."
+    ],
+    "attack_surface_summary": {
+      "endpoints_discovered": 15,
+      "endpoints_accessible_without_auth": 3,
+      "backend_architecture": "Application web SPA (React/Vue) avec backend API REST hébergé sur Render (https://techshop-backend-cc1t.onrender.com/api). Frontend sur Cloudflare. Base de données exposant des données utilisateur sensibles."
+    },
+    "recommendations_for_next_agents": [
+      "Exploiter les identifiants cassés (admin:admin123) pour tenter une connexion admin sur /auth/login ou /login.",
+      "Tester l'endpoint /users avec les tokens JWT récupérés pour vérifier l'étendue de l'accès.",
+      "Vérifier si l'endpoint /orders expose des données de commandes sensibles (adresses, paiements).",
+      "Tester les vulnérabilités XSS sur le frontend en l'absence de CSP.",
+      "Vérifier la possibilité d'injection SQL ou NoSQL sur les endpoints accessibles (/products, /orders)."
+    ],
+    "overall_risk": "critical",
+    "confidence": 0.98
+  },
+  "executive_summary": "🎯 APPLICATION\nApplication e-commerce SPA (React/Vue) avec backend API REST sur Render, frontend hébergé sur Cloudflare.\n\n🔴 VULNÉRABILITÉS CRITIQUES\n- Endpoint /users accessible sans authentification, exposant 5 comptes avec mots de passe hachés (MD5), numéros de carte bancaire en clair, emails et adresses.\n- 3 mots de passe cassés en clair (admin123, password, 123456) – risque de compromission admin immédiate.\n- Stockage et exposition de numéros de carte Visa valides en clair (violation PCI DSS).\n\n🟠 PROBLÈMES SECONDAIRES\n- Absence de CSP, HSTS et X-Frame-Options (risques XSS, downgrade HTTPS, clickjacking).\n- En-tête Server divulguant Cloudflare.\n\n✅ POINTS POSITIFS\n- Aucun endpoint critique supplémentaire découvert (catalogue public normal).\n\n➡️ ACTIONS PRIORITAIRES\n1. Restreindre immédiatement l’accès à /users avec authentification forte (JWT, RBAC).\n2. Supprimer les données de carte bancaire et remplacer MD5 par bcrypt/Argon2.\n3. Ajouter les headers de sécurité manquants (CSP, HSTS, X-Frame-Options)."
+}

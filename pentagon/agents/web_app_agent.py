@@ -29,7 +29,7 @@ from pentagon.core.llm_client import LLMClient
 from pentagon.tools.js_analyzer_tool import run_js_analysis
 from pentagon.tools.api_prober_tool import run_api_probe
 from pentagon.tools.security_headers_tool import run_security_headers_scan
-
+from pentagon.tools.data_analyzer_tool import run_data_analysis
 
 WEBAPP_SYSTEM_PROMPT = """Tu es l'Agent Web App de PENTAGON, un système multi-agent \
 de test d'intrusion automatisé.
@@ -168,12 +168,34 @@ class WebAppAgent:
         # === Outil 3 : Analyse des headers de sécurité ===
         print(f"[{self.name}] Analyse des headers de sécurité...")
         headers_data = run_security_headers_scan(target_url)
+        # === Outil 4 : Analyse approfondie des données exposées ===
+        # Analyse les données JSON récupérées par l'api_prober pour détecter
+        # hashes faibles, mots de passe cassables, cartes bancaires.
+        print(f"[{self.name}] Analyse approfondie des données exposées...")
+        data_analysis_results = []
+        for endpoint_result in api_data.get("results", []):
+            raw_data = endpoint_result.get("raw_json_data")
+            if raw_data:
+                analysis = run_data_analysis(raw_data)
+                if analysis.get("findings"):
+                    data_analysis_results.append({
+                        "endpoint": endpoint_result["endpoint"],
+                        "url": endpoint_result["url"],
+                        "analysis": analysis,
+                    })
         
+        if data_analysis_results:
+            total_cracked = sum(
+                len(d["analysis"]["cracked_passwords"]) for d in data_analysis_results
+            )
+            print(f"[{self.name}]   → {len(data_analysis_results)} endpoint(s) avec données sensibles analysées")
+            if total_cracked:
+                print(f"[{self.name}]   → ⚠️  {total_cracked} mot(s) de passe cassé(s)")
         # === Analyse LLM contextuelle ===
         print(f"[{self.name}] Analyse LLM des résultats...")
         analysis = self._analyze_with_llm(
             target_url, js_data, api_data, headers_data,
-            osint_context, scanning_context,
+            data_analysis_results,  osint_context, scanning_context,
         )
         
         # === Construction du résultat ===
@@ -190,11 +212,12 @@ class WebAppAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration,
-            "tools_used": ["js_analyzer", "api_prober", "security_headers"],
+            "tools_used": ["js_analyzer", "api_prober", "security_headers", "data_analyzer"],
             "raw_data": {
                 "js_analysis": js_data,
                 "api_probe": api_data,
                 "security_headers": headers_data,
+                "data_analysis": data_analysis_results,
             },
             "analysis": analysis,
         }
@@ -212,6 +235,7 @@ class WebAppAgent:
         js_data: dict[str, Any],
         api_data: dict[str, Any],
         headers_data: dict[str, Any],
+        data_analysis_results: list[dict[str, Any]],
         osint_context: dict[str, Any] | None,
         scanning_context: dict[str, Any] | None,
     ) -> dict[str, Any]:
@@ -245,6 +269,10 @@ Analyse la sécurité de l'application web '{target}' à partir des résultats d
 === ANALYSE DES HEADERS DE SÉCURITÉ ===
 ```json
 {json.dumps(headers_data, indent=2, ensure_ascii=False, default=str)}
+```
+=== ANALYSE APPROFONDIE DES DONNÉES EXPOSÉES (hashes, mots de passe, cartes) ===
+```json
+{json.dumps(data_analysis_results, indent=2, ensure_ascii=False, default=str)}
 ```
 
 Produis une analyse de sécurité structurée selon le format JSON défini dans tes instructions.

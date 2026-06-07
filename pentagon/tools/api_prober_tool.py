@@ -149,6 +149,7 @@ def _probe_single_endpoint(url: str, endpoint: str, timeout: int) -> dict[str, A
         "response_size": 0,
         "sensitive_fields_found": [],
         "record_count": None,
+        "raw_json_data": None,
         "error": None,
     }
     
@@ -172,6 +173,10 @@ def _probe_single_endpoint(url: str, endpoint: str, timeout: int) -> dict[str, A
                 
                 # Cherche des champs sensibles dans la réponse
                 endpoint_result["sensitive_fields_found"] = _find_sensitive_fields(data)
+                # Conserve les données brutes pour analyse approfondie (data_analyzer)
+                # uniquement si des champs sensibles sont présents (économie de mémoire)
+                if endpoint_result["sensitive_fields_found"]:
+                    endpoint_result["raw_json_data"] = data
             except Exception:
                 pass
     
