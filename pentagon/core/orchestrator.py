@@ -21,6 +21,7 @@ from pentagon.core.llm_client import LLMClient
 from pentagon.agents.osint_agent import OSINTAgent
 from pentagon.agents.scanning_agent import ScanningAgent
 from pentagon.agents.web_app_agent import WebAppAgent
+from pentagon.core.roe_enforcer import RoEEnforcer, RoEViolation
 
 class Orchestrator:
     """
@@ -29,20 +30,46 @@ class Orchestrator:
     Pilote l'exécution de la chaîne d'agents et gère l'état partagé.
     """
     
-    def __init__(self, llm: LLMClient | None = None):
+    def __init__(self, llm: LLMClient | None = None, roe_enforcer: RoEEnforcer | None = None):
         """
         Initialise l'orchestrateur et les agents.
         
         Args:
             llm: client LLM partagé entre tous les agents (économie de ressources).
+            roe_enforcer: garde-fou RoE. Si None, en crée un avec la politique par défaut.
         """
         # Un seul client LLM partagé par tous les agents
         self.llm = llm or LLMClient()
         
+        # Garde-fou RoE (gouvernance)
+        self.roe = roe_enforcer or RoEEnforcer()
+
         # Instanciation des agents
         self.osint_agent = OSINTAgent(llm=self.llm)
         self.scanning_agent = ScanningAgent(llm=self.llm)
         self.web_app_agent = WebAppAgent(llm=self.llm)
+
+    def _check_roe(self, target: str, action_category: str, agent_name: str) -> bool:
+        """
+        Vérifie auprès du RoE si un agent peut s'exécuter.
+        
+        Args:
+            target: cible de l'agent.
+            action_category: catégorie d'action de l'agent (passive, active_scan...).
+            agent_name: nom de l'agent (pour le log).
+        
+        Returns:
+            True si autorisé, False si refusé (l'agent sera sauté).
+        """
+        try:
+            self.roe.enforce(target, action_category)
+            print(f"[RoE] ✓ {agent_name} autorisé ({action_category} sur {target})")
+            return True
+        except RoEViolation as e:
+            print(f"[RoE] ✗ {agent_name} BLOQUÉ : {e}")
+            return False
+
+
     def run_campaign(
         self,
         target: str,
@@ -93,6 +120,11 @@ class Orchestrator:
         
         state.log_event("orchestrator", "phase_start", "OSINT")
         
+        # Vérification RoE (OSINT = action passive)
+        if not self._check_roe(target, "passive", "OSINT_Agent"):
+            state.log_error("OSINT_Agent", "Bloqué par le RoE (action passive non autorisée)")
+            return
+
         try:
             osint_result = self.osint_agent.run(target)
             state.osint_result = osint_result
@@ -121,6 +153,11 @@ class Orchestrator:
         print(f"{'─' * 70}")
         
         state.log_event("orchestrator", "phase_start", "Scanning")
+
+        # Vérification RoE (Scanning = scan actif)
+        if not self._check_roe(target, "active_scan", "Scanning_Agent"):
+            state.log_error("Scanning_Agent", "Bloqué par le RoE (scan actif non autorisé)")
+            return
         
         # Prépare le contexte OSINT à passer à l'agent Scanning
         osint_context = state.discovered_infrastructure if state.discovered_infrastructure else None
@@ -153,6 +190,11 @@ class Orchestrator:
         
         state.log_event("orchestrator", "phase_start", "WebApp")
         
+        # Vérification RoE (Web App = scan actif)
+        if not self._check_roe(target, "active_scan", "WebApp_Agent"):
+            state.log_error("WebApp_Agent", "Bloqué par le RoE (scan actif non autorisé)")
+            return
+
         # Prépare les contextes des agents précédents
         osint_context = state.discovered_infrastructure if state.discovered_infrastructure else None
         

@@ -1,0 +1,1201 @@
+{
+  "campaign_id": "cde5b4e5-a9db-4850-9370-d45da89164b0",
+  "target": "techshop-vuln.rokina-sylla.me",
+  "started_at": "2026-06-07T14:35:39.859336+00:00",
+  "ended_at": "2026-06-07T14:40:30.129903+00:00",
+  "agents_executed": [
+    "OSINT_Agent",
+    "Scanning_Agent",
+    "WebApp_Agent"
+  ],
+  "discovered_infrastructure": {
+    "hosting_provider": "Render.com",
+    "ip_addresses": [
+      "216.24.57.7",
+      "216.24.57.251"
+    ],
+    "osint_summary": "🎯 CIBLE\nSous-domaine `techshop-vuln.rokina-sylla.me`, application web hébergée sur Render.com, domaine parent récent (avril 2026).\n\n🏗️ INFRASTRUCTURE\n- Hébergement via Render.com (CNAME vers `techshop-vuln.onrender.com`).\n- Deux adresses IP exposées : 216.24.57.7 et 216.24.57.251 (possible load balancing).\n- Domaine parent enregistré chez NameCheap avec protection de la vie privée activée.\n\n🔍 OBSERVATIONS CLÉS\n- Infrastructure cloud moderne (Render) : les tests devront cibler les IP Render et les configurations spécifiques à cette plateforme.\n- Domaine parent récent : projet probablement en phase initiale, configuration encore évolutive.\n\n⚠️ POINTS D'ATTENTION\n- Absence de serveurs de noms et d’emails dans le WHOIS : cohérent avec un CNAME, mais simplifie la surface d’attaque DNS.\n- Protection de la vie privée activée sur le domaine parent : peut compliquer un éventuel pivotement.\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Scanner les IP 216.24.57.7 et 216.24.57.251 pour identifier les services exposés (ports, protocoles).\n2. Analyser l’application web sur `techshop-vuln.onrender.com` (technologies, endpoints, vulnérabilités OWASP Top 10).\n3. Rechercher des traces du projet sur les archives web et réseaux sociaux pour contextualiser la cible."
+  },
+  "osint_result": {
+    "agent": "OSINT_Agent",
+    "version": "1.1",
+    "ptes_phase": 2,
+    "attack_tactic": "TA0043",
+    "target": "techshop-vuln.rokina-sylla.me",
+    "started_at": "2026-06-07T14:35:39.871547+00:00",
+    "ended_at": "2026-06-07T14:36:14.064665+00:00",
+    "duration_seconds": 34.193118,
+    "tools_used": [
+      "whois",
+      "dns_lookup"
+    ],
+    "raw_data": {
+      "whois": {
+        "status": "success",
+        "domain": "techshop-vuln.rokina-sylla.me",
+        "registrar": "NameCheap, Inc.",
+        "creation_date": "2026-04-16T12:42:45+00:00",
+        "expiration_date": "2027-04-16T12:42:45+00:00",
+        "name_servers": [],
+        "emails": [],
+        "org": null,
+        "country": null,
+        "raw": "{\n  \"domain_id\": \"REDACTED\",\n  \"domain_name\": \"rokina-sylla.me\",\n  \"creation_date\": \"2026-04-16 12:42:45+00:00\",\n  \"updated_date\": \"2026-04-21 12:43:42+00:00\",\n  \"expiration_date\": \"2027-04-16 12:42:45+00:00\",\n  \"registrar\": \"NameCheap, Inc.\",\n  \"status\": \"clientTransferProhibited https://icann.org/epp#clientTransferProhibited\",\n  \"registrant_id\": \"REDACTED\",\n  \"registrant_name\": \"REDACTED\",\n  \"registrant_org\": \"Privacy service provided by Withheld for Privacy ehf\",\n  \"registrant_address\": null,\n  \"registrant_address2\": null,\n  \"registrant_address3\": null,\n  \"registrant_city\": \"REDACTED\",\n  \"registrant_state_province\": \"Capital Region\",\n  \"registrant_country\": null,\n  \"registrant_postal_code\": \"REDACTED\",\n  \"registrant_phone\": \"REDACTED\",\n  \"registrant_phone_ext\": null,\n  \"registrant_fax\": \"REDACTED\",\n  \"registrant_fax_ext\": null,\n  \"registrant_email\": null,\n  \"admin_id\": \"REDACTED\",\n  \"admin_name\": \"REDACTED\",\n  \"admin_org\": \"REDACTED\",\n  \"admin_address\": null,\n  \"admin_address2\": null,\n  \"admin_address3\": null,\n  \"admin_city\": \"REDACTED\",\n  \"admin_state_province\": \"REDACTED\",\n  \"admin_country\": null,\n  \"admin_postal_code\": \"REDACTED\",\n  \"admin_phone\": \"REDACTED\",\n  \"admin_phone_ext\": null,\n  \"admin_fax\": \"REDACTED\",\n  \"admin_fax_ext\": null,\n  \"admin_email\": null,\n  \"tech_id\": \"REDACTED\",\n  \"tech_name\": \"REDACTED\",\n  \"tech_org\": \"REDACTED\",\n  \"tech_address\": null,\n  \"tech_address2\": null,\n  \"tech_address3\": null,\n  \"tech_city\": \"REDACTED\",\n  \"tech_state_province\": \"REDACTED\",\n  \"tech_country\": null,\n  \"tech_postal_code\": \"REDACTED\",\n  \"tech_phone\": \"REDACTED\",\n  \"tech_phone_ext\": null,\n  \"tech_fax\": \"REDACTED\",\n  \"tech_fax_ext\": null,\n  \"tech_email\": null,\n  \"name_servers\": null\n}",
+        "error": null
+      },
+      "dns": {
+        "status": "success",
+        "domain": "techshop-vuln.rokina-sylla.me",
+        "records": {
+          "A": [
+            "216.24.57.7",
+            "216.24.57.251"
+          ],
+          "CNAME": [
+            "techshop-vuln.onrender.com."
+          ]
+        },
+        "errors": {},
+        "inferred_hosting": "Render.com"
+      }
+    },
+    "analysis": {
+      "summary": "Le sous-domaine 'techshop-vuln.rokina-sylla.me' est hébergé sur Render.com (infrastructure cloud moderne) via un enregistrement CNAME. Le domaine parent 'rokina-sylla.me' a été créé récemment (avril 2026) chez NameCheap avec un service de protection de la vie privée activé (Withheld for Privacy ehf). Deux adresses IP A sont exposées, pointant vers l'infrastructure Render. L'absence de serveurs de noms et d'emails dans les données WHOIS est cohérente avec l'utilisation d'un CNAME pointant vers un fournisseur tiers.",
+      "key_findings": [
+        {
+          "type": "infrastructure",
+          "value": "Hébergement via Render.com (CNAME vers techshop-vuln.onrender.com)",
+          "significance": "L'infrastructure cible est hébergée sur Render.com, une plateforme cloud moderne. Les phases de scanning et de test d'application web devront se concentrer sur les adresses IP Render et les configurations spécifiques à cette plateforme (ex: headers, certificats, sous-domaines Render).",
+          "attack_mapping": "T1590.002",
+          "source_tool": "dns"
+        },
+        {
+          "type": "infrastructure",
+          "value": "Adresses IP exposées : 216.24.57.7 et 216.24.57.251",
+          "significance": "Ces adresses IP sont les points d'entrée réseau de l'application. Elles seront la cible du scanning réseau (phase 3) pour identifier les ports ouverts, les services et les vulnérabilités potentielles. La présence de deux IP peut indiquer un load balancing ou une redondance.",
+          "attack_mapping": "T1590.005",
+          "source_tool": "dns"
+        },
+        {
+          "type": "anomaly",
+          "value": "Privacy service activé (Withheld for Privacy ehf) sur le WHOIS du domaine parent",
+          "significance": "Bien que le sous-domaine soit directement accessible, le propriétaire du domaine parent a masqué ses informations personnelles. Cela peut indiquer une tentative de protection de l'identité, mais ne bloque pas l'analyse du sous-domaine cible. À noter pour un éventuel pivotement vers le domaine parent.",
+          "attack_mapping": "T1590.001",
+          "source_tool": "whois"
+        },
+        {
+          "type": "registrar",
+          "value": "NameCheap, Inc.",
+          "significance": "NameCheap est un registrar courant. La date de création récente (16 avril 2026) suggère que le domaine est relativement nouveau, ce qui peut être un indicateur de projet récent ou de configuration encore en évolution.",
+          "attack_mapping": "T1590.001",
+          "source_tool": "whois"
+        },
+        {
+          "type": "dns",
+          "value": "Absence de serveurs de noms et d'emails dans les données WHOIS",
+          "significance": "Cela est cohérent avec l'utilisation d'un CNAME pointant vers Render.com. Le domaine parent délègue probablement la résolution DNS à Render ou utilise des serveurs de noms par défaut de NameCheap. Cela simplifie la surface d'attaque DNS.",
+          "attack_mapping": "T1590.002",
+          "source_tool": "whois"
+        }
+      ],
+      "infrastructure_summary": {
+        "hosting_provider": "Render.com",
+        "ip_addresses": [
+          "216.24.57.7",
+          "216.24.57.251"
+        ],
+        "name_servers": [],
+        "mail_servers": []
+      },
+      "recommendations_for_next_agents": [
+        "Agent Scanning : Effectuer un scan de ports sur les IP 216.24.57.7 et 216.24.57.251 pour identifier les services exposés (HTTP/HTTPS, SSH, etc.). Vérifier la présence de services supplémentaires sur des ports non standards.",
+        "Agent Web App : Analyser le sous-domaine 'techshop-vuln.onrender.com' (CNAME) pour identifier la technologie web utilisée, les endpoints, les formulaires et les potentielles vulnérabilités OWASP Top 10. Vérifier les en-têtes de sécurité et les certificats TLS.",
+        "Agent Vulnerability Analysis : Corréler les résultats du scanning réseau et de l'analyse web pour identifier des vulnérabilités spécifiques à Render.com (ex: misconfiguration de déploiement, variables d'environnement exposées).",
+        "Agent OSINT (phase complémentaire) : Rechercher des informations supplémentaires sur le domaine parent 'rokina-sylla.me' et le sous-domaine Render 'techshop-vuln.onrender.com' via des sources comme les moteurs de recherche, les archives web (Wayback Machine) et les réseaux sociaux pour identifier des indices sur le propriétaire ou le contexte de l'application."
+      ],
+      "confidence": 0.95
+    },
+    "executive_summary": "🎯 CIBLE\nSous-domaine `techshop-vuln.rokina-sylla.me`, application web hébergée sur Render.com, domaine parent récent (avril 2026).\n\n🏗️ INFRASTRUCTURE\n- Hébergement via Render.com (CNAME vers `techshop-vuln.onrender.com`).\n- Deux adresses IP exposées : 216.24.57.7 et 216.24.57.251 (possible load balancing).\n- Domaine parent enregistré chez NameCheap avec protection de la vie privée activée.\n\n🔍 OBSERVATIONS CLÉS\n- Infrastructure cloud moderne (Render) : les tests devront cibler les IP Render et les configurations spécifiques à cette plateforme.\n- Domaine parent récent : projet probablement en phase initiale, configuration encore évolutive.\n\n⚠️ POINTS D'ATTENTION\n- Absence de serveurs de noms et d’emails dans le WHOIS : cohérent avec un CNAME, mais simplifie la surface d’attaque DNS.\n- Protection de la vie privée activée sur le domaine parent : peut compliquer un éventuel pivotement.\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Scanner les IP 216.24.57.7 et 216.24.57.251 pour identifier les services exposés (ports, protocoles).\n2. Analyser l’application web sur `techshop-vuln.onrender.com` (technologies, endpoints, vulnérabilités OWASP Top 10).\n3. Rechercher des traces du projet sur les archives web et réseaux sociaux pour contextualiser la cible."
+  },
+  "scanning_result": {
+    "agent": "Scanning_Agent",
+    "version": "1.0",
+    "ptes_phase": 3,
+    "attack_tactic": "TA0007",
+    "risk_level": "active",
+    "target": "techshop-vuln.rokina-sylla.me",
+    "scan_profile": "web_focused",
+    "started_at": "2026-06-07T14:36:18.626959+00:00",
+    "ended_at": "2026-06-07T14:37:23.728830+00:00",
+    "duration_seconds": 65.101871,
+    "tools_used": [
+      "nmap",
+      "whatweb"
+    ],
+    "raw_data": {
+      "nmap": {
+        "status": "success",
+        "target": "techshop-vuln.rokina-sylla.me",
+        "profile_used": "web_focused",
+        "profile_description": "Scan ciblé sur les ports web avec scripts par défaut",
+        "scan_start": "2026-06-07T14:36:18.626982+00:00",
+        "scan_end": "2026-06-07T14:36:56.290922+00:00",
+        "duration_seconds": 37.66394,
+        "hosts": {
+          "216.24.57.7": {
+            "state": "up",
+            "hostnames": [
+              "techshop-vuln.rokina-sylla.me"
+            ],
+            "addresses": {
+              "ipv4": "216.24.57.7"
+            },
+            "ports": [
+              {
+                "port": 80,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 443,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 3000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "ppp",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 5000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "upnp",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "http-alt",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8080,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8081,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "blackice-icecap",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8443,
+                "protocol": "tcp",
+                "state": "open",
+                "service": "http",
+                "product": "Cloudflare http proxy",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 8888,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "sun-answerbook",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              },
+              {
+                "port": 9000,
+                "protocol": "tcp",
+                "state": "filtered",
+                "service": "cslistener",
+                "product": "",
+                "version": "",
+                "extra_info": "",
+                "cpe": ""
+              }
+            ]
+          }
+        },
+        "summary": {
+          "hosts_scanned": 1,
+          "hosts_up": 1,
+          "open_ports_total": 4,
+          "services_detected": [
+            "http"
+          ]
+        },
+        "error": null
+      },
+      "whatweb": {
+        "status": "success",
+        "target_url": "https://techshop-vuln.rokina-sylla.me",
+        "aggression_level": 3,
+        "http_status": 200,
+        "technologies": [
+          {
+            "name": "Country",
+            "values": [
+              "UNITED STATES",
+              "US"
+            ]
+          },
+          {
+            "name": "HTML5",
+            "values": []
+          },
+          {
+            "name": "HTTPServer",
+            "values": [
+              "cloudflare"
+            ]
+          },
+          {
+            "name": "IP",
+            "values": [
+              "216.24.57.7"
+            ]
+          },
+          {
+            "name": "Script",
+            "values": [
+              "module"
+            ]
+          },
+          {
+            "name": "Title",
+            "values": [
+              "TechShop — Votre boutique tech au Sénégal"
+            ]
+          },
+          {
+            "name": "UncommonHeaders",
+            "values": [
+              "cf-cache-status,rndr-id,x-content-type-options,cf-ray,alt-svc"
+            ]
+          }
+        ],
+        "categories": {
+          "metadata": [
+            {
+              "name": "Country",
+              "values": [
+                "UNITED STATES",
+                "US"
+              ]
+            },
+            {
+              "name": "HTML5",
+              "values": []
+            },
+            {
+              "name": "IP",
+              "values": [
+                "216.24.57.7"
+              ]
+            },
+            {
+              "name": "Script",
+              "values": [
+                "module"
+              ]
+            },
+            {
+              "name": "Title",
+              "values": [
+                "TechShop — Votre boutique tech au Sénégal"
+              ]
+            }
+          ],
+          "server": [
+            {
+              "name": "HTTPServer",
+              "values": [
+                "cloudflare"
+              ]
+            }
+          ],
+          "headers": [
+            {
+              "name": "UncommonHeaders",
+              "values": [
+                "cf-cache-status,rndr-id,x-content-type-options,cf-ray,alt-svc"
+              ]
+            }
+          ]
+        },
+        "sensitive_findings": [
+          {
+            "name": "HTTPServer",
+            "values": [
+              "cloudflare"
+            ],
+            "reason": "Révèle des informations techniques détaillées"
+          },
+          {
+            "name": "IP",
+            "values": [
+              "216.24.57.7"
+            ],
+            "reason": "Version exacte exposée (utile pour corrélation CVE)"
+          }
+        ],
+        "inferred_stack": {
+          "frontend": null,
+          "backend": null,
+          "server": [
+            "HTTPServer"
+          ],
+          "cdn_waf": null,
+          "hosting_signals": [
+            "Render.com (via rndr-id header)"
+          ]
+        },
+        "duration_seconds": 11.463856,
+        "error": null
+      }
+    },
+    "analysis": {
+      "summary": "La cible 'techshop-vuln.rokina-sylla.me' est une application web hébergée sur Render.com, protégée par Cloudflare (CDN/WAF). Le scan Nmap révèle 4 ports HTTP ouverts (80, 443, 8080, 8443) tous derrière Cloudflare, et 6 ports filtrés (3000, 5000, 8000, 8081, 8888, 9000) qui pourraient correspondre à des services internes. WhatWeb confirme la présence de Cloudflare et révèle un header 'rndr-id' typique de Render.com. L'architecture est un front-end derrière un CDN, avec des services internes potentiellement exposés.",
+      "key_findings": [
+        {
+          "type": "open_port",
+          "value": "Port 80 (HTTP) - Cloudflare http proxy",
+          "significance": "Port HTTP standard, mais derrière Cloudflare. Le trafic est probablement redirigé vers HTTPS.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "info"
+        },
+        {
+          "type": "open_port",
+          "value": "Port 443 (HTTPS) - Cloudflare http proxy",
+          "significance": "Port HTTPS standard, point d'entrée principal de l'application web. Cloudflare agit comme reverse proxy.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "info"
+        },
+        {
+          "type": "open_port",
+          "value": "Port 8080 (HTTP) - Cloudflare http proxy",
+          "significance": "Port HTTP alternatif, également derrière Cloudflare. Peut indiquer un service de développement ou d'administration exposé.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "medium"
+        },
+        {
+          "type": "open_port",
+          "value": "Port 8443 (HTTPS) - Cloudflare http proxy",
+          "significance": "Port HTTPS alternatif, également derrière Cloudflare. Peut indiquer un service d'administration ou une API.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "medium"
+        },
+        {
+          "type": "filtered_port",
+          "value": "Ports 3000, 5000, 8000, 8081, 8888, 9000 filtrés",
+          "significance": "Ces ports sont filtrés par Cloudflare ou un pare-feu. Ils pourraient correspondre à des services internes (ex: Node.js sur 3000, API sur 5000, etc.) qui ne sont pas accessibles directement.",
+          "attack_mapping": "T1046 - Network Service Scanning",
+          "severity": "low"
+        },
+        {
+          "type": "technology",
+          "value": "Cloudflare (CDN/WAF)",
+          "significance": "Cloudflare est utilisé comme CDN et WAF. Il masque l'IP d'origine et protège contre certaines attaques. Les règles WAF peuvent bloquer des payloads courants.",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "info"
+        },
+        {
+          "type": "technology",
+          "value": "Render.com (hébergement)",
+          "significance": "L'application est hébergée sur Render.com (PaaS). Le header 'rndr-id' est un identifiant unique de l'instance Render. Render.com gère l'infrastructure sous-jacente.",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "info"
+        },
+        {
+          "type": "anomaly",
+          "value": "Titre de la page : 'TechShop — Votre boutique tech au Sénégal'",
+          "significance": "Le titre indique une boutique en ligne ciblant le Sénégal. Cela peut être utilisé pour du social engineering ou pour identifier des fonctionnalités spécifiques (e-commerce, panier, etc.).",
+          "attack_mapping": "T1591 - Gather Victim Org Information",
+          "severity": "low"
+        },
+        {
+          "type": "defense_layer",
+          "value": "Cloudflare (CDN + WAF)",
+          "significance": "Cloudflare agit comme première ligne de défense. Il peut bloquer les scans agressifs, les injections SQL, XSS, etc. Il faut tester les contournements possibles (ex: IP d'origine, headers spécifiques).",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "info"
+        },
+        {
+          "type": "defense_layer",
+          "value": "Render.com (PaaS isolation)",
+          "significance": "Render.com isole les applications dans des conteneurs. L'accès direct aux services internes (ports filtrés) est limité. Les vulnérabilités doivent être exploitées au niveau applicatif.",
+          "attack_mapping": "T1590 - Gather Victim Network Information",
+          "severity": "info"
+        }
+      ],
+      "attack_surface": {
+        "exposed_ports": [
+          {
+            "port": 80,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          },
+          {
+            "port": 443,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          },
+          {
+            "port": 8080,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          },
+          {
+            "port": 8443,
+            "service": "http",
+            "version": "Cloudflare http proxy"
+          }
+        ],
+        "detected_technologies": [
+          "Cloudflare (CDN/WAF)",
+          "Render.com (PaaS)",
+          "HTML5",
+          "JavaScript (module)"
+        ],
+        "defense_layers": [
+          "Cloudflare CDN",
+          "Cloudflare WAF",
+          "Render.com container isolation"
+        ],
+        "architecture_inference": "Application web (TechShop) hébergée sur Render.com, derrière Cloudflare qui agit comme CDN et WAF. Les ports 80, 443, 8080, 8443 sont les points d'entrée publics. Les ports filtrés (3000, 5000, 8000, 8081, 8888, 9000) sont probablement des services internes (API, base de données, etc.) non accessibles directement. L'application semble être une boutique e-commerce (Node.js probablement, vu les ports 3000 et 5000)."
+      },
+      "recommendations_for_next_agents": [
+        "Agent Web App : Tester les endpoints sur les ports 80, 443, 8080, 8443. Vérifier les fonctionnalités e-commerce (panier, checkout, login). Tester les vulnérabilités OWASP Top 10 (XSS, SQLi, CSRF, etc.). Essayer de contourner Cloudflare (ex: en utilisant l'IP d'origine si trouvée, ou des headers spécifiques).",
+        "Agent Vuln Analysis : Analyser les versions des technologies détectées (si identifiables). Rechercher des CVE pour Cloudflare (contournement WAF) et Render.com (isolation). Tester les ports filtrés pour voir s'ils répondent à des requêtes spécifiques (ex: HTTP sur 3000).",
+        "Agent OSINT : Rechercher des informations sur l'application 'TechShop' et le développeur 'rokina-sylla'. Vérifier les réseaux sociaux, les forums, les fuites de code. Chercher l'IP d'origine de l'application (ex: via des historiques DNS ou des scans de sous-domaines)."
+      ],
+      "confidence": 0.95
+    },
+    "executive_summary": "🎯 SURFACE D'ATTAQUE\nApplication web e-commerce (TechShop) hébergée sur Render.com, exposée via Cloudflare (CDN/WAF). Quatre ports HTTP/HTTPS publics sont ouverts, et six ports internes filtrés suggèrent des services backend potentiellement accessibles.\n\n🟢 PORTS ET SERVICES\n- 80/tcp (HTTP) – Cloudflare proxy\n- 443/tcp (HTTPS) – Cloudflare proxy\n- 8080/tcp (HTTP) – Cloudflare proxy\n- 8443/tcp (HTTPS) – Cloudflare proxy\n\n🛡️ DÉFENSES IDENTIFIÉES\n- Cloudflare (CDN + WAF) : masque l’IP d’origine, filtre les attaques courantes\n- Render.com (isolation conteneur) : limite l’accès direct aux services internes\n\n🔍 OBSERVATIONS CLÉS\n- Technos : HTML5, JavaScript (module), header `rndr-id` (Render.com)\n- Architecture : front-end derrière CDN, services internes probables (Node.js sur 3000, API sur 5000)\n- Titre de page : « TechShop — Votre boutique tech au Sénégal » (cible géographique)\n\n⚠️ POINTS D'ATTENTION\n- Ports 8080 et 8443 exposés : peuvent héberger des services d’administration ou de développement\n- Ports filtrés (3000, 5000, 8000, 8081, 8888, 9000) : à tester pour contournement éventuel\n\n➡️ RECOMMANDATIONS PRIORITAIRES\n1. Agent Web App : tester les 4 ports publics pour OWASP Top 10 (XSS, SQLi, CSRF) ; tenter un contournement Cloudflare (IP d’origine via DNS history)\n2. Agent Vuln Analysis : analyser les versions logicielles détectées ; sonder les ports filtrés avec des requêtes HTTP spécifiques\n3. Agent OSINT : rechercher l’IP d’origine, fuites de code, et informations sur le développeur « rokina-sylla »"
+  },
+  "web_app_result": {
+    "agent": "WebApp_Agent",
+    "version": "1.0",
+    "ptes_phase": 4,
+    "attack_technique": "T1190",
+    "risk_level": "active",
+    "target": "https://techshop-vuln.rokina-sylla.me",
+    "started_at": "2026-06-07T14:37:28.907867+00:00",
+    "ended_at": "2026-06-07T14:40:14.582431+00:00",
+    "duration_seconds": 165.674564,
+    "tools_used": [
+      "js_analyzer",
+      "api_prober",
+      "security_headers",
+      "data_analyzer"
+    ],
+    "raw_data": {
+      "js_analysis": {
+        "status": "success",
+        "target_url": "https://techshop-vuln.rokina-sylla.me",
+        "bundles_found": [
+          "https://techshop-vuln.rokina-sylla.me/assets/index-C5zfjJs0.js"
+        ],
+        "bundles_analyzed": 1,
+        "api_endpoints": [],
+        "app_routes": [
+          "/admin",
+          "/auth/forgot-password",
+          "/auth/login",
+          "/auth/register",
+          "/cart",
+          "/checkout",
+          "/comments",
+          "/forgot-password",
+          "/login",
+          "/orders",
+          "/products",
+          "/profile",
+          "/register",
+          "/users",
+          "/users/me"
+        ],
+        "backend_urls": [
+          "https://techshop-backend-cc1t.onrender.com/api"
+        ],
+        "sensitive_keywords": {
+          "token": 24,
+          "password": 23,
+          "secret": 4,
+          "bearer": 1,
+          "authorization": 5,
+          "credential": 11,
+          "admin": 11
+        },
+        "potential_secrets": [],
+        "duration_seconds": 1.320196,
+        "error": null
+      },
+      "api_probe": {
+        "status": "success",
+        "base_url": "https://techshop-backend-cc1t.onrender.com/api",
+        "endpoints_tested": 15,
+        "results": [
+          {
+            "endpoint": "/admin",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/admin",
+            "status_code": null,
+            "content_type": null,
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": "Timeout"
+          },
+          {
+            "endpoint": "/auth/forgot-password",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/auth/forgot-password",
+            "status_code": null,
+            "content_type": null,
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": "Timeout"
+          },
+          {
+            "endpoint": "/auth/login",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/auth/login",
+            "status_code": null,
+            "content_type": null,
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": "Timeout"
+          },
+          {
+            "endpoint": "/auth/register",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/auth/register",
+            "status_code": null,
+            "content_type": null,
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": "Timeout"
+          },
+          {
+            "endpoint": "/cart",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/cart",
+            "status_code": null,
+            "content_type": null,
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": "Timeout"
+          },
+          {
+            "endpoint": "/checkout",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/checkout",
+            "status_code": null,
+            "content_type": null,
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": "Timeout"
+          },
+          {
+            "endpoint": "/comments",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/comments",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/forgot-password",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/forgot-password",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/login",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/login",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/orders",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/orders",
+            "status_code": 200,
+            "content_type": "application/json",
+            "returns_json": true,
+            "response_size": 436,
+            "sensitive_fields_found": [],
+            "record_count": 4,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/products",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/products",
+            "status_code": 200,
+            "content_type": "application/json",
+            "returns_json": true,
+            "response_size": 1681,
+            "sensitive_fields_found": [],
+            "record_count": 8,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/profile",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/profile",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/register",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/register",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": null
+          },
+          {
+            "endpoint": "/users",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+            "status_code": 200,
+            "content_type": "application/json",
+            "returns_json": true,
+            "response_size": 998,
+            "sensitive_fields_found": [
+              "creditCard",
+              "password",
+              "resetToken"
+            ],
+            "record_count": 5,
+            "raw_json_data": [
+              {
+                "id": 1,
+                "username": "admin",
+                "email": "admin@techshop.sn",
+                "password": "0192023a7bbd73250516f069df18b500",
+                "role": "ADMIN",
+                "address": "123 Rue de Dakar, Sénégal",
+                "phone": "+221 77 123 45 67",
+                "resetToken": null,
+                "creditCard": "4532015112830366"
+              },
+              {
+                "id": 2,
+                "username": "alice",
+                "email": "alice@gmail.com",
+                "password": "5f4dcc3b5aa765d61d8327deb882cf99",
+                "role": "USER",
+                "address": null,
+                "phone": "+221 78 234 56 78",
+                "resetToken": null,
+                "creditCard": "4916338506082832"
+              },
+              {
+                "id": 3,
+                "username": "bob",
+                "email": "bob@gmail.com",
+                "password": "e10adc3949ba59abbe56e057f20f883e",
+                "role": "USER",
+                "address": null,
+                "phone": null,
+                "resetToken": null,
+                "creditCard": "4532756279624064"
+              },
+              {
+                "id": 4,
+                "username": "rokhaya",
+                "email": "rokhaya@uadb.edu.sn",
+                "password": "c5340280e0765c90f9e94838dab8f22d",
+                "role": "USER",
+                "address": null,
+                "phone": null,
+                "resetToken": null,
+                "creditCard": null
+              },
+              {
+                "id": 5,
+                "username": "max",
+                "email": "max@gmail.com",
+                "password": "d1696816bc1a7afe92f1c8787ac222c3",
+                "role": "USER",
+                "address": "Ucad",
+                "phone": "783149843",
+                "resetToken": null,
+                "creditCard": null
+              }
+            ],
+            "error": null
+          },
+          {
+            "endpoint": "/users/me",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users/me",
+            "status_code": 403,
+            "content_type": "",
+            "returns_json": false,
+            "response_size": 0,
+            "sensitive_fields_found": [],
+            "record_count": null,
+            "raw_json_data": null,
+            "error": null
+          }
+        ],
+        "access_control_findings": [
+          {
+            "endpoint": "/orders",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/orders",
+            "status_code": 200,
+            "reason": "Endpoint JSON accessible sans authentification",
+            "owasp": "A01:2021 Broken Access Control"
+          },
+          {
+            "endpoint": "/products",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/products",
+            "status_code": 200,
+            "reason": "Endpoint JSON accessible sans authentification",
+            "owasp": "A01:2021 Broken Access Control"
+          },
+          {
+            "endpoint": "/users",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+            "status_code": 200,
+            "reason": "Endpoint JSON accessible sans authentification",
+            "owasp": "A01:2021 Broken Access Control"
+          }
+        ],
+        "data_exposure_findings": [
+          {
+            "endpoint": "/users",
+            "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+            "sensitive_fields": [
+              "creditCard",
+              "password",
+              "resetToken"
+            ],
+            "reason": "Champs sensibles exposés dans la réponse",
+            "owasp": "A01:2021 / A02:2021"
+          }
+        ],
+        "summary": {
+          "accessible_without_auth": 3,
+          "protected": 6,
+          "errors": 6,
+          "sensitive_data_exposed": 1
+        },
+        "duration_seconds": 142.452564,
+        "error": null
+      },
+      "security_headers": {
+        "status": "success",
+        "target_url": "https://techshop-vuln.rokina-sylla.me",
+        "http_status": 200,
+        "missing_security_headers": [
+          {
+            "header": "content-security-policy",
+            "severity": "high",
+            "description": "Protège contre XSS et injection de contenu",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "strict-transport-security",
+            "severity": "high",
+            "description": "Force HTTPS, protège contre les attaques downgrade",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "x-frame-options",
+            "severity": "medium",
+            "description": "Protège contre le clickjacking",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "referrer-policy",
+            "severity": "low",
+            "description": "Contrôle les informations de referrer transmises",
+            "owasp": "A05:2021"
+          },
+          {
+            "header": "permissions-policy",
+            "severity": "low",
+            "description": "Restreint l'accès aux API du navigateur",
+            "owasp": "A05:2021"
+          }
+        ],
+        "present_security_headers": [
+          {
+            "header": "x-content-type-options",
+            "value": "nosniff"
+          }
+        ],
+        "info_disclosure_headers": [
+          {
+            "header": "server",
+            "value": "cloudflare",
+            "description": "Révèle le serveur web et parfois sa version"
+          }
+        ],
+        "cookie_issues": [],
+        "all_headers": {
+          "Date": "Sun, 07 Jun 2026 14:39:53 GMT",
+          "Content-Type": "text/html; charset=utf-8",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "Cache-Control": "public, max-age=0, s-maxage=300",
+          "Age": "193",
+          "cf-cache-status": "HIT",
+          "last-modified": "Sun, 07 Jun 2026 12:21:54 UTC",
+          "rndr-id": "3bf254aa-2ab3-4549",
+          "Server": "cloudflare",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "x-content-type-options": "nosniff",
+          "etag": "W/\"4754eba39cb9283111d2f47069f6d145\"",
+          "Content-Encoding": "gzip",
+          "CF-RAY": "a08068a6ac0de839-LHR",
+          "alt-svc": "h3=\":443\"; ma=86400"
+        },
+        "security_score": 35,
+        "summary": {
+          "missing_count": 5,
+          "info_leaks_count": 1,
+          "cookie_issues_count": 0
+        },
+        "duration_seconds": 0.494895,
+        "error": null
+      },
+      "data_analysis": [
+        {
+          "endpoint": "/users",
+          "url": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "analysis": {
+            "status": "success",
+            "findings": [
+              {
+                "title": "Utilisation d'algorithmes de hash faibles (MD5)",
+                "severity": "high",
+                "owasp": "A02:2021 Cryptographic Failures",
+                "cwe": "CWE-327",
+                "count": 5,
+                "description": "Des mots de passe sont hachés avec des algorithmes cryptographiquement faibles, vulnérables aux attaques par dictionnaire et rainbow tables."
+              },
+              {
+                "title": "Mots de passe faibles cassés via dictionnaire",
+                "severity": "critical",
+                "owasp": "A02:2021 / A07:2021",
+                "cwe": "CWE-916",
+                "count": 3,
+                "description": "3 mot(s) de passe ont été retrouvés en clair à partir de leur hash, démontrant l'usage de mots de passe triviaux et de hash non salés."
+              },
+              {
+                "title": "Numéros de carte bancaire exposés",
+                "severity": "critical",
+                "owasp": "A02:2021 Cryptographic Failures",
+                "cwe": "CWE-311",
+                "count": 3,
+                "description": "3 numéro(s) de carte bancaire valide(s) (vérifiés par Luhn) exposé(s) en clair. Violation directe de PCI DSS."
+              }
+            ],
+            "weak_hashes": [
+              {
+                "field": "password",
+                "path": "[0].password",
+                "algorithm": "MD5",
+                "strength": "weak",
+                "cwe": "CWE-327"
+              },
+              {
+                "field": "password",
+                "path": "[1].password",
+                "algorithm": "MD5",
+                "strength": "weak",
+                "cwe": "CWE-327"
+              },
+              {
+                "field": "password",
+                "path": "[2].password",
+                "algorithm": "MD5",
+                "strength": "weak",
+                "cwe": "CWE-327"
+              },
+              {
+                "field": "password",
+                "path": "[3].password",
+                "algorithm": "MD5",
+                "strength": "weak",
+                "cwe": "CWE-327"
+              },
+              {
+                "field": "password",
+                "path": "[4].password",
+                "algorithm": "MD5",
+                "strength": "weak",
+                "cwe": "CWE-327"
+              }
+            ],
+            "cracked_passwords": [
+              {
+                "field": "password",
+                "path": "[0].password",
+                "hash": "0192023a...",
+                "algorithm": "MD5",
+                "plaintext": "admin123"
+              },
+              {
+                "field": "password",
+                "path": "[1].password",
+                "hash": "5f4dcc3b...",
+                "algorithm": "MD5",
+                "plaintext": "password"
+              },
+              {
+                "field": "password",
+                "path": "[2].password",
+                "hash": "e10adc39...",
+                "algorithm": "MD5",
+                "plaintext": "123456"
+              }
+            ],
+            "exposed_cards": [
+              {
+                "field": "creditCard",
+                "path": "[0].creditCard",
+                "card_type": "Visa",
+                "masked": "************0366"
+              },
+              {
+                "field": "creditCard",
+                "path": "[1].creditCard",
+                "card_type": "Visa",
+                "masked": "************2832"
+              },
+              {
+                "field": "creditCard",
+                "path": "[2].creditCard",
+                "card_type": "Visa",
+                "masked": "************4064"
+              }
+            ],
+            "summary": {
+              "weak_hash_count": 5,
+              "cracked_password_count": 3,
+              "exposed_card_count": 3
+            },
+            "duration_seconds": 0.001281,
+            "error": null
+          }
+        }
+      ]
+    },
+    "analysis": {
+      "summary": "L'application web 'techshop-vuln.rokina-sylla.me' présente une vulnérabilité critique de contrôle d'accès : l'endpoint /users de l'API backend expose sans authentification les données personnelles de 5 utilisateurs, incluant des mots de passe hachés avec MD5 (dont 3 ont été cassés en clair) et 3 numéros de carte bancaire en clair. L'application manque également de plusieurs en-têtes de sécurité essentiels (CSP, HSTS, X-Frame-Options). La posture de sécurité est très faible, avec un risque immédiat de compromission des comptes et de violation de données.",
+      "vulnerabilities": [
+        {
+          "title": "Exposition massive de données sensibles via l'API /users sans authentification",
+          "severity": "critical",
+          "owasp_top10": "A01:2021 Broken Access Control",
+          "cwe": "CWE-862",
+          "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "description": "L'endpoint /users de l'API backend est accessible sans aucune authentification et expose l'intégralité des données utilisateur : mots de passe hachés (MD5), numéros de carte bancaire en clair, emails, adresses et numéros de téléphone. 5 comptes sont exposés, dont un administrateur.",
+          "evidence": "Requête GET sur /api/users sans token : réponse JSON contenant 5 objets utilisateur avec champs 'password', 'creditCard', 'email', 'address', 'phone'. Les mots de passe sont des hashs MD5 (32 caractères hexadécimaux). 3 numéros de carte Visa sont présents en clair.",
+          "remediation": "1. Restreindre l'accès à /api/users aux seuls administrateurs authentifiés avec un rôle 'ADMIN'. 2. Ne jamais exposer les mots de passe, même hachés, dans les réponses API. 3. Supprimer les numéros de carte bancaire de l'API ou les masquer complètement. 4. Implémenter une authentification forte (JWT avec vérification du rôle).",
+          "confidence": 1.0
+        },
+        {
+          "title": "Utilisation d'algorithmes de hachage faibles (MD5) pour les mots de passe",
+          "severity": "high",
+          "owasp_top10": "A02:2021 Cryptographic Failures",
+          "cwe": "CWE-327",
+          "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "description": "Les 5 mots de passe exposés sont hachés avec MD5, un algorithme cryptographiquement obsolète et vulnérable aux attaques par dictionnaire et rainbow tables. 3 de ces hashs ont été cassés en clair (admin123, password, 123456), démontrant la faiblesse du mécanisme.",
+          "evidence": "Analyse des hashs : '0192023a...' (admin123), '5f4dcc3b...' (password), 'e10adc39...' (123456). Tous les hashs font 32 caractères hexadécimaux, caractéristique du MD5.",
+          "remediation": "Remplacer MD5 par un algorithme de hachage moderne et salé comme bcrypt, Argon2 ou PBKDF2. Implémenter un salage unique par mot de passe. Forcer les utilisateurs à changer leur mot de passe lors de la prochaine connexion.",
+          "confidence": 1.0
+        },
+        {
+          "title": "Exposition de numéros de carte bancaire en clair",
+          "severity": "critical",
+          "owasp_top10": "A02:2021 Cryptographic Failures",
+          "cwe": "CWE-311",
+          "affected_endpoint": "https://techshop-backend-cc1t.onrender.com/api/users",
+          "description": "3 numéros de carte bancaire Visa sont stockés et exposés en clair dans la base de données, accessibles via l'API sans authentification. Cela constitue une violation directe de la norme PCI DSS qui interdit le stockage de numéros de carte complets après autorisation.",
+          "evidence": "Champs 'creditCard' dans les réponses JSON pour les utilisateurs admin, alice et bob. Les numéros sont complets (16 chiffres) et validés comme des numéros Visa via l'algorithme de Luhn.",
+          "remediation": "1. Ne jamais stocker de numéros de carte bancaire en clair. 2. Utiliser un token de paiement (via un prestataire PCI DSS compliant comme Stripe) à la place du numéro réel. 3. Supprimer immédiatement les numéros existants de la base de données. 4. Notifier les utilisateurs concernés et les autorités compétentes (CNIL, PCI SSC).",
+          "confidence": 1.0
+        },
+        {
+          "title": "Absence d'en-têtes de sécurité HTTP essentiels",
+          "severity": "high",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-693",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+          "description": "L'application ne définit pas plusieurs en-têtes de sécurité critiques : Content-Security-Policy (protection XSS), Strict-Transport-Security (HSTS, protection downgrade HTTPS), X-Frame-Options (protection clickjacking), Referrer-Policy et Permissions-Policy. Seul X-Content-Type-Options est présent.",
+          "evidence": "Analyse des en-têtes HTTP de la page d'accueil : absence de CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy. Score de sécurité calculé à 35/100.",
+          "remediation": "Ajouter les en-têtes suivants : Content-Security-Policy (avec une politique restrictive), Strict-Transport-Security (max-age=31536000; includeSubDomains), X-Frame-Options (DENY), Referrer-Policy (strict-origin-when-cross-origin), Permissions-Policy (restreindre les API).",
+          "confidence": 0.95
+        },
+        {
+          "title": "Divulgation d'informations via l'en-tête Server",
+          "severity": "low",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-200",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me",
+          "description": "L'en-tête 'Server: cloudflare' est présent dans les réponses HTTP, révélant la technologie utilisée en amont. Bien que mineur, cela peut aider un attaquant à cibler des vulnérabilités spécifiques à Cloudflare.",
+          "evidence": "En-tête HTTP 'Server: cloudflare' présent dans la réponse.",
+          "remediation": "Configurer Cloudflare pour masquer ou personnaliser l'en-tête Server via les règles de transformation.",
+          "confidence": 0.9
+        },
+        {
+          "title": "Exposition des routes et endpoints de l'application via le bundle JS",
+          "severity": "medium",
+          "owasp_top10": "A05:2021 Security Misconfiguration",
+          "cwe": "CWE-200",
+          "affected_endpoint": "https://techshop-vuln.rokina-sylla.me/assets/index-C5zfjJs0.js",
+          "description": "Le bundle JavaScript frontend expose l'intégralité des routes de l'application (15 endpoints) et l'URL de l'API backend. Cela facilite la cartographie de l'application par un attaquant.",
+          "evidence": "Analyse du bundle JS : découverte de 15 routes (dont /admin, /users, /orders) et de l'URL backend 'https://techshop-backend-cc1t.onrender.com/api'.",
+          "remediation": "Implémenter un routage dynamique côté serveur ou utiliser des variables d'environnement pour masquer les routes sensibles. Ne pas exposer l'URL backend complète dans le bundle.",
+          "confidence": 0.85
+        }
+      ],
+      "false_positives_filtered": [
+        "Catalogue de produits accessible sans authentification (/products) : comportement normal pour une boutique en ligne, les produits doivent être publics.",
+        "Liste des commandes accessible sans authentification (/orders) : bien que non protégé, le faible nombre de commandes (4) et l'absence de données sensibles dans la réponse en font un risque mineur dans ce contexte.",
+        "Timeout sur les endpoints d'authentification (/auth/login, /auth/register) : probablement dû à une protection WAF ou à un rate limiting, pas une vulnérabilité en soi.",
+        "Présence de l'en-tête 'Server: cloudflare' : information mineure, courante sur les sites utilisant Cloudflare."
+      ],
+      "attack_surface_summary": {
+        "endpoints_discovered": 15,
+        "endpoints_accessible_without_auth": 3,
+        "backend_architecture": "Application web monopage (SPA) avec frontend statique hébergé sur Render.com et API backend Node.js/Express sur Render.com. Utilisation de Cloudflare comme CDN/WAF en amont. Base de données non identifiée mais probablement PostgreSQL ou MongoDB (hébergée sur Render.com)."
+      },
+      "recommendations_for_next_agents": [
+        "Agent Exploitation : tenter une connexion avec les identifiants cassés (admin/admin123, alice/password, bob/123456) sur /auth/login pour confirmer l'accès.",
+        "Agent Exploitation : vérifier si l'endpoint /admin est accessible après connexion avec le compte admin.",
+        "Agent Exploitation : tester l'injection SQL ou NoSQL sur les endpoints /products et /orders.",
+        "Agent Exploitation : vérifier la présence de vulnérabilités XSS sur les endpoints /comments et /profile.",
+        "Agent Post-Exploitation : si accès admin obtenu, rechercher des fichiers de configuration, clés API ou autres secrets dans l'application."
+      ],
+      "overall_risk": "critical",
+      "confidence": 0.98
+    },
+    "executive_summary": "🎯 APPLICATION\nBoutique en ligne monopage (SPA) avec frontend statique et API backend Node.js/Express, hébergée sur Render.com derrière Cloudflare.\n\n🔴 VULNÉRABILITÉS CRITIQUES\n- Exposition massive de données sensibles via l’API /users sans authentification : mots de passe hachés (MD5), 3 numéros de carte bancaire en clair, emails, adresses.\n- 3 mots de passe MD5 cassés en clair (admin123, password, 123456).\n- Stockage de numéros de carte bancaire en clair (violation PCI DSS).\n\n🟠 PROBLÈMES SECONDAIRES\n- Absence d’en-têtes de sécurité HTTP essentiels (CSP, HSTS, X-Frame-Options).\n- Exposition des routes et de l’URL backend dans le bundle JavaScript.\n- En-tête Server: cloudflare divulgué.\n\n✅ POINTS POSITIFS\n- Catalogue de produits accessible sans authentification (comportement normal).\n- X-Content-Type-Options présent.\n\n➡️ ACTIONS PRIORITAIRES\n1. Restreindre immédiatement l’accès à /api/users aux administrateurs authentifiés.\n2. Supprimer les numéros de carte bancaire de la base et migrer vers un token de paiement.\n3. Remplacer MD5 par bcrypt/Argon2 et forcer la réinitialisation des mots de passe."
+  },
+  "execution_log": [
+    {
+      "timestamp": "2026-06-07T14:35:39.868992+00:00",
+      "agent": "orchestrator",
+      "event": "phase_start",
+      "details": "OSINT"
+    },
+    {
+      "timestamp": "2026-06-07T14:36:18.626805+00:00",
+      "agent": "OSINT_Agent",
+      "event": "completed",
+      "details": "5 findings"
+    },
+    {
+      "timestamp": "2026-06-07T14:36:18.626877+00:00",
+      "agent": "orchestrator",
+      "event": "phase_start",
+      "details": "Scanning"
+    },
+    {
+      "timestamp": "2026-06-07T14:37:28.907722+00:00",
+      "agent": "Scanning_Agent",
+      "event": "completed",
+      "details": "10 findings"
+    },
+    {
+      "timestamp": "2026-06-07T14:37:28.907799+00:00",
+      "agent": "orchestrator",
+      "event": "phase_start",
+      "details": "WebApp"
+    },
+    {
+      "timestamp": "2026-06-07T14:40:30.129864+00:00",
+      "agent": "WebApp_Agent",
+      "event": "completed",
+      "details": "6 vulnérabilités"
+    },
+    {
+      "timestamp": "2026-06-07T14:40:30.129911+00:00",
+      "agent": "orchestrator",
+      "event": "campaign_completed",
+      "details": "3 agents exécutés"
+    }
+  ],
+  "errors": []
+}
