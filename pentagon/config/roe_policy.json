@@ -1,0 +1,15 @@
+{
+  "policy_name": "Politique RoE par defaut PENTAGON",
+  "version": "1.0",
+  "description": "Definit le perimetre autorise pour les campagnes de pentest.",
+  "default_behavior": "deny",
+  "authorized_targets": [
+    "techshop-vuln.rokina-sylla.me",
+    "techshop-backend-cc1t.onrender.com"
+  ],
+  "authorized_action_categories": [
+    "passive",
+    "active_scan"
+  ],
+  "notes": "deny by default : toute cible non listee est refusee."
+}
