@@ -34,13 +34,13 @@ def make_jwt(payload: dict, secret: str = "secret", alg: str = "HS256") -> str:
     return f"{header_b64}.{payload_b64}.{signature}"
 
 
-def analyze_and_print(label: str, token: str):
+def analyze_and_print(label: str, token: str, context_hints: list | None = None):
     print(f"\n{'─' * 70}")
     print(f">>> {label}")
     print(f"{'─' * 70}")
     print(f"Token : {token[:50]}...")
-    
-    result = run_jwt_analysis(token)
+
+    result = run_jwt_analysis(token, context_hints=context_hints)
     
     if result["status"] != "success":
         print(f"  ✗ {result['error']}")
@@ -48,8 +48,11 @@ def analyze_and_print(label: str, token: str):
     
     print(f"  Algorithme : {result['algorithm']}")
     print(f"  Payload    : {result['payload']}")
+    print(f"  Forgeable  : {'OUI' if result['is_forgeable'] else 'non'}")
     if result["cracked_secret"]:
         print(f"  🔓 SECRET CASSÉ : '{result['cracked_secret']}'")
+    if result["privilege_claims"]:
+        print(f"  Claims de privilège : {result['privilege_claims']}")
     
     if result["findings"]:
         print(f"\n  🚨 FAIBLESSES DÉTECTÉES ({len(result['findings'])}) :")
@@ -80,6 +83,35 @@ def main():
     # Cas 4 : JWT avec secret fort (ne devrait pas être cassé)
     token4 = make_jwt({"sub": "user3", "exp": 9999999999}, secret="X9k$2mP!qR7zW3nY8vL5tA1bC6dE0fG")
     analyze_and_print("JWT avec secret fort (ne doit PAS être cassé)", token4)
+
+    # Cas 5 : profil du token TechShop réel — role ADMIN + secret faible.
+    # Forgeable (secret cassable) ET claim de privilège exposé → critical.
+    token5 = make_jwt(
+        {"sub": "admin", "role": "ADMIN", "exp": 9999999999}, secret="secret"
+    )
+    analyze_and_print("JWT type TechShop (role=ADMIN + secret faible)", token5)
+
+    # Cas 6 : role ADMIN mais secret FORT (non forgeable) → privilège en 'low'
+    token6 = make_jwt(
+        {"sub": "admin", "role": "ADMIN", "exp": 9999999999},
+        secret="X9k$2mP!qR7zW3nY8vL5tA1bC6dE0fG",
+    )
+    analyze_and_print("JWT role=ADMIN mais secret fort (privilège en low)", token6)
+
+    # Cas 7 : fuite d'information (claim debug_info) — profil token TechShop réel
+    token7 = make_jwt(
+        {"sub": "admin", "role": "ADMIN", "debug_info": "TechShop v1.0", "exp": 9999999999},
+        secret="X9k$2mP!qR7zW3nY8vL5tA1bC6dE0fG",
+    )
+    analyze_and_print("JWT avec fuite d'info (debug_info)", token7)
+
+    # Cas 8 : secret = nom de l'app, cassé grâce aux indices de contexte
+    token8 = make_jwt({"sub": "admin", "role": "ADMIN", "exp": 9999999999}, secret="techshop")
+    analyze_and_print(
+        "JWT secret = nom d'app, cassé via context_hints",
+        token8,
+        context_hints=["techshop-vuln.rokina-sylla.me"],
+    )
     
     print("\n" + "=" * 70)
     print("Test terminé.")
