@@ -95,10 +95,16 @@ def main():
             print(f"  {path:40} ERREUR {type(e).__name__}")
             continue
         body = r.text or ""
+        ctype = r.headers.get("content-type", "")[:30]
         raw = MARKER in body
         escaped = "&lt;pgnxss7s9&gt;" in body
         verdict = "REFLÉTÉ BRUT ⚠" if raw and not escaped else ("échappé (sûr)" if escaped else "non reflété")
-        print(f"  {path:40} {r.status_code}  {verdict}")
+        print(f"  {path:40} {r.status_code}  [{ctype}]  {verdict}")
+        # Si reflété brut, montre le contexte (HTML vs JSON) autour du marqueur
+        if raw and not escaped:
+            idx = body.find(MARKER)
+            snippet = body[max(0, idx - 60): idx + len(MARKER) + 30].replace("\n", " ")
+            print(f"       contexte: ...{snippet}...")
 
     print("\nDiagnostic terminé.")
 
