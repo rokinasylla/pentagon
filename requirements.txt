@@ -16,3 +16,7 @@ dnspython>=2.4.0       # pour les requêtes DNS
 # Outils de scanning réseau
 python-nmap>=0.7.1
 requests>=2.31.0
+
+# Confirmation XSS par navigateur (agent/outil offensif)
+# Après installation : exécuter `playwright install chromium`
+playwright>=1.40.0
