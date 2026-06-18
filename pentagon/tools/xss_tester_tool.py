@@ -57,6 +57,13 @@ COMMON_REFLECT_PARAMS = ["q", "search", "query", "keyword", "s", "term", "filter
 # Noms de champs de contenu courants pour le XSS stocké (génériques).
 COMMON_CONTENT_FIELDS = ["content", "text", "comment", "message", "body", "review", "description"]
 
+# Champs typiquement générés par le serveur : on ne les renvoie pas dans un POST
+# (ils provoqueraient un rejet ou seraient ignorés).
+SERVER_SET_FIELDS = {
+    "id", "_id", "uuid", "createdat", "updatedat", "timestamp", "date",
+    "userid", "author", "authorid", "ownerid",
+}
+
 
 def run_xss_test(
     reflected_urls: list[str] | None = None,
@@ -186,8 +193,14 @@ def _test_stored(
     delay: float,
 ) -> dict[str, Any] | None:
     """
-    Tente d'enregistrer le marqueur via POST (champs de contenu courants) puis
-    de le relire via GET ; cherche un stockage NON échappé.
+    Tente d'enregistrer le marqueur via POST puis de le relire via GET ;
+    cherche un stockage NON échappé.
+
+    Approche SCHEMA-AWARE : on lit d'abord un objet existant de la collection
+    pour apprendre son schéma (champs + types), puis on recopie ce schéma valide
+    en injectant le marqueur dans le meilleur champ texte. Cela maximise la
+    réussite du POST (champs requis fournis) sans deviner. Si la collection est
+    vide, on retombe sur des noms de champs de contenu courants.
     """
     outcome: dict[str, Any] = {
         "vector": "stored",
@@ -200,20 +213,39 @@ def _test_stored(
     post_headers = dict(headers)
     post_headers["Content-Type"] = "application/json"
 
-    for field in COMMON_CONTENT_FIELDS:
+    # 1. Apprend le schéma depuis un objet existant
+    sample = None
+    try:
+        getr = requests.get(collection_url, headers=headers, timeout=timeout)
+        sample = _extract_sample_object(getr)
+    except requests.RequestException:
+        pass
+    time.sleep(delay)
+
+    # 2. Construit les tentatives de POST
+    attempts: list[tuple[dict[str, Any], str]] = []
+    if sample:
+        body, inject_field = _build_post_from_sample(sample)
+        if inject_field:
+            outcome["notes"].append(
+                f"Schéma appris ({len(sample)} champs) ; injection dans '{inject_field}'."
+            )
+            attempts.append((body, inject_field))
+    if not attempts:
+        # Repli : on devine le champ de contenu (collection vide ou non apprise)
+        outcome["notes"].append("Schéma non appris ; repli sur des noms de champs courants.")
+        for field in COMMON_CONTENT_FIELDS:
+            attempts.append(({field: f"PENTAGON test {XSS_CANARY}"}, field))
+
+    # 3. Exécute les tentatives
+    for body, field in attempts:
         outcome["tested_fields"] += 1
         try:
-            post = requests.post(
-                collection_url,
-                json={field: f"PENTAGON test {XSS_CANARY}"},
-                headers=post_headers,
-                timeout=timeout,
-            )
+            post = requests.post(collection_url, json=body, headers=post_headers, timeout=timeout)
         except requests.RequestException:
             time.sleep(delay)
             continue
 
-        # On ne considère que les écritures acceptées (2xx)
         if post.status_code not in (200, 201):
             time.sleep(delay)
             continue
@@ -225,8 +257,8 @@ def _test_stored(
             time.sleep(delay)
             continue
 
-        body = getr.text or ""
-        if XSS_CANARY in body and XSS_CANARY_ESCAPED not in body:
+        page = getr.text or ""
+        if XSS_CANARY in page and XSS_CANARY_ESCAPED not in page:
             outcome["findings"].append({
                 "title": "XSS stocké (contenu enregistré sans assainissement)",
                 "severity": "high",
@@ -242,8 +274,67 @@ def _test_stored(
             })
             time.sleep(delay)
             break  # preuve obtenue
-        elif XSS_CANARY_ESCAPED in body:
+        elif XSS_CANARY_ESCAPED in page:
             outcome["notes"].append(f"Champ '{field}' : stocké mais correctement échappé (sûr).")
         time.sleep(delay)
 
     return outcome
+
+
+def _extract_sample_object(response: requests.Response) -> dict[str, Any] | None:
+    """Extrait un objet représentatif d'une réponse de collection JSON."""
+    try:
+        data = response.json()
+    except ValueError:
+        return None
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return data[0]
+    if isinstance(data, dict):
+        # Cas {"items": [...]} ou {"data": [...]}
+        for value in data.values():
+            if isinstance(value, list) and value and isinstance(value[0], dict):
+                return value[0]
+        # Sinon, l'objet lui-même s'il a des champs simples
+        if data:
+            return data
+    return None
+
+
+def _build_post_from_sample(sample: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    """
+    Construit un corps de POST en recopiant le schéma d'un objet existant,
+    en omettant les champs gérés par le serveur, et en choisissant le meilleur
+    champ texte où injecter le marqueur.
+
+    Returns:
+        (corps_du_post, champ_d_injection ou None)
+    """
+    body: dict[str, Any] = {}
+    string_fields: list[tuple[str, int]] = []
+
+    for key, value in sample.items():
+        key_norm = key.lower().replace("_", "")
+        if key_norm in SERVER_SET_FIELDS:
+            continue
+        if isinstance(value, bool):
+            body[key] = value
+        elif isinstance(value, (int, float)):
+            body[key] = value          # réutilise la valeur réelle (ex. productId valide)
+        elif isinstance(value, str):
+            body[key] = "PENTAGON"
+            string_fields.append((key, len(value)))
+        # on ignore None / listes / objets imbriqués
+
+    # Choix du champ d'injection : un nom évoquant du contenu, sinon le plus long
+    inject_field = None
+    for key, _ in string_fields:
+        if any(hint in key.lower() for hint in COMMON_CONTENT_FIELDS):
+            inject_field = key
+            break
+    if not inject_field and string_fields:
+        inject_field = max(string_fields, key=lambda kv: kv[1])[0]
+
+    if inject_field:
+        body[inject_field] = f"PENTAGON test {XSS_CANARY}"
+
+    return body, inject_field
