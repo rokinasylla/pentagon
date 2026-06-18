@@ -68,7 +68,9 @@ COMMON_PASSWORD_FIELDS = ["password", "pass", "pwd", "passwd"]
 COMMON_TOKEN_KEYS = ["token", "access_token", "accessToken", "jwt", "auth_token", "id_token"]
 
 # Signatures d'erreurs SQL (multi-SGBD). Leur présence trahit une requête
-# construite par concaténation non protégée.
+# construite par concaténation non protégée. Inclut les fuites de requête
+# verbeuses (ex. message « error executing SQL [SELECT ... ] ») et les
+# exceptions ORM/JDBC courantes.
 SQL_ERROR_SIGNATURES = [
     "you have an error in your sql syntax",
     "warning: mysql", "mysqli", "mysql_fetch", "mysql_num_rows",
@@ -78,7 +80,16 @@ SQL_ERROR_SIGNATURES = [
     "sqlite3.", "sqlite error", "near \"", "sql syntax",
     "odbc", "sqlstate", "incorrect syntax near", "microsoft sql",
     "system.data.sqlclient", "unterminated quoted string",
+    # Fuites de requête / exceptions ORM-JDBC (Spring/Hibernate/Postgres...)
+    "error executing sql", "select * from", " ilike ", "could not extract",
+    "could not execute", "sqlexception", "jdbc", "org.hibernate",
+    "org.postgresql", "psqlexception", "dataintegrityviolation",
+    "badsqlgrammar", "queryexception",
 ]
+
+# Paramètres de requête courants susceptibles d'atteindre une requête SQL
+# (recherche, filtre). Génériques.
+SEARCH_PARAMS = ["q", "search", "query", "keyword", "term", "name", "filter"]
 
 # Mots indiquant un échec de connexion (pour distinguer un vrai succès).
 FAILURE_WORDS = ["invalid", "incorrect", "failed", "error", "unauthorized", "wrong", "denied"]
@@ -87,17 +98,21 @@ FAILURE_WORDS = ["invalid", "incorrect", "failed", "error", "unauthorized", "wro
 def run_sqli_test(
     login_url: str | None = None,
     injectable_endpoints: list[str] | None = None,
+    search_endpoints: list[str] | None = None,
     token: str | None = None,
     timeout: int = DEFAULT_TIMEOUT,
     delay_between_requests: float = 0.6,
 ) -> dict[str, Any]:
     """
-    Teste l'injection SQL sur un endpoint de login et/ou des endpoints paramétrés.
+    Teste l'injection SQL sur un login, des endpoints paramétrés et/ou des
+    endpoints de recherche (paramètres de requête).
 
     Args:
         login_url: URL du login à tester pour le contournement d'auth (optionnel).
         injectable_endpoints: URLs (avec un placeholder {id} ou un segment
-            numérique) à tester par injection sur le paramètre (optionnel).
+            numérique) à tester par injection sur le paramètre de chemin (optionnel).
+        search_endpoints: URLs à tester par injection sur un paramètre de
+            requête (?q=, ?search=...) — typiquement les endpoints de recherche.
         token: token d'authentification à présenter sur les endpoints protégés.
         timeout: délai d'attente par requête.
         delay_between_requests: délai éthique entre requêtes.
@@ -132,7 +147,7 @@ def run_sqli_test(
             result["endpoints_tested"] += 1
             result["sqli_findings"].extend(login_outcome.get("findings", []))
 
-        # === Vecteur 2 : injection sur les paramètres des endpoints ===
+        # === Vecteur 2 : injection sur les paramètres de chemin des endpoints ===
         for endpoint in (injectable_endpoints or []):
             param_outcome = _test_param_sqli(
                 endpoint, headers, timeout, delay_between_requests
@@ -142,6 +157,15 @@ def run_sqli_test(
             result["results"].append(param_outcome)
             result["endpoints_tested"] += 1
             result["sqli_findings"].extend(param_outcome.get("findings", []))
+
+        # === Vecteur 3 : injection sur les paramètres de requête (recherche) ===
+        for endpoint in (search_endpoints or []):
+            query_outcome = _test_query_param_sqli(
+                endpoint, headers, timeout, delay_between_requests
+            )
+            result["results"].append(query_outcome)
+            result["endpoints_tested"] += 1
+            result["sqli_findings"].extend(query_outcome.get("findings", []))
 
     except Exception as e:
         result["status"] = "error"
@@ -312,6 +336,67 @@ def _test_param_sqli(
     except requests.RequestException:
         pass
     time.sleep(delay)
+
+    return outcome
+
+
+def _test_query_param_sqli(
+    url: str,
+    headers: dict[str, str],
+    timeout: int,
+    delay: float,
+) -> dict[str, Any]:
+    """
+    Teste l'injection SQL sur les paramètres de requête d'un endpoint (ex. la
+    recherche /api/products/search?q=...).
+
+    Pour chaque nom de paramètre courant, on compare une valeur bénigne à la
+    même valeur suivie d'une apostrophe : si l'apostrophe déclenche une erreur
+    SQL (ou une fuite de requête) absente du cas bénin, le paramètre est injectable.
+    """
+    outcome: dict[str, Any] = {
+        "vector": "query_param",
+        "target": url,
+        "tested_params": 0,
+        "findings": [],
+        "notes": [],
+    }
+
+    sep = "&" if "?" in url else "?"
+
+    for param in SEARCH_PARAMS:
+        outcome["tested_params"] += 1
+        try:
+            benign = requests.get(f"{url}{sep}{param}=test", headers=headers, timeout=timeout)
+        except requests.RequestException:
+            time.sleep(delay)
+            continue
+        time.sleep(delay)
+
+        try:
+            inject = requests.get(f"{url}{sep}{param}=test'", headers=headers, timeout=timeout)
+        except requests.RequestException:
+            time.sleep(delay)
+            continue
+
+        if _has_sql_error(inject.text) and not _has_sql_error(benign.text):
+            outcome["findings"].append({
+                "title": "Injection SQL sur un paramètre de recherche",
+                "severity": "critical",
+                "owasp": "A03:2021 Injection",
+                "cwe": "CWE-89",
+                "mitre": "T1190",
+                "vector": "query_param",
+                "target": url,
+                "parameter": param,
+                "evidence": f"Une apostrophe injectée dans le paramètre '{param}' "
+                            "déclenche une erreur SQL (ou une fuite de requête) "
+                            "absente de la requête bénigne — le paramètre est "
+                            "concaténé dans une requête SQL sans protection.",
+            })
+            time.sleep(delay)
+            break  # preuve obtenue sur cet endpoint
+        time.sleep(delay)
 
     return outcome
 
