@@ -45,9 +45,11 @@ DEFAULT_HEADERS = {"User-Agent": "PENTAGON-Exploitation-Agent/1.0"}
 
 # Champs indiquant qu'un objet est lié à un UTILISATEUR (et non un catalogue
 # public). Leur présence distingue un vrai IDOR d'un faux positif (ex. /products).
+# NB : on évite le marqueur trop générique « name » (un produit a aussi un nom) ;
+# on garde les variantes spécifiques à l'utilisateur (username, firstname...).
 USER_BOUND_FIELD_NAMES = [
     "email", "username", "user", "userid", "owner", "phone", "address",
-    "firstname", "lastname", "fullname", "name", "dob", "birthdate",
+    "firstname", "lastname", "fullname", "dob", "birthdate",
     "order", "invoice", "account", "customer", "card", "creditcard",
     "ssn", "password", "passwd", "hash", "token", "reset",
 ]
