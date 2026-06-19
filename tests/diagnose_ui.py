@@ -68,32 +68,37 @@ def main():
         print("DIAGNOSTIC UI — TechShop")
         print("=" * 70)
 
+        # NB : SPA React → on NAVIGUE PAR CLIC depuis l'accueil (la navigation
+        # directe vers /login renvoie une page vide, pas de SPA fallback côté serveur).
+
         # 1. Page d'accueil
         try:
             page.goto(FRONTEND, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(2000)
             dump_elements(page, "ACCUEIL")
             page.screenshot(path="diag_accueil.png")
         except Exception as e:
             print(f"Accueil: erreur {type(e).__name__}: {e}")
 
-        # 2. Page de login (attente longue, affichage inconditionnel)
+        # 2. Login — par CLIC sur le lien /login
         try:
-            page.goto(FRONTEND + "/login", wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(3000)
-            dump_elements(page, "LOGIN (/login)")
+            page.click("a[href='/login']", timeout=10000)
+            page.wait_for_timeout(2500)
+            dump_elements(page, "LOGIN (clic sur /login)")
             page.screenshot(path="diag_login.png")
         except Exception as e:
-            print(f"/login: erreur {type(e).__name__}: {e}")
+            print(f"\nLOGIN (clic): erreur {type(e).__name__}: {e}")
 
-        # 3. Page produit (là où se trouve probablement le formulaire de commentaire)
+        # 3. Page produit — retour accueil puis CLIC sur un produit
         try:
-            page.goto(FRONTEND + "/products/1", wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(3000)
-            dump_elements(page, "PRODUIT (/products/1)")
+            page.goto(FRONTEND, wait_until="networkidle", timeout=40000)
+            page.wait_for_timeout(1500)
+            page.click("a[href='/products/1']", timeout=10000)
+            page.wait_for_timeout(2500)
+            dump_elements(page, "PRODUIT (clic sur /products/1)")
             page.screenshot(path="diag_produit.png")
         except Exception as e:
-            print(f"/products/1: erreur {type(e).__name__}: {e}")
+            print(f"\nPRODUIT (clic): erreur {type(e).__name__}: {e}")
 
         print("\nCaptures: diag_accueil.png, diag_login.png, diag_produit.png")
         browser.close()
