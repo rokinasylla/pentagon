@@ -21,6 +21,7 @@ from pentagon.core.llm_client import LLMClient
 from pentagon.agents.osint_agent import OSINTAgent
 from pentagon.agents.scanning_agent import ScanningAgent
 from pentagon.agents.web_app_agent import WebAppAgent
+from pentagon.agents.exploitation_agent import ExploitationAgent
 from pentagon.core.roe_enforcer import RoEEnforcer, RoEViolation
 
 class Orchestrator:
@@ -48,6 +49,7 @@ class Orchestrator:
         self.osint_agent = OSINTAgent(llm=self.llm)
         self.scanning_agent = ScanningAgent(llm=self.llm)
         self.web_app_agent = WebAppAgent(llm=self.llm)
+        self.exploitation_agent = ExploitationAgent(llm=self.llm)
 
     def _check_roe(self, target: str, action_category: str, agent_name: str) -> bool:
         """
@@ -100,7 +102,10 @@ class Orchestrator:
         self._run_scanning_phase(state, target, scan_profile)
          # === PHASE 3 : WEB APP (PTES phase 4) ===
         self._run_web_app_phase(state, target)
-        
+
+        # === PHASE 4 : EXPLOITATION (PTES phase 5) ===
+        self._run_exploitation_phase(state, target)
+
         # === Clôture de la campagne ===
         state.ended_at = datetime.now(timezone.utc).isoformat()
         state.log_event("orchestrator", "campaign_completed",
@@ -226,6 +231,58 @@ class Orchestrator:
             error_msg = f"{type(e).__name__}: {str(e)}"
             state.log_error("WebApp_Agent", error_msg)
             print(f"❌ Erreur Web App : {error_msg}")
+
+    def _run_exploitation_phase(self, state: PentagonState, target: str) -> None:
+        """Exécute l'agent Exploitation (offensif) avec le contexte des agents amont."""
+        print(f"\n{'─' * 70}")
+        print(f"PHASE 4 — Exploitation")
+        print(f"{'─' * 70}")
+
+        state.log_event("orchestrator", "phase_start", "Exploitation")
+
+        # Vérification RoE (Exploitation = catégorie offensive).
+        # Par défaut, la politique n'autorise PAS 'exploitation' → phase sautée
+        # (démonstration du deny-by-default). L'opérateur doit l'autoriser
+        # explicitement pour mener les tests offensifs.
+        if not self._check_roe(target, "exploitation", "Exploitation_Agent"):
+            state.log_error("Exploitation_Agent",
+                            "Bloqué par le RoE (exploitation non autorisée)")
+            return
+
+        # Contexte transmis : l'agent réutilise les endpoints découverts par le
+        # Web App pour cibler ses attaques (login, objets, recherche).
+        osint_context = state.discovered_infrastructure if state.discovered_infrastructure else None
+        web_app_context = state.web_app_result if state.web_app_result else None
+        scanning_context = None
+        if state.scanning_result:
+            scanning_analysis = state.scanning_result.get("analysis", {})
+            scanning_context = {
+                "attack_surface": scanning_analysis.get("attack_surface", {}),
+                "summary": scanning_analysis.get("summary", ""),
+            }
+
+        if web_app_context:
+            print(f"[Orchestrator] Transmission du contexte Web App à l'agent Exploitation")
+
+        try:
+            exploitation_result = self.exploitation_agent.run(
+                target=target,
+                web_app_context=web_app_context,
+                osint_context=osint_context,
+                scanning_context=scanning_context,
+            )
+            state.exploitation_result = exploitation_result
+            state.agents_executed.append("Exploitation_Agent")
+
+            vulns = exploitation_result.get("analysis", {}).get("exploited_vulnerabilities", [])
+            state.log_event("Exploitation_Agent", "completed",
+                            f"{len(vulns)} vulnérabilités prouvées")
+
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            state.log_error("Exploitation_Agent", error_msg)
+            print(f"❌ Erreur Exploitation : {error_msg}")
+
     def _extract_osint_infrastructure(
         self,
         state: PentagonState,
