@@ -181,6 +181,52 @@ class RoEEnforcer:
         if not action_decision["allowed"]:
             raise RoEViolation(f"ACTION REFUSEE : {action_decision['reason']}")
 
+    def add_authorized_target(self, target: str, justification: str = "") -> bool:
+        """
+        Étend dynamiquement le périmètre en ajoutant une cible autorisée.
+
+        Utilisée par le mode "interactive-scope" : quand l'opérateur décide,
+        EN COURS de campagne, d'autoriser un asset découvert (ex: une IP
+        trouvée par l'OSINT). Reste fidèle au deny-by-default — rien n'est
+        ajouté sans cet appel explicite — et journalise la décision pour
+        l'audit.
+
+        NB de gouvernance : autoriser un asset ici n'engage QUE la
+        responsabilité de l'opérateur. La légalité du test dépend de l'accord
+        réel du propriétaire (pré-engagement), pas de cet ajout technique.
+
+        Args:
+            target: l'asset à autoriser (domaine, hôte ou IP).
+            justification: motif fourni par l'opérateur (tracé dans l'audit).
+
+        Returns:
+            True si la cible a été ajoutée, False si elle était déjà autorisée.
+        """
+        normalized = self._normalize_target(target)
+        existing = {
+            self._normalize_target(t)
+            for t in self.policy.get("authorized_targets", [])
+        }
+
+        if normalized in existing:
+            self._log_decision("scope_expansion", {
+                "allowed": True,
+                "target": target,
+                "normalized": normalized,
+                "reason": "Déjà dans le périmètre autorisé (aucun changement).",
+            })
+            return False
+
+        self.policy.setdefault("authorized_targets", []).append(target)
+        self._log_decision("scope_expansion", {
+            "allowed": True,
+            "target": target,
+            "normalized": normalized,
+            "reason": f"Périmètre étendu par l'opérateur. Justification : "
+                      f"{justification or '(non précisée)'}",
+        })
+        return True
+
     @classmethod
     def from_user_input(
         cls,

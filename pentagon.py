@@ -138,7 +138,7 @@ def _parse_actions(raw: str) -> list[str]:
 # ──────────────────────────── Récap & confirmation ─────────────────────────
 
 def _print_plan(targets: list[str], actions: list[str], operator: str,
-                scan_profile: str) -> None:
+                scan_profile: str, interactive_scope: bool = False) -> None:
     """Affiche le récapitulatif de mission avant lancement."""
     print("\n" + "=" * 70)
     print("RÉCAPITULATIF DE LA MISSION (à valider)")
@@ -149,6 +149,8 @@ def _print_plan(targets: list[str], actions: list[str], operator: str,
         print(f"  Périmètre étendu : {', '.join(targets[1:])}")
     print(f"  Profil de scan   : {scan_profile}")
     print(f"  Actions RoE      : {', '.join(actions)}")
+    mode_scope = "interactif (supervisé après OSINT)" if interactive_scope else "statique (figé)"
+    print(f"  Périmètre        : {mode_scope}")
 
     # Phases qui s'exécuteront vs sautées, dérivées des catégories autorisées.
     phase_category = [
@@ -175,6 +177,28 @@ def _confirm(auto_yes: bool) -> bool:
         return True
     answer = _prompt("\nLancer la campagne ? (o/N)", "N").lower()
     return answer in ("o", "oui", "y", "yes")
+
+
+def _make_scope_authorizer(auto_yes: bool):
+    """
+    Construit le callback d'élargissement de périmètre (mode interactif).
+
+    Injecté dans l'orchestrateur : il est appelé pour chaque asset découvert
+    hors périmètre. Rappelle la responsabilité légale avant chaque décision.
+    En mode --yes (aucun humain présent), refuse systématiquement
+    l'élargissement pour préserver le deny-by-default.
+    """
+    def authorizer(asset: str, infrastructure: dict) -> bool:
+        print(f"\n  🔎 Asset découvert HORS périmètre : {asset}")
+        print( "     ⚖️  Rappel : l'autoriser n'est légal que si tu as réellement")
+        print( "         le droit de tester cet asset (accord du propriétaire).")
+        if auto_yes:
+            print("     [--yes] Élargissement refusé d'office (deny-by-default préservé).")
+            return False
+        answer = _prompt("     Ajouter au périmètre autorisé ? (o/N)", "N").lower()
+        return answer in ("o", "oui", "y", "yes")
+
+    return authorizer
 
 
 # ──────────────────────────── Synthèse de campagne ─────────────────────────
@@ -210,7 +234,8 @@ def _print_summary(state, output_file: str | None) -> None:
 # ───────────────────────────────── Pipeline ────────────────────────────────
 
 def run_mission(targets: list[str], actions: list[str], operator: str,
-                scan_profile: str, output_dir: str, save: bool):
+                scan_profile: str, output_dir: str, save: bool,
+                scope_authorizer=None):
     """
     Construit le RoE depuis la saisie opérateur puis lance la campagne.
 
@@ -230,6 +255,7 @@ def run_mission(targets: list[str], actions: list[str], operator: str,
     state = orchestrator.run_campaign(
         target=targets[0],
         scan_profile=scan_profile,
+        scope_authorizer=scope_authorizer,
     )
 
     output_file = orchestrator.save_campaign(state, output_dir=output_dir) if save else None
@@ -259,6 +285,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Dossier de sauvegarde du JSON (défaut: results).")
     p.add_argument("--no-save", action="store_true",
                    help="Ne pas sauvegarder le JSON de campagne.")
+    p.add_argument("--interactive-scope", action="store_true",
+                   help="Après l'OSINT, proposer d'autoriser les assets "
+                        "découverts (élargissement de périmètre supervisé).")
     p.add_argument("--yes", "-y", action="store_true",
                    help="Confirmer automatiquement (mode non-interactif).")
     return p
@@ -295,11 +324,13 @@ def main(argv: list[str] | None = None) -> int:
 
     scan_profile = args.scan_profile
 
-    _print_plan(targets, actions, operator, scan_profile)
+    _print_plan(targets, actions, operator, scan_profile, args.interactive_scope)
 
     if not _confirm(args.yes):
         print("Campagne annulée. Aucune action menée.")
         return 0
+
+    scope_authorizer = _make_scope_authorizer(args.yes) if args.interactive_scope else None
 
     try:
         run_mission(
@@ -309,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
             scan_profile=scan_profile,
             output_dir=args.output_dir,
             save=not args.no_save,
+            scope_authorizer=scope_authorizer,
         )
     except Exception as e:
         print(f"\n❌ Échec de la campagne : {type(e).__name__}: {e}")

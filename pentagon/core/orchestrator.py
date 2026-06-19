@@ -14,7 +14,7 @@ conditionnelles et exécution parallèle) dans une version ultérieure.
 import json
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable, Optional
 
 from pentagon.core.state import PentagonState
 from pentagon.core.llm_client import LLMClient
@@ -76,28 +76,40 @@ class Orchestrator:
         self,
         target: str,
         scan_profile: str = "web_focused",
+        scope_authorizer: Optional[Callable[[str, dict[str, Any]], bool]] = None,
     ) -> PentagonState:
         """
         Exécute une campagne complète de reconnaissance et scanning.
-        
+
         Args:
             target: domaine ou URL cible.
             scan_profile: profil de scan Nmap.
-        
+            scope_authorizer: callback OPTIONNEL d'élargissement de périmètre
+                (mode "interactive-scope"). Appelé après l'OSINT pour chaque
+                asset découvert hors périmètre, avec la signature
+                (asset, infrastructure_decouverte) -> bool. S'il renvoie True,
+                l'asset est ajouté au périmètre autorisé du RoE. Si None
+                (défaut), le périmètre reste STATIQUE (deny-by-default figé).
+
         Returns:
             L'état PentagonState consolidé en fin de campagne.
         """
         # Initialise l'état partagé
         state = PentagonState(target=target)
-        
+
         print("=" * 70)
         print(f"PENTAGON — Campagne {state.campaign_id[:8]}")
         print(f"Cible : {target}")
         print("=" * 70)
-        
+
         # === PHASE 1 : OSINT (PTES phase 2) ===
         self._run_osint_phase(state, target)
-        
+
+        # === Élargissement de périmètre supervisé (optionnel) ===
+        # Si l'opérateur a activé le mode interactif, on lui propose d'autoriser
+        # les assets fraîchement découverts (deny-by-default tant qu'il refuse).
+        self._run_scope_authorization(state, scope_authorizer)
+
         # === PHASE 2 : SCANNING (PTES phase 3) ===
         self._run_scanning_phase(state, target, scan_profile)
          # === PHASE 3 : WEB APP (PTES phase 4) ===
@@ -307,7 +319,76 @@ class Orchestrator:
         # Ajoute aussi le résumé exécutif OSINT comme contexte
         if osint_result.get("executive_summary"):
             state.update_infrastructure("osint_summary", osint_result["executive_summary"])
-    
+
+    def _collect_discovered_assets(self, state: PentagonState) -> list[str]:
+        """
+        Rassemble les assets réseau concrets découverts par l'OSINT.
+
+        On ne retient que ce qui constitue une CIBLE potentielle (IP, serveurs
+        de noms) — pas les libellés non adressables (ex: hosting_provider).
+        Liste dédupliquée, dans l'ordre de découverte.
+        """
+        infra = state.discovered_infrastructure
+        assets: list[str] = []
+
+        for key in ("ip_addresses", "name_servers"):
+            value = infra.get(key)
+            if not value:
+                continue
+            items = value if isinstance(value, list) else [value]
+            for item in items:
+                item = str(item).strip()
+                if item and item not in assets:
+                    assets.append(item)
+
+        return assets
+
+    def _run_scope_authorization(
+        self,
+        state: PentagonState,
+        scope_authorizer: Optional[Callable[[str, dict[str, Any]], bool]],
+    ) -> None:
+        """
+        Propose à l'opérateur d'étendre le périmètre aux assets découverts.
+
+        N'agit QUE si un scope_authorizer est fourni (mode interactif). Pour
+        chaque asset déjà hors périmètre, demande la décision via le callback ;
+        en cas d'accord, étend le périmètre du RoE. Tout est journalisé.
+        """
+        if scope_authorizer is None:
+            return  # Mode statique : aucun élargissement.
+
+        candidates = self._collect_discovered_assets(state)
+        if not candidates:
+            return
+
+        print(f"\n{'─' * 70}")
+        print("ÉLARGISSEMENT DE PÉRIMÈTRE (supervisé par l'opérateur)")
+        print(f"{'─' * 70}")
+        state.log_event("orchestrator", "scope_review_start",
+                        f"{len(candidates)} asset(s) découvert(s)")
+
+        for asset in candidates:
+            # Déjà dans le périmètre ? on n'interroge pas l'opérateur.
+            if self.roe.check_target(asset)["allowed"]:
+                continue
+
+            try:
+                approved = scope_authorizer(asset, state.discovered_infrastructure)
+            except Exception as e:
+                # Un échec du dialogue ne doit jamais élargir le périmètre.
+                state.log_error("RoE", f"scope_authorizer a échoué sur {asset}: {e}")
+                approved = False
+
+            if approved:
+                self.roe.add_authorized_target(
+                    asset, justification="Élargissement supervisé post-OSINT")
+                state.log_event("RoE", "scope_expanded", asset)
+                print(f"[RoE] ✓ Périmètre étendu : {asset}")
+            else:
+                state.log_event("RoE", "scope_denied", asset)
+                print(f"[RoE] ✗ {asset} laissé hors périmètre (deny-by-default)")
+
     def save_campaign(self, state: PentagonState, output_dir: str = "results") -> str:
         """
         Sauvegarde l'état complet de la campagne en JSON.
