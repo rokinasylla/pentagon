@@ -77,21 +77,25 @@ def main():
         except Exception as e:
             print(f"Accueil: erreur {type(e).__name__}: {e}")
 
-        # 2. Candidats de page de login
-        for path in LOGIN_CANDIDATES[1:]:
-            try:
-                page.goto(FRONTEND + path, wait_until="networkidle", timeout=30000)
-                page.wait_for_timeout(1200)
-                # n'affiche que si la page contient un champ password
-                has_pw = page.query_selector("input[type=password]") is not None
-                if has_pw:
-                    dump_elements(page, f"LOGIN trouvé sur {path}")
-                    page.screenshot(path="diag_login.png")
-                    break
-            except Exception as e:
-                print(f"{path}: erreur {type(e).__name__}")
+        # 2. Page de login (attente longue, affichage inconditionnel)
+        try:
+            page.goto(FRONTEND + "/login", wait_until="networkidle", timeout=30000)
+            page.wait_for_timeout(3000)
+            dump_elements(page, "LOGIN (/login)")
+            page.screenshot(path="diag_login.png")
+        except Exception as e:
+            print(f"/login: erreur {type(e).__name__}: {e}")
 
-        print("\nCaptures: diag_accueil.png, diag_login.png (à ouvrir si besoin)")
+        # 3. Page produit (là où se trouve probablement le formulaire de commentaire)
+        try:
+            page.goto(FRONTEND + "/products/1", wait_until="networkidle", timeout=30000)
+            page.wait_for_timeout(3000)
+            dump_elements(page, "PRODUIT (/products/1)")
+            page.screenshot(path="diag_produit.png")
+        except Exception as e:
+            print(f"/products/1: erreur {type(e).__name__}: {e}")
+
+        print("\nCaptures: diag_accueil.png, diag_login.png, diag_produit.png")
         browser.close()
         print("\nDiagnostic UI terminé.")
 
