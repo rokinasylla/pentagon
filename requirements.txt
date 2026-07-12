@@ -23,3 +23,6 @@ playwright>=1.40.0
 
 # Génération du rapport PDF (agent Reporting)
 reportlab>=4.0.0
+
+# Interface web opérateur (webapp.py)
+flask>=3.0.0

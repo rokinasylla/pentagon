@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PENTAGON — Interface opérateur</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#2d3748;
+    --text:#e6edf3; --muted:#8b949e; --accent:#3b82f6; --accent2:#1d4ed8;
+    --crit:#b00020; --high:#e65100; --med:#f9a825; --low:#2e7d32; --info:#546e7a;
+    --ok:#2ea043; --warn:#d29922;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  header{padding:22px 28px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#111827,#0d1117)}
+  header .logo{font-size:26px;font-weight:800;letter-spacing:2px}
+  header .tag{color:var(--muted);font-size:13px}
+  .wrap{max-width:920px;margin:0 auto;padding:26px 20px 60px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:22px;margin-bottom:20px}
+  .card h2{margin:0 0 4px;font-size:17px}
+  .card .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+  input[type=text],select{width:100%;padding:11px 13px;background:var(--panel2);
+    border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px}
+  input[type=text]:focus,select:focus{outline:none;border-color:var(--accent)}
+  .checks{display:grid;gap:10px;margin-top:6px}
+  .check{display:flex;align-items:flex-start;gap:11px;padding:12px 14px;
+    background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer}
+  .check:hover{border-color:var(--accent)}
+  .check input{margin-top:3px}
+  .check .t{font-weight:600;font-size:14px}
+  .check .d{color:var(--muted);font-size:12.5px}
+  .check.exploit .t{color:#ff9d5c}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:180px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border:none;
+    border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent2)}
+  .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--accent)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+  .hidden{display:none}
+  .note{font-size:12.5px;color:var(--muted);margin-top:12px}
+  .err{color:#ff7b72;font-size:13px;margin-top:10px}
+  /* Plan */
+  .phase{display:flex;align-items:center;justify-content:space-between;
+    padding:11px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;
+    background:var(--panel2)}
+  .phase .badge{font-size:12px;padding:3px 9px;border-radius:20px}
+  .badge.on{background:rgba(46,160,67,.15);color:#3fb950;border:1px solid #238636}
+  .badge.off{background:rgba(139,148,158,.12);color:var(--muted);border:1px solid var(--border)}
+  .warnbox{margin-top:14px;padding:12px 14px;border-radius:8px;font-size:13px;
+    background:rgba(210,153,34,.12);border:1px solid var(--warn);color:#e3b341}
+  /* Terminal */
+  #term{background:#010409;border:1px solid var(--border);border-radius:8px;
+    padding:14px;height:340px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12.5px;white-space:pre-wrap;color:#c9d1d9}
+  #term .l{padding:1px 0}
+  .spinner{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;display:inline-block;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  /* Results */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:6px 0 16px}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .stat .n{font-size:26px;font-weight:800}
+  .stat .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .risk-critical{color:var(--crit)} .risk-high{color:var(--high)}
+  .risk-medium{color:var(--med)} .risk-low{color:var(--low)} .risk-unknown{color:var(--muted)}
+  .sevbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .pill{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid var(--border)}
+  .pill.critical{color:#ff6b6b;border-color:var(--crit)}
+  .pill.high{color:#ffab5c;border-color:var(--high)}
+  .pill.medium{color:#ffd75e;border-color:var(--med)}
+  .pill.low{color:#7bd88f;border-color:var(--low)}
+  .pill.info{color:#9bb0bf;border-color:var(--info)}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">PENTAGON</span>
+  <span class="tag">Interface opérateur — pentest multi-agent gouverné par le RoE</span>
+</header>
+
+<div class="wrap">
+
+  <!-- ÉTAPE 1 : Configuration -->
+  <div class="card" id="step-config">
+    <h2>1. Cible &amp; règles d'engagement</h2>
+    <div class="sub">Saisissez l'URL à tester et les catégories d'action autorisées. Deny-by-default : tout ce qui n'est pas coché est refusé.</div>
+
+    <label for="target">URL ou domaine de la cible</label>
+    <input type="text" id="target" placeholder="https://exemple.com" autocomplete="off">
+
+    <label>Catégories d'action (RoE)</label>
+    <div class="checks">
+      {% for cat in categories %}
+      <label class="check {% if cat == 'exploitation' %}exploit{% endif %}">
+        <input type="checkbox" name="action" value="{{ cat }}"
+               {% if cat != 'exploitation' %}checked{% endif %}>
+        <span>
+          <span class="t">{{ cat }}</span><br>
+          <span class="d">{{ category_labels[cat] }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="operator">Opérateur (traçabilité)</label>
+        <input type="text" id="operator" placeholder="anonyme" autocomplete="off">
+      </div>
+      <div>
+        <label for="profile">Profil de scan</label>
+        <select id="profile">
+          <option value="web_focused">web_focused</option>
+          <option value="quick">quick</option>
+          <option value="full">full</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-plan">Prévisualiser le plan →</button>
+    </div>
+    <div class="err hidden" id="config-err"></div>
+  </div>
+
+  <!-- ÉTAPE 2 : Plan / confirmation -->
+  <div class="card hidden" id="step-plan">
+    <h2>2. Récapitulatif de la mission</h2>
+    <div class="sub" id="plan-target"></div>
+    <div id="plan-phases"></div>
+    <div class="warnbox hidden" id="plan-warn">
+      ⚠️ La phase <b>offensive</b> (exploitation) est activée. PENTAGON s'arrête à la
+      <b>preuve</b> de la faille — aucun dommage. Assurez-vous d'être autorisé à tester cette cible.
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-launch">Lancer la campagne</button>
+      <button class="btn btn-ghost" id="btn-back">← Modifier</button>
+    </div>
+  </div>
+
+  <!-- ÉTAPE 3 : Progression en direct -->
+  <div class="card hidden" id="step-run">
+    <h2><span class="spinner" id="run-spin"></span> &nbsp;3. Campagne en cours</h2>
+    <div class="sub" id="run-status">Initialisation…</div>
+    <div id="term"></div>
+  </div>
+
+  <!-- ÉTAPE 4 : Résultats -->
+  <div class="card hidden" id="step-results">
+    <h2>4. Résultats</h2>
+    <div class="sub" id="res-target"></div>
+    <div class="stats" id="res-stats"></div>
+    <div>
+      <label>Prouvées par exploitation</label>
+      <div class="sevbar" id="res-proven"></div>
+      <label style="margin-top:12px">Détectées par analyse</label>
+      <div class="sevbar" id="res-detected"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="btn-json">⬇ Télécharger le JSON</button>
+      <button class="btn btn-primary" id="btn-pdf">📄 Générer le rapport PDF</button>
+      <button class="btn btn-ghost hidden" id="btn-pdf-dl">⬇ Télécharger le PDF</button>
+      <button class="btn btn-ghost" id="btn-new">Nouvelle campagne</button>
+    </div>
+    <div class="err hidden" id="res-err"></div>
+  </div>
+
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let currentJob = null;
+
+function show(id, on=true){ $(id).classList.toggle('hidden', !on); }
+function selectedActions(){
+  return [...document.querySelectorAll('input[name=action]:checked')].map(c=>c.value);
+}
+
+// --- Étape 1 → 2 : prévisualiser le plan ---
+$('#btn-plan').onclick = async () => {
+  $('#config-err').classList.add('hidden');
+  const target = $('#target').value.trim();
+  const actions = selectedActions();
+  const r = await fetch('/api/plan', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({target, actions})});
+  const d = await r.json();
+  if(!r.ok){ $('#config-err').textContent = d.error; $('#config-err').classList.remove('hidden'); return; }
+
+  $('#plan-target').textContent = 'Cible : ' + d.target + '  •  RoE : ' + d.actions.join(', ');
+  $('#plan-phases').innerHTML = d.plan.map(p =>
+    `<div class="phase"><span>${p.phase} <span style="color:#8b949e;font-size:12px">[${p.category}]</span></span>
+     <span class="badge ${p.enabled?'on':'off'}">${p.enabled?'✓ exécutée':'✗ sautée (RoE)'}</span></div>`
+  ).join('');
+  show('#plan-warn', d.exploitation);
+  show('#step-config', false); show('#step-plan', true);
+};
+
+$('#btn-back').onclick = () => { show('#step-plan', false); show('#step-config', true); };
+
+// --- Étape 2 → 3 : lancer + streamer ---
+$('#btn-launch').onclick = async () => {
+  const body = {
+    target: $('#target').value.trim(),
+    actions: selectedActions(),
+    operator: $('#operator').value.trim(),
+    scan_profile: $('#profile').value,
+  };
+  const r = await fetch('/api/start', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)});
+  const d = await r.json();
+  if(!r.ok){ alert(d.error || 'Erreur au démarrage'); return; }
+  currentJob = d.job_id;
+
+  $('#term').innerHTML = '';
+  show('#step-plan', false); show('#step-run', true);
+  $('#run-status').textContent = 'Campagne en cours…';
+
+  const es = new EventSource('/api/stream/' + currentJob);
+  es.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if(m.line !== undefined){
+      const div = document.createElement('div'); div.className='l'; div.textContent = m.line;
+      $('#term').appendChild(div); $('#term').scrollTop = $('#term').scrollHeight;
+    }
+    if(m.status){
+      es.close();
+      $('#run-spin').style.display='none';
+      if(m.status === 'error'){ $('#run-status').textContent = 'Échec : ' + (m.error||''); return; }
+      $('#run-status').textContent = 'Terminée ✓';
+      renderResults(m.summary);
+    }
+  };
+  es.onerror = () => { es.close(); };
+};
+
+// --- Étape 4 : résultats ---
+function sevPills(obj){
+  const order = ['critical','high','medium','low','info'];
+  const entries = order.filter(k => obj && obj[k]);
+  if(entries.length === 0) return '<span style="color:#8b949e;font-size:13px">aucune</span>';
+  return entries.map(k => `<span class="pill ${k}">${k}: ${obj[k]}</span>`).join('');
+}
+function renderResults(s){
+  if(!s) return;
+  $('#res-target').textContent = 'Cible : ' + s.target + '  •  Campagne ' + s.campaign_id.slice(0,8);
+  $('#res-stats').innerHTML = `
+    <div class="stat"><div class="n risk-${s.overall_risk}">${(s.overall_risk||'—').toUpperCase()}</div><div class="k">Risque global</div></div>
+    <div class="stat"><div class="n">${s.proven_count}</div><div class="k">Prouvées</div></div>
+    <div class="stat"><div class="n">${s.detected_count}</div><div class="k">Détectées</div></div>
+    <div class="stat"><div class="n">${s.agents_executed.length}</div><div class="k">Agents</div></div>
+    <div class="stat"><div class="n">${s.n_errors}</div><div class="k">Erreurs</div></div>`;
+  $('#res-proven').innerHTML = sevPills(s.proven_by_severity);
+  $('#res-detected').innerHTML = sevPills(s.detected_by_severity);
+  show('#step-run', false); show('#step-results', true);
+}
+
+$('#btn-json').onclick = () => { if(currentJob) window.location = '/api/download/'+currentJob+'/json'; };
+
+$('#btn-pdf').onclick = async () => {
+  $('#res-err').classList.add('hidden');
+  $('#btn-pdf').disabled = true; $('#btn-pdf').textContent = '⏳ Génération…';
+  const r = await fetch('/api/report/'+currentJob, {method:'POST'});
+  const d = await r.json();
+  $('#btn-pdf').disabled = false; $('#btn-pdf').textContent = '📄 Générer le rapport PDF';
+  if(!r.ok){ $('#res-err').textContent = d.error; $('#res-err').classList.remove('hidden'); return; }
+  show('#btn-pdf-dl', true);
+};
+$('#btn-pdf-dl').onclick = () => { if(currentJob) window.location = '/api/download/'+currentJob+'/pdf'; };
+
+$('#btn-new').onclick = () => {
+  currentJob = null;
+  show('#step-results', false); show('#step-config', true);
+  show('#btn-pdf-dl', false);
+};
+</script>
+</body>
+</html>
