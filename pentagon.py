@@ -235,7 +235,7 @@ def _print_summary(state, output_file: str | None) -> None:
 
 def run_mission(targets: list[str], actions: list[str], operator: str,
                 scan_profile: str, output_dir: str, save: bool,
-                scope_authorizer=None):
+                scope_authorizer=None, report: bool = False):
     """
     Construit le RoE depuis la saisie opérateur puis lance la campagne.
 
@@ -260,6 +260,17 @@ def run_mission(targets: list[str], actions: list[str], operator: str,
 
     output_file = orchestrator.save_campaign(state, output_dir=output_dir) if save else None
     _print_summary(state, output_file)
+
+    # Rapport PDF optionnel (import différé : ne charge reportlab que si demandé).
+    if report:
+        try:
+            from pentagon.agents.reporting_agent import ReportingAgent
+            pdf_path = ReportingAgent().run(
+                campaign=state.to_dict(), operator=operator)
+            print(f"  📄 Rapport PDF : {pdf_path}")
+        except RuntimeError as e:
+            print(f"  ⚠️  Rapport PDF non généré : {e}")
+
     return state
 
 
@@ -288,6 +299,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--interactive-scope", action="store_true",
                    help="Après l'OSINT, proposer d'autoriser les assets "
                         "découverts (élargissement de périmètre supervisé).")
+    p.add_argument("--report", action="store_true",
+                   help="Générer un rapport PDF en fin de campagne "
+                        "(nécessite reportlab).")
     p.add_argument("--yes", "-y", action="store_true",
                    help="Confirmer automatiquement (mode non-interactif).")
     return p
@@ -341,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=args.output_dir,
             save=not args.no_save,
             scope_authorizer=scope_authorizer,
+            report=args.report,
         )
     except Exception as e:
         print(f"\n❌ Échec de la campagne : {type(e).__name__}: {e}")

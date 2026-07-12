@@ -20,3 +20,6 @@ requests>=2.31.0
 # Confirmation XSS par navigateur (agent/outil offensif)
 # Après installation : exécuter `playwright install chromium`
 playwright>=1.40.0
+
+# Génération du rapport PDF (agent Reporting)
+reportlab>=4.0.0
