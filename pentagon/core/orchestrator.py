@@ -389,6 +389,26 @@ class Orchestrator:
                 state.log_event("RoE", "scope_denied", asset)
                 print(f"[RoE] ✗ {asset} laissé hors périmètre (deny-by-default)")
 
+    @staticmethod
+    def _slugify_target(target: str) -> str:
+        """
+        Transforme une cible (URL ou domaine) en fragment de nom de fichier sûr.
+
+        "https://techshop-vuln.rokina-sylla.me/" -> "techshop-vuln.rokina-sylla.me"
+        Retire le schéma, remplace tout caractère non sûr par '_', et évite
+        un nom vide.
+        """
+        import re
+
+        slug = target.strip()
+        # Retire le schéma (http:// ou https://)
+        slug = re.sub(r"^[a-zA-Z]+://", "", slug)
+        # Remplace tout ce qui n'est ni alphanumérique, ni '.', ni '-' par '_'
+        slug = re.sub(r"[^A-Za-z0-9.\-]+", "_", slug)
+        # Nettoie les '_' en trop aux extrémités
+        slug = slug.strip("_")
+        return slug or "cible"
+
     def save_campaign(self, state: PentagonState, output_dir: str = "results") -> str:
         """
         Sauvegarde l'état complet de la campagne en JSON.
@@ -398,8 +418,12 @@ class Orchestrator:
         """
         os.makedirs(output_dir, exist_ok=True)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        filename = f"{output_dir}/campaign_{state.target}_{timestamp}.json"
-        
+        # La cible peut être une URL complète (avec ':' et '/') : on la
+        # slugifie pour obtenir un nom de fichier valide (sinon les '/' sont
+        # pris pour des sous-dossiers inexistants → FileNotFoundError).
+        safe_target = self._slugify_target(state.target)
+        filename = os.path.join(output_dir, f"campaign_{safe_target}_{timestamp}.json")
+
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(state.to_dict(), f, indent=2, ensure_ascii=False, default=str)
         
