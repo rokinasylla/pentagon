@@ -88,4 +88,22 @@ button { font-family: inherit; }
 .comment-form textarea { min-height: 80px; }
 .comment { padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--panel); border-radius: 6px; margin-bottom: 8px; }
 
+/* Panier */
+.cart { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.cart-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.cart-row:last-child { border-bottom: none; }
+.cart-name { flex: 1; font-weight: 600; }
+.cart-qty { color: var(--muted); }
+.link-btn { background: none; border: none; color: #ff7b72; cursor: pointer; font-size: 13px; padding: 0; }
+.cart-total { font-size: 18px; margin: 18px 0; }
+
+/* Toast */
+#toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+  background: #0e1626; border: 1px solid var(--accent); color: var(--text);
+  padding: 12px 18px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none;
+  transition: opacity .2s, transform .2s; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 26px; border-top: 1px solid var(--border); margin-top: 50px; }

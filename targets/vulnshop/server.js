@@ -47,6 +47,19 @@ function signJwt(payload) {
   return `${data}.${b64url(sig)}`;
 }
 
+// Lit le payload du token Bearer SANS verifier la signature (l'app est laxiste
+// a dessein) — suffit pour rattacher une commande a l'utilisateur courant.
+function decodeBearer(req) {
+  const h = req.headers.authorization || "";
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  try {
+    return JSON.parse(Buffer.from(m[1].split(".")[1], "base64").toString());
+  } catch (e) {
+    return null;
+  }
+}
+
 // ------------------------------ Application ---------------------------------
 
 async function main() {
@@ -129,6 +142,20 @@ async function main() {
         .status(500)
         .json({ error: `SQL error executing query: ${sql} :: ${e.message}` });
     }
+  });
+
+  // Passer commande : cree une commande rattachee a l'utilisateur du token.
+  app.post("/api/orders", (req, res) => {
+    const user = decodeBearer(req);
+    if (!user) return res.status(401).json({ error: "authentification requise" });
+    const { items, total } = req.body || {};
+    const email =
+      user.email || `${user.username || "client"}@vulnshop.test`;
+    const id = store.run(
+      "INSERT INTO orders (userId, customerEmail, total, items) VALUES (?,?,?,?)",
+      [user.sub || 0, email, total || 0, items == null ? "" : String(items)]
+    );
+    res.status(201).json({ id, userId: user.sub || 0, total: total || 0, items });
   });
 
   // A01 : commandes d'AUTRUI accessibles par simple enumeration d'id (IDOR/BOLA).
