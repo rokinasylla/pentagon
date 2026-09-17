@@ -3,20 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VulnShop</title>
+  <title>VulnShop — high-tech</title>
+  <link rel="icon" href="/assets/img/logo.svg" />
   <link rel="stylesheet" href="/assets/style.css" />
 </head>
 <body>
   <header>
-    <h1>VulnShop</h1>
+    <a class="brand" id="home-link" href="#/">
+      <img src="/assets/img/logo.svg" alt="" width="34" height="34" />
+      <span>VulnShop</span>
+    </a>
+    <form id="search-form" class="search">
+      <input id="search-input" type="text" placeholder="Rechercher un produit..." autocomplete="off" />
+      <button id="search-btn" type="submit">Rechercher</button>
+    </form>
     <nav>
-      <a id="home-link" href="#/">Accueil</a>
       <a id="login-link" href="#/login">Connexion</a>
+      <a id="register-link" class="btn-nav" href="#/register">Inscription</a>
     </nav>
     <span id="user-status"></span>
   </header>
   <main id="app"></main>
-  <footer>Boutique de demonstration — cible d'entrainement (donnees factices).</footer>
+  <footer>
+    VulnShop — boutique de démonstration. Cible d'entraînement (données factices).
+  </footer>
   <script src="/assets/app.js"></script>
 </body>
 </html>

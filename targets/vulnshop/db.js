@@ -41,7 +41,8 @@ async function createDb() {
       id INTEGER PRIMARY KEY,
       name TEXT,
       price REAL,
-      description TEXT
+      description TEXT,
+      image TEXT
     );
     CREATE TABLE orders (
       id INTEGER PRIMARY KEY,
@@ -75,13 +76,18 @@ async function createDb() {
 
   // --- Catalogue produits (public, NORMAL — sert d'anti-faux-positif IDOR) ---
   const products = [
-    [1, "Clavier mecanique", 79.9, "Clavier retroeclaire, switches bruns."],
-    [2, "Souris ergonomique", 39.5, "Souris sans fil, 6 boutons."],
-    [3, "Ecran 27 pouces", 229.0, "Dalle IPS 2560x1440, 75 Hz."],
-    [4, "Casque USB", 59.0, "Casque micro antibruit."],
+    [1, "Clavier mecanique RGB", 79.9, "Clavier retroeclaire, switches bruns, chassis aluminium.", "keyboard.svg"],
+    [2, "Souris ergonomique sans fil", 39.5, "Capteur 16000 DPI, 6 boutons programmables.", "mouse.svg"],
+    [3, "Ecran 27 pouces QHD", 229.0, "Dalle IPS 2560x1440, 75 Hz, bords fins.", "monitor.svg"],
+    [4, "Casque micro USB", 59.0, "Casque-micro antibruit, son surround 7.1.", "headset.svg"],
+    [5, "Webcam Full HD", 45.0, "1080p 30fps, micro stereo integre, autofocus.", "webcam.svg"],
+    [6, "Hub USB-C 7-en-1", 29.0, "HDMI 4K, 3x USB 3.0, lecteur SD, PD 100W.", "hub.svg"],
   ];
   for (const p of products) {
-    db.run("INSERT INTO products (id, name, price, description) VALUES (?,?,?,?)", p);
+    db.run(
+      "INSERT INTO products (id, name, price, description, image) VALUES (?,?,?,?,?)",
+      p
+    );
   }
 
   // --- Commandes (liees a des utilisateurs → support de l'IDOR/BOLA, A01) ---

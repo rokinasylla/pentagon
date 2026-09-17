@@ -80,15 +80,33 @@ async function main() {
     }
   });
 
+  // A07 (bonus) : inscription — cree un compte (mot de passe hache MD5, faible).
+  app.post("/api/auth/register", (req, res) => {
+    const { username, email, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: "username et password requis" });
+    }
+    const exists = store.get("SELECT id FROM users WHERE username = ?", [username]);
+    if (exists) {
+      return res.status(409).json({ error: "utilisateur deja existant" });
+    }
+    const id = store.run(
+      "INSERT INTO users (username, email, password, creditCard, role) VALUES (?,?,?,?,?)",
+      [username, email == null ? "" : String(email), md5(password), "", "USER"]
+    );
+    const token = signJwt({ sub: id, username, role: "USER" });
+    return res.status(201).json({ token, user: { id, username, role: "USER" } });
+  });
+
   // Catalogue public (NORMAL — ne doit PAS etre signale comme faille).
   app.get("/api/products", (_req, res) => {
-    res.json(store.all("SELECT id, name, price, description FROM products"));
+    res.json(store.all("SELECT id, name, price, description, image FROM products"));
   });
 
   // A03 : recherche par CONCATENATION sur le parametre q (+ reflexion de q).
   app.get("/api/products/search", (req, res) => {
     const q = req.query.q == null ? "" : String(req.query.q);
-    const sql = `SELECT id, name, price, description FROM products WHERE name LIKE '%${q}%'`;
+    const sql = `SELECT id, name, price, description, image FROM products WHERE name LIKE '%${q}%'`;
     try {
       const results = store.all(sql);
       return res.json({ query: q, results }); // q reflete brut (XSS reflechi/DOM)
@@ -101,7 +119,7 @@ async function main() {
 
   // A03 (bonus) : id de chemin concatene → SQLi sur le parametre de chemin.
   app.get("/api/products/:id", (req, res) => {
-    const sql = `SELECT id, name, price, description FROM products WHERE id = ${req.params.id}`;
+    const sql = `SELECT id, name, price, description, image FROM products WHERE id = ${req.params.id}`;
     try {
       const row = store.get(sql);
       if (!row) return res.status(404).json({ error: "not found" });

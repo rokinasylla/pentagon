@@ -25,6 +25,18 @@ la stack Java/Spring de TechShop → preuve de généricité.
 Comptes de démonstration (données factices) : `admin/admin123`, `alice/password`,
 `bob/123456`, `carol/qwerty`.
 
+### Fonctionnalités « vitrine »
+Boutique complète pour un rendu réaliste : catalogue avec **images** (SVG),
+**recherche**, **connexion** et **inscription** (`POST /api/auth/register`),
+page produit avec **avis clients**. Les comptes créés sont hachés en MD5
+(cohérent avec la faiblesse crypto A02).
+
+> ⚠️ Base **en mémoire** : sur le free tier Render le disque est éphémère, donc
+> les comptes créés et les avis postés sont réinitialisés à chaque redémarrage
+> (mise en veille comprise). C'est voulu pour une cible de démo (état propre à
+> chaque campagne). Pour une persistance réelle, brancher une base externe
+> (Postgres/Turso) — non nécessaire pour les tests PENTAGON.
+
 ## Déploiement en ligne (Render)
 
 1. Pousser ce dossier dans un dépôt GitHub (il est déjà sous
@@ -37,6 +49,26 @@ Comptes de démonstration (données factices) : `admin/admin123`, `alice/passwor
 3. Render fournit une URL publique https, ex. `https://vulnshop.onrender.com`.
 4. **Réveiller le service** avant un test : le free tier s'endort après
    inactivité (premier appel ~50 s). Ouvrez l'URL une fois dans le navigateur.
+
+## Domaine personnalisé (rokina-sylla.me)
+
+Pour servir la boutique sur un sous-domaine, ex. `vulnshop.rokina-sylla.me` :
+
+1. **Render** → service `vulnshop` → **Settings → Custom Domains → Add** →
+   saisir `vulnshop.rokina-sylla.me`. Render affiche une cible CNAME
+   (ex. `vulnshop-xxxx.onrender.com`).
+2. **DNS** (chez le gestionnaire de `rokina-sylla.me`, ex. Cloudflare) → ajouter
+   un enregistrement **CNAME** :
+   - *Name/Nom* : `vulnshop`
+   - *Target/Cible* : la valeur `...onrender.com` fournie par Render
+   - *(Cloudflare : mettre le nuage en **DNS only / gris** le temps que Render
+     émette le certificat TLS ; on peut réactiver le proxy ensuite en SSL Full.)*
+3. Attendre la vérification (quelques minutes) : Render provisionne le HTTPS
+   automatiquement. La cible devient `https://vulnshop.rokina-sylla.me`.
+4. Lancer alors PENTAGON sur ce domaine :
+   `python pentagon.py --target https://vulnshop.rokina-sylla.me ...`
+
+> Aucun changement de code : le serveur répond quel que soit le domaine.
 
 ## Lancer PENTAGON sur cette cible (depuis Kali)
 
