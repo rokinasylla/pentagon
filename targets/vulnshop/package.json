@@ -1,0 +1,17 @@
+{
+  "name": "vulnshop",
+  "version": "1.0.0",
+  "description": "Cible d'entrainement volontairement vulnerable pour PENTAGON (usage pedagogique, donnees factices uniquement).",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "sql.js": "^1.11.0"
+  }
+}

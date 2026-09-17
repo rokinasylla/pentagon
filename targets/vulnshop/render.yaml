@@ -1,0 +1,19 @@
+# Blueprint Render pour VulnShop (cible d'entrainement PENTAGON).
+#
+# Deploiement : depuis le dashboard Render → New → Blueprint → pointer sur ce
+# depot. Render lit ce fichier et cree un service web Node gratuit avec une URL
+# https publique (ex. https://vulnshop.onrender.com).
+#
+# NB : le service tourne depuis le sous-dossier targets/vulnshop (rootDir).
+services:
+  - type: web
+    name: vulnshop
+    runtime: node
+    rootDir: targets/vulnshop
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
