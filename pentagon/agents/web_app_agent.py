@@ -287,9 +287,10 @@ RAPPEL CRITIQUE :
             system_prompt=WEBAPP_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0.2,
-            max_tokens=4000,
+            max_tokens=6000,   # marge pour éviter la troncature du JSON
+            json_mode=True,    # JSON strict → parsing fiable
         )
-        
+
         return self._parse_llm_response(response_text)
     
     def generate_summary(self, result: dict[str, Any]) -> str:

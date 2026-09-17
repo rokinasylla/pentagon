@@ -59,10 +59,11 @@ class LLMClient:
         user_prompt: str,
         temperature: float = 0.3,
         max_tokens: int = 2000,
+        json_mode: bool = False,
     ) -> str:
         """
         Envoie une requête de chat au LLM et retourne la réponse texte.
-        
+
         Args:
             system_prompt: instructions de système (rôle, contexte, persona).
             user_prompt: question ou tâche à effectuer.
@@ -70,20 +71,28 @@ class LLMClient:
                          Pour le pentest, on utilise 0.3 pour avoir des réponses
                          plutôt déterministes mais avec un peu de souplesse.
             max_tokens: longueur maximale de la réponse.
-        
+            json_mode: si True, force le LLM à répondre par un objet JSON valide
+                       (response_format json_object). Le prompt doit mentionner
+                       « JSON » (contrainte DeepSeek/OpenAI). Évite les réponses
+                       enrobées de prose et fiabilise le parsing structuré.
+
         Returns:
             La réponse texte du LLM.
         """
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
+        kwargs = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        response = self.client.chat.completions.create(**kwargs)
+
         return response.choices[0].message.content
     
     def health_check(self) -> bool:
