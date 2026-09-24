@@ -94,7 +94,57 @@ def summarize_state(state_dict: dict) -> dict:
         "detected_by_severity": counts(detected),
         "proven_by_severity": counts(proven),
         "overall_risk": exp.get("overall_risk") or web.get("overall_risk") or "unknown",
+        "findings": _unify_findings(proven, detected),
     }
+
+
+# Ordre de sévérité pour le tri d'affichage.
+_SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+
+
+def _unify_findings(proven: list[dict], detected: list[dict]) -> list[dict]:
+    """
+    Fusionne les vulnérabilités PROUVÉES (agent Exploitation) et DÉTECTÉES
+    (agent Web App) en une liste unifiée pour l'affichage : nom, sévérité,
+    description et IMPACT sécurité tels qu'interprétés par le LLM.
+
+    Prouvées d'abord, puis par sévérité décroissante.
+    """
+    out: list[dict] = []
+
+    for v in proven:
+        out.append({
+            "title": v.get("title", "Vulnérabilité"),
+            "severity": v.get("severity", "info"),
+            "source": "prouvée",
+            "owasp": v.get("owasp_top10") or v.get("owasp", ""),
+            "cwe": v.get("cwe", ""),
+            "endpoint": v.get("affected_endpoint", ""),
+            # Pour une faille prouvée, la "preuve" décrit ce qui a été démontré.
+            "description": v.get("proof") or v.get("description", ""),
+            "impact": v.get("impact", ""),
+            "remediation": v.get("remediation", ""),
+            "confidence": v.get("confidence"),
+        })
+
+    for v in detected:
+        out.append({
+            "title": v.get("title", "Vulnérabilité"),
+            "severity": v.get("severity", "info"),
+            "source": "détectée",
+            "owasp": v.get("owasp_top10") or v.get("owasp", ""),
+            "cwe": v.get("cwe", ""),
+            "endpoint": v.get("affected_endpoint", ""),
+            "description": v.get("description", ""),
+            # L'agent Web App expose une "evidence" ; à défaut d'un champ impact.
+            "impact": v.get("impact") or v.get("evidence", ""),
+            "remediation": v.get("remediation", ""),
+            "confidence": v.get("confidence"),
+        })
+
+    out.sort(key=lambda f: (0 if f["source"] == "prouvée" else 1,
+                            _SEV_ORDER.get(f["severity"], 9)))
+    return out
 
 
 # ─────────────────────────── Capture de la sortie ──────────────────────────

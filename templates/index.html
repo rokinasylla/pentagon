@@ -171,6 +171,26 @@
   .pill.medium{color:#ffe066;border-color:rgba(250,204,21,.4);background:rgba(250,204,21,.08)}
   .pill.low{color:#6ee7b7;border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)}
   .pill.info{color:#9fb0c8;border-color:var(--border)}
+
+  /* Fiches vulnérabilité (interprétation LLM) */
+  .findings{margin-top:24px; display:flex; flex-direction:column; gap:13px}
+  .findings-title{font-size:14px; font-weight:700; margin:6px 0 2px; display:flex; align-items:center; gap:9px}
+  .findings-title .cnt{font-size:11px; color:var(--muted); font-weight:600; padding:3px 10px; border:1px solid var(--border); border-radius:100px}
+  .finding{display:grid; grid-template-columns:minmax(190px,250px) 1fr; gap:18px; padding:16px 18px;
+    border:1px solid var(--border); border-left:4px solid var(--info); border-radius:14px; background:rgba(12,18,30,.55)}
+  .finding.sev-critical{border-left-color:var(--crit)} .finding.sev-high{border-left-color:var(--high)}
+  .finding.sev-medium{border-left-color:var(--med)} .finding.sev-low{border-left-color:var(--low)}
+  .f-badges{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .f-src{font-size:10px; text-transform:uppercase; letter-spacing:.6px; padding:3px 9px; border-radius:100px; font-weight:800}
+  .f-src.proven{background:rgba(244,63,94,.15); color:#ff8a97} .f-src.detected{background:rgba(56,189,248,.13); color:var(--accent)}
+  .f-title{font-weight:700; font-size:14.5px; margin-top:9px; line-height:1.35; text-wrap:balance}
+  .f-meta{color:var(--faint); font-size:11px; margin-top:7px; font-family:ui-monospace,Consolas,monospace; word-break:break-word}
+  .f-detail{display:flex; flex-direction:column; gap:11px; min-width:0}
+  .f-block .f-lbl{display:block; font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin-bottom:3px; font-weight:800}
+  .f-block .f-lbl.impact{color:#ffb782}
+  .f-block p{margin:0; font-size:13px; line-height:1.55; color:var(--text); opacity:.93}
+  @media(max-width:640px){.finding{grid-template-columns:1fr; gap:12px}}
+
   footer{color:var(--faint); font-size:12px; text-align:center; margin-top:26px; letter-spacing:.3px}
   .spin-ic{animation:spin 1s linear infinite}
 </style>
@@ -292,6 +312,7 @@
       <h4>🔎 Détectées par analyse</h4>
       <div class="sevbar" id="res-detected"></div>
     </div>
+    <div class="findings" id="res-findings"></div>
     <div class="row">
       <button class="btn btn-primary" id="btn-pdf">📄 Générer le rapport PDF</button>
       <button class="btn btn-ghost hidden" id="btn-pdf-dl">⬇ Télécharger le PDF</button>
@@ -412,6 +433,29 @@ function sevPills(obj){
   if(!keys.length) return '<span class="pill info">aucune</span>';
   return keys.map(k=>`<span class="pill ${k}">${k} · ${obj[k]}</span>`).join('');
 }
+/* Échappe le contenu (issu du LLM analysant une cible) → console non injectable. */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function renderFindings(list){
+  const el=$('#res-findings');
+  if(!list||!list.length){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="findings-title">🧠 Vulnérabilités interprétées par le LLM <span class="cnt">'+list.length+'</span></div>'+
+    list.map(f=>{
+      const meta=[f.owasp,f.cwe,f.endpoint].filter(Boolean).map(esc).join(' · ');
+      const src=(f.source==='prouvée')?'proven':'detected';
+      return `<div class="finding sev-${esc(f.severity)}">
+        <div class="f-id">
+          <div class="f-badges"><span class="pill ${esc(f.severity)}">${esc(f.severity)}</span><span class="f-src ${src}">${esc(f.source)}</span></div>
+          <div class="f-title">${esc(f.title)}</div>
+          ${meta?`<div class="f-meta">${meta}</div>`:''}
+        </div>
+        <div class="f-detail">
+          ${f.description?`<div class="f-block"><span class="f-lbl">Description</span><p>${esc(f.description)}</p></div>`:''}
+          ${f.impact?`<div class="f-block"><span class="f-lbl impact">Impact sécurité</span><p>${esc(f.impact)}</p></div>`:''}
+          ${f.remediation?`<div class="f-block"><span class="f-lbl">Correctif</span><p>${esc(f.remediation)}</p></div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+}
 function renderResults(s){
   if(!s) return;
   $('#res-target').innerHTML='Cible : <b>'+s.target+'</b> &nbsp;•&nbsp; Campagne '+(s.campaign_id||'').slice(0,8);
@@ -425,6 +469,7 @@ function renderResults(s){
     <div class="stat"><div class="n" style="color:${s.n_errors?'var(--high)':'var(--ok)'}">${s.n_errors}</div><div class="k">Erreurs</div></div>`;
   $('#res-proven').innerHTML=sevPills(s.proven_by_severity);
   $('#res-detected').innerHTML=sevPills(s.detected_by_severity);
+  renderFindings(s.findings);
   show('#step-run', false); show('#step-results', true);
   $('#step-results').scrollIntoView({behavior:'smooth',block:'start'});
 }
