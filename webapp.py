@@ -63,6 +63,73 @@ def sanitize_actions(raw_actions) -> list[str]:
     return [c for c in SELECTABLE_CATEGORIES if c in given]
 
 
+# ───────────────────── Liste blanche ADMIN (roe_policy.json) ────────────────
+# L'ADMINISTRATEUR maintient les cibles autorisées dans pentagon/config/
+# roe_policy.json. L'interface web n'accepte de lancer une campagne QUE sur une
+# cible qui y figure ; sinon elle invite l'utilisateur à demander l'autorisation
+# de l'admin. Le fichier est relu à CHAQUE requête → l'admin peut l'éditer sans
+# redémarrer le serveur.
+
+ADMIN_DENIED_MSG = (
+    "⛔ La cible « {t} » n'est pas autorisée par l'administrateur. "
+    "Pour la tester, demandez à l'administrateur de l'ajouter à la liste "
+    "blanche (fichier roe_policy.json)."
+)
+
+
+def check_admin_authorization(target: str) -> dict:
+    """
+    Vérifie une cible contre la liste blanche de l'admin (roe_policy.json).
+
+    Réutilise le RoEEnforcer (même normalisation de domaine + deny-by-default)
+    en le construisant SANS argument → il charge le fichier admin. Relu à
+    chaque appel pour prendre en compte les éditions de l'admin à chaud.
+
+    Returns:
+        {"allowed": bool, "categories": [...], "targets": [...]}
+        categories = catégories d'action autorisées par l'admin (bornent le
+        niveau des tests) ; targets = liste blanche courante.
+    """
+    try:
+        # Import différé (module stdlib pur, pas de stack LLM).
+        from pentagon.core.roe_enforcer import RoEEnforcer
+        enforcer = RoEEnforcer()  # charge pentagon/config/roe_policy.json
+    except Exception:
+        # Politique admin absente/illisible → deny-by-default strict.
+        return {"allowed": False, "categories": [], "targets": []}
+
+    decision = enforcer.check_target(target)
+    return {
+        "allowed": bool(decision.get("allowed")),
+        "categories": enforcer.policy.get("authorized_action_categories", []) or [],
+        "targets": enforcer.policy.get("authorized_targets", []) or [],
+    }
+
+
+def gate_request(target: str, actions: list[str]):
+    """
+    Applique la gouvernance admin à une requête (plan ou start).
+
+    Returns:
+        (effective_actions, error) — si error est non nul, c'est un tuple
+        (message, code_http) à renvoyer tel quel ; sinon effective_actions est
+        la liste des catégories effectivement permises (bornée par l'admin).
+    """
+    admin = check_admin_authorization(target)
+    if not admin["allowed"]:
+        return None, (ADMIN_DENIED_MSG.format(t=target), 403)
+
+    # L'admin borne aussi le niveau : on garde l'intersection des catégories
+    # choisies par l'utilisateur et de celles permises par l'admin.
+    effective = [a for a in actions if a in admin["categories"]]
+    if not effective:
+        allowed = ", ".join(admin["categories"]) or "(aucune)"
+        return None, (
+            "L'administrateur n'autorise aucune des catégories choisies pour "
+            f"cette cible. Catégories autorisées par l'admin : {allowed}.", 403)
+    return effective, None
+
+
 def compute_plan(actions: list[str]) -> list[dict]:
     """Renvoie l'état de chaque phase (exécutée/sautée) selon le RoE choisi."""
     return [
@@ -232,11 +299,17 @@ def api_plan():
         return jsonify({"error": "URL cible requise."}), 400
     if not actions:
         return jsonify({"error": "Sélectionnez au moins une catégorie RoE."}), 400
+
+    # Gouvernance admin : la cible doit figurer dans roe_policy.json.
+    effective, err = gate_request(target, actions)
+    if err:
+        return jsonify({"error": err[0], "reason": "admin_unauthorized"}), err[1]
+
     return jsonify({
         "target": target,
-        "actions": actions,
-        "plan": compute_plan(actions),
-        "exploitation": "exploitation" in actions,
+        "actions": effective,
+        "plan": compute_plan(effective),
+        "exploitation": "exploitation" in effective,
     })
 
 
@@ -253,6 +326,13 @@ def api_start():
         return jsonify({"error": "URL cible requise."}), 400
     if not actions:
         return jsonify({"error": "Sélectionnez au moins une catégorie RoE."}), 400
+
+    # Gouvernance admin : refuse toute cible hors liste blanche roe_policy.json,
+    # et borne les catégories à celles permises par l'admin.
+    effective, err = gate_request(target, actions)
+    if err:
+        return jsonify({"error": err[0], "reason": "admin_unauthorized"}), err[1]
+    actions = effective
 
     # Un seul job actif à la fois (capture stdout globale + outil local).
     with _JOBS_LOCK:

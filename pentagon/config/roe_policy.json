@@ -1,15 +1,15 @@
 {
-  "policy_name": "Politique RoE par defaut PENTAGON",
-  "version": "1.0",
-  "description": "Definit le perimetre autorise pour les campagnes de pentest.",
+  "policy_name": "Liste blanche ADMIN - PENTAGON",
+  "version": "2.0",
+  "description": "Liste blanche maintenue par l'ADMINISTRATEUR. L'interface web n'accepte de lancer une campagne que sur une cible figurant dans 'authorized_targets'. Toute autre cible est refusee (l'utilisateur doit demander a l'admin de l'ajouter). Les categories listees bornent le niveau d'action permis.",
   "default_behavior": "deny",
   "authorized_targets": [
-    "techshop-vuln.rokina-sylla.me",
-    "techshop-backend-cc1t.onrender.com"
+    "vulnshop.rokina-sylla.me"
   ],
   "authorized_action_categories": [
     "passive",
-    "active_scan"
+    "active_scan",
+    "exploitation"
   ],
-  "notes": "deny by default : toute cible non listee est refusee."
+  "notes": "deny by default : toute cible non listee est refusee. L'admin ajoute/retire les cibles ici ; le fichier est relu a chaque requete (aucun redemarrage necessaire)."
 }
