@@ -407,6 +407,29 @@ $('#btn-launch').onclick = async () => {
   $('#run-status').innerHTML = '<svg class="spin-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-3px"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg> Campagne en cours…';
   $('#step-run').scrollIntoView({behavior:'smooth',block:'start'});
 
+  // Finalisation unique (depuis le flux SSE OU le sondage de secours).
+  let finalized = false, pollTimer = null;
+  function finalize(status, summary, error){
+    if(finalized) return; finalized = true;
+    if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+    try{ es.close(); }catch(_){}
+    if(status === 'error'){ $('#run-status').textContent = '❌ Échec : ' + (error || ''); return; }
+    finishTracker();
+    $('#run-status').textContent = '✓ Campagne terminée';
+    renderResults(summary);
+  }
+  // Filet de sécurité : interroge l'état même si le flux en direct se coupe
+  // ou reste silencieux (longue analyse LLM) → la fin s'affiche TOUJOURS.
+  async function poll(){
+    try{
+      const r = await fetch('/api/result/' + currentJob);
+      if(!r.ok) return;
+      const s = await r.json();
+      if(s.status === 'done') finalize('done', s.summary);
+      else if(s.status === 'error') finalize('error', null, s.error);
+    }catch(_){}
+  }
+
   const es = new EventSource('/api/stream/'+currentJob);
   es.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
@@ -415,15 +438,11 @@ $('#btn-launch').onclick = async () => {
       const div=document.createElement('div'); div.className='l '+classifyLine(m.line); div.textContent=m.line;
       const term=$('#term'); term.appendChild(div); term.scrollTop=term.scrollHeight;
     }
-    if(m.status){
-      es.close();
-      if(m.status==='error'){ $('#run-status').textContent='❌ Échec : '+(m.error||''); return; }
-      finishTracker();
-      $('#run-status').textContent='✓ Campagne terminée';
-      renderResults(m.summary);
-    }
+    if(m.status) finalize(m.status, m.summary, m.error);
   };
-  es.onerror = () => es.close();
+  // Le flux a coupé : on ne reste pas bloqué, le sondage prend le relais.
+  es.onerror = () => { try{ es.close(); }catch(_){} };
+  pollTimer = setInterval(poll, 5000);
 };
 
 /* Étape 4 */

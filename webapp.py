@@ -436,19 +436,29 @@ def api_stream(job_id: str):
 
     def generate():
         idx = 0
+        quiet = 0
         while True:
             job = JOBS.get(job_id)
             if job is None:
                 break
             log = job["log"]
+            sent = False
             while idx < len(log):
                 yield f"data: {json.dumps({'line': log[idx]})}\n\n"
                 idx += 1
+                sent = True
             if job["status"] in ("done", "error"):
                 payload = {"status": job["status"], "error": job.get("error"),
                            "summary": job.get("summary")}
                 yield f"data: {json.dumps(payload)}\n\n"
                 break
+            # Battement de cœur : pendant les phases silencieuses (longue
+            # analyse LLM ~200s), on envoie un commentaire SSE pour maintenir
+            # la connexion ouverte et éviter qu'un intermédiaire la coupe.
+            quiet = 0 if sent else quiet + 1
+            if quiet >= 30:  # ~12 s sans nouvelle ligne
+                yield ": keepalive\n\n"
+                quiet = 0
             time.sleep(0.4)
 
     return Response(generate(), mimetype="text/event-stream")
