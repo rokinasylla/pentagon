@@ -46,16 +46,16 @@ def main():
     results = []
 
     # Cas 1 : cible autorisee + action passive -> doit passer
-    results.append(test_case(enforcer, "techshop-vuln.rokina-sylla.me", "passive", should_pass=True))
+    results.append(test_case(enforcer, "vulnshop.rokina-sylla.me", "passive", should_pass=True))
 
     # Cas 2 : cible autorisee (URL complete) + scan actif -> doit passer
-    results.append(test_case(enforcer, "https://techshop-vuln.rokina-sylla.me/path", "active_scan", should_pass=True))
+    results.append(test_case(enforcer, "https://vulnshop.rokina-sylla.me/path", "active_scan", should_pass=True))
 
-    # Cas 3 : backend autorise + scan actif -> doit passer
-    results.append(test_case(enforcer, "techshop-backend-cc1t.onrender.com", "active_scan", should_pass=True))
+    # Cas 3 : cible autorisee + exploitation (permise par le defaut) -> doit passer
+    results.append(test_case(enforcer, "vulnshop.rokina-sylla.me", "exploitation", should_pass=True))
 
-    # Cas 4 : cible autorisee MAIS action exploitation -> doit etre refuse
-    results.append(test_case(enforcer, "techshop-vuln.rokina-sylla.me", "exploitation", should_pass=False))
+    # Cas 4 : cible autorisee MAIS action destructive -> doit etre refuse (jamais permise)
+    results.append(test_case(enforcer, "vulnshop.rokina-sylla.me", "destructive", should_pass=False))
 
     # Cas 5 : IP partagee Render -> doit etre refuse (hors perimetre)
     results.append(test_case(enforcer, "216.24.57.7", "active_scan", should_pass=False))
@@ -66,8 +66,9 @@ def main():
     # Cas 7 : cible totalement externe -> doit etre refuse
     results.append(test_case(enforcer, "google.com", "passive", should_pass=False))
 
-    # Cas 8 : action destructive -> doit etre refuse
-    results.append(test_case(enforcer, "techshop-vuln.rokina-sylla.me", "destructive", should_pass=False))
+    # Cas 8 : ancienne cible (hors liste blanche) meme avec action permise -> refuse
+    #         (verifie que le controle de cible precede celui de l'action)
+    results.append(test_case(enforcer, "techshop-vuln.rokina-sylla.me", "exploitation", should_pass=False))
 
     # Resume d'audit
     print("\n" + "=" * 70)
