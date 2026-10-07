@@ -209,7 +209,7 @@
         <p>Console opérateur — pentest multi-agent gouverné par le RoE</p>
       </div>
     </div>
-    <div class="status"><span class="dot"></span> Prêt</div>
+    <div class="status"><span class="dot"></span> Prêt{% if operator %} <span style="color:var(--muted,#8aa0b8);margin-left:8px">· {{ operator }}</span> <a href="{{ url_for('logout') }}" style="color:#4aa3ff;margin-left:8px;text-decoration:none;font-size:12px">déconnexion</a>{% endif %}</div>
   </header>
 
   <!-- ÉTAPE 1 : Configuration -->

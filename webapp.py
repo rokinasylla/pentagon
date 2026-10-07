@@ -24,16 +24,56 @@ ce module s'importe sans la stack — seule une campagne réelle la charge.
 import io
 import json
 import os
+import secrets
 import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from functools import wraps
 
+from dotenv import load_dotenv
 from flask import (
     Flask, jsonify, render_template, request, Response, send_file, abort,
+    session, redirect, url_for,
 )
+from werkzeug.security import check_password_hash
+
+# Charge .env (clé DeepSeek, identifiants opérateur, secret de session).
+load_dotenv()
 
 app = Flask(__name__)
+
+# ─────────────────────────── Authentification opérateur ────────────────────
+# La console est une interface OFFENSIVE : elle ne doit JAMAIS être ouverte
+# sans authentification. Un seul compte opérateur, dont le HASH du mot de passe
+# est stocké dans .env (jamais en clair). Configurez-le via set_password.py.
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # Passé à True en production derrière TLS (via COOKIE_SECURE=1).
+    SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "0") == "1",
+)
+
+OPERATOR_USERNAME = os.getenv("OPERATOR_USERNAME", "admin")
+OPERATOR_PASSWORD_HASH = os.getenv("OPERATOR_PASSWORD_HASH", "")
+
+# Points d'accès joignables SANS être authentifié.
+_PUBLIC_ENDPOINTS = {"login", "static"}
+
+
+@app.before_request
+def _require_login():
+    """Garde globale : tout exige une session opérateur, sauf /login et static."""
+    if request.endpoint in _PUBLIC_ENDPOINTS:
+        return None
+    if session.get("operator"):
+        return None
+    # Non authentifié : JSON pour l'API, redirection pour les pages.
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Authentification requise."}), 401
+    return redirect(url_for("login"))
 
 # Catégories RoE proposables (destructive jamais offerte — charte éthique).
 SELECTABLE_CATEGORIES = ["passive", "active_scan", "exploitation"]
@@ -280,12 +320,38 @@ def _run_campaign_job(job_id: str, target: str, actions: list[str],
 
 # ─────────────────────────────────── Routes ────────────────────────────────
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Connexion opérateur (identifiants vérifiés contre le hash du .env)."""
+    if not OPERATOR_PASSWORD_HASH:
+        return render_template(
+            "login.html",
+            error="Aucun mot de passe opérateur configuré. "
+                  "Exécutez « python set_password.py » sur le serveur."), 503
+    error = None
+    if request.method == "POST":
+        user = (request.form.get("username") or "").strip()
+        pwd = request.form.get("password") or ""
+        if user == OPERATOR_USERNAME and check_password_hash(OPERATOR_PASSWORD_HASH, pwd):
+            session["operator"] = user
+            return redirect(url_for("index"))
+        error = "Identifiants invalides."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
     return render_template(
         "index.html",
         categories=SELECTABLE_CATEGORIES,
         category_labels=CATEGORY_LABELS,
+        operator=session.get("operator", ""),
     )
 
 
