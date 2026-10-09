@@ -22,6 +22,7 @@ from typing import Any
 from pentagon.core.llm_client import LLMClient
 from pentagon.tools.nmap_tool import run_nmap_scan
 from pentagon.tools.whatweb_tool import run_whatweb_scan
+from pentagon.tools.tls_analyzer_tool import run_tls_analysis
 
 SCANNING_SYSTEM_PROMPT = """Tu es l'Agent Scanning & Enumeration de PENTAGON, un système \
 multi-agent de test d'intrusion automatisé.
@@ -165,10 +166,20 @@ class ScanningAgent:
         
         if whatweb_data["status"] == "error":
             print(f"[{self.name}] ⚠️  WhatWeb échoué (on continue avec Nmap seul) : {whatweb_data['error']}")
-        
+
+        # 2bis. Analyse de la configuration TLS/SSL (hors OWASP Top 10 web)
+        print(f"[{self.name}] Analyse de la configuration TLS/SSL...")
+        tls_data = run_tls_analysis(whatweb_url)
+        if tls_data.get("status") == "success":
+            n_tls = len(tls_data.get("findings", []))
+            print(f"[{self.name}]   → {n_tls} finding(s) TLS")
+        else:
+            print(f"[{self.name}]   → TLS non analysable : {tls_data.get('error')}")
+
         # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des résultats du scan...")
-        analysis = self._analyze_with_llm(target, nmap_data, whatweb_data, osint_context)
+        analysis = self._analyze_with_llm(
+            target, nmap_data, whatweb_data, tls_data, osint_context)
         
         # 3. Construction du résultat final
         ended_at = datetime.now(timezone.utc)
@@ -185,10 +196,11 @@ class ScanningAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["nmap", "whatweb"],
+            "tools_used": ["nmap", "whatweb", "tls"],
             "raw_data": {
                 "nmap": nmap_data,
                 "whatweb": whatweb_data,
+                "tls": tls_data,
             },
             "analysis": analysis,
         }
@@ -205,10 +217,11 @@ class ScanningAgent:
         target: str,
         nmap_data: dict[str, Any],
         whatweb_data: dict[str, Any],
+        tls_data: dict[str, Any] | None = None,
         osint_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Demande au LLM d'analyser les résultats corrélés de Nmap et WhatWeb.
+        Demande au LLM d'analyser les résultats corrélés de Nmap, WhatWeb et TLS.
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
@@ -225,6 +238,9 @@ l'hébergeur a déjà été identifié par l'OSINT, ne le devine pas — utilise
 
 """
         
+        tls_block = json.dumps(tls_data or {}, indent=2, ensure_ascii=False,
+                               default=str)
+
         user_prompt = f"""Date actuelle : {current_date}
 
 Analyse les résultats de scan effectués sur la cible '{target}'.
@@ -239,6 +255,11 @@ Analyse les résultats de scan effectués sur la cible '{target}'.
 {json.dumps(whatweb_data, indent=2, ensure_ascii=False, default=str)}
 ```
 
+=== DONNÉES TLS/SSL (configuration du transport chiffré) ===
+```json
+{tls_block}
+```
+
 Produis une analyse de scanning structurée selon le format JSON défini dans tes instructions.
 
 Sois particulièrement attentif à :
@@ -246,6 +267,10 @@ Sois particulièrement attentif à :
 - L'identification des couches de défense (WAF, CDN, reverse proxy)
 - La déduction de l'architecture complète (frontend, backend, hébergement)
 - Les signaux d'hébergement révélés par WhatWeb (ex: header rndr-id = Render.com)
+- La CONFIGURATION TLS/SSL : chaque entrée de 'findings' TLS (protocole obsolète, \
+chiffrement faible, certificat expiré/auto-signé/non concordant) DOIT apparaître dans \
+tes 'key_findings' avec le type 'tls_misconfig' et la sévérité fournie. C'est une famille \
+de vulnérabilités HORS OWASP Top 10 applicatif (couche transport) — ne l'ignore pas.
 - Les implications pour les agents en aval (quels tests applicatifs sont pertinents ?)
 - Les anomalies ou expositions sensibles"""
         
