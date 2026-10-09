@@ -23,6 +23,7 @@ from pentagon.core.llm_client import LLMClient
 from pentagon.tools.nmap_tool import run_nmap_scan
 from pentagon.tools.whatweb_tool import run_whatweb_scan
 from pentagon.tools.tls_analyzer_tool import run_tls_analysis
+from pentagon.tools.network_exposure_tool import analyze_network_exposure
 
 SCANNING_SYSTEM_PROMPT = """Tu es l'Agent Scanning & Enumeration de PENTAGON, un système \
 multi-agent de test d'intrusion automatisé.
@@ -176,10 +177,16 @@ class ScanningAgent:
         else:
             print(f"[{self.name}]   → TLS non analysable : {tls_data.get('error')}")
 
+        # 2ter. Analyse de l'exposition réseau (services risqués dans Nmap)
+        print(f"[{self.name}] Analyse de l'exposition réseau...")
+        net_data = analyze_network_exposure(nmap_data)
+        if net_data.get("status") == "success":
+            print(f"[{self.name}]   → {len(net_data.get('findings', []))} finding(s) exposition réseau")
+
         # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des résultats du scan...")
         analysis = self._analyze_with_llm(
-            target, nmap_data, whatweb_data, tls_data, osint_context)
+            target, nmap_data, whatweb_data, tls_data, net_data, osint_context)
         
         # 3. Construction du résultat final
         ended_at = datetime.now(timezone.utc)
@@ -196,11 +203,12 @@ class ScanningAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["nmap", "whatweb", "tls"],
+            "tools_used": ["nmap", "whatweb", "tls", "network_exposure"],
             "raw_data": {
                 "nmap": nmap_data,
                 "whatweb": whatweb_data,
                 "tls": tls_data,
+                "network_exposure": net_data,
             },
             "analysis": analysis,
         }
@@ -218,10 +226,11 @@ class ScanningAgent:
         nmap_data: dict[str, Any],
         whatweb_data: dict[str, Any],
         tls_data: dict[str, Any] | None = None,
+        net_data: dict[str, Any] | None = None,
         osint_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Demande au LLM d'analyser les résultats corrélés de Nmap, WhatWeb et TLS.
+        Analyse LLM corrélée : Nmap, WhatWeb, TLS et exposition réseau.
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
@@ -239,6 +248,8 @@ l'hébergeur a déjà été identifié par l'OSINT, ne le devine pas — utilise
 """
         
         tls_block = json.dumps(tls_data or {}, indent=2, ensure_ascii=False,
+                               default=str)
+        net_block = json.dumps(net_data or {}, indent=2, ensure_ascii=False,
                                default=str)
 
         user_prompt = f"""Date actuelle : {current_date}
@@ -259,6 +270,15 @@ Analyse les résultats de scan effectués sur la cible '{target}'.
 ```json
 {tls_block}
 ```
+
+=== EXPOSITION RÉSEAU (services risqués repérés dans Nmap) ===
+```json
+{net_block}
+```
+Chaque entrée de 'findings' d'exposition réseau (base de données exposée, RDP/VNC/\
+Telnet/FTP, Docker API, SMB/NFS, panneau d'admin) DOIT apparaître dans tes \
+'key_findings' avec le type 'exposed_service' et la sévérité fournie — c'est une \
+surface d'attaque réseau hors OWASP Top 10 applicatif.
 
 Produis une analyse de scanning structurée selon le format JSON défini dans tes instructions.
 
