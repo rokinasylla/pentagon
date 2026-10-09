@@ -21,6 +21,7 @@ from typing import Any
 from pentagon.core.llm_client import LLMClient
 from pentagon.tools.whois_tool import run_whois
 from pentagon.tools.dns_tool import run_dns_lookup
+from pentagon.tools.email_dns_security_tool import run_email_dns_security
 
 
 OSINT_SYSTEM_PROMPT = """Tu es l'Agent OSINT (Open-Source Intelligence) de PENTAGON, un système \
@@ -138,10 +139,18 @@ class OSINTAgent:
         # 2. Collecte DNS
         print(f"[{self.name}] Invocation de l'outil DNS Lookup...")
         dns_data = run_dns_lookup(target_domain)
-        
+
+        # 2bis. Sécurité DNS & e-mail (SPF/DKIM/DMARC, AXFR) — hors OWASP Top 10
+        print(f"[{self.name}] Analyse de la sécurité DNS & e-mail (SPF/DKIM/DMARC, AXFR)...")
+        email_dns_data = run_email_dns_security(target_domain)
+        if email_dns_data.get("status") == "success":
+            n_ed = len(email_dns_data.get("findings", []))
+            print(f"[{self.name}]   → {n_ed} finding(s) DNS/e-mail")
+
         # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des données collectées...")
-        analysis = self._analyze_with_llm(target_domain, whois_data, dns_data)
+        analysis = self._analyze_with_llm(
+            target_domain, whois_data, dns_data, email_dns_data)
         
         # 4. Construction du résultat final structuré
         ended_at = datetime.now(timezone.utc)
@@ -156,10 +165,11 @@ class OSINTAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["whois", "dns_lookup"],
+            "tools_used": ["whois", "dns_lookup", "email_dns_security"],
             "raw_data": {
                 "whois": whois_data,
                 "dns": dns_data,
+                "email_dns_security": email_dns_data,
             },
             "analysis": analysis,
         }
@@ -176,12 +186,15 @@ class OSINTAgent:
         target: str,
         whois_data: dict[str, Any],
         dns_data: dict[str, Any],
+        email_dns_data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Demande au LLM d'analyser les données collectées (WHOIS + DNS).
+        Demande au LLM d'analyser les données collectées (WHOIS + DNS + e-mail).
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        
+        email_dns_block = json.dumps(email_dns_data or {}, indent=2,
+                                     ensure_ascii=False, default=str)
+
         user_prompt = f"""Date actuelle : {current_date}
 
 Analyse les données de reconnaissance collectées sur la cible '{target}'.
@@ -195,6 +208,15 @@ Analyse les données de reconnaissance collectées sur la cible '{target}'.
 ```json
 {json.dumps(dns_data, indent=2, default=str)}
 ```
+
+=== SÉCURITÉ DNS & E-MAIL (SPF/DKIM/DMARC, AXFR — hors OWASP Top 10) ===
+```json
+{email_dns_block}
+```
+Chaque entrée de 'findings' DNS/e-mail (SPF/DMARC absent ou faible, AXFR ouvert) \
+DOIT apparaître dans tes 'key_findings' avec la sévérité fournie. Ces failles \
+permettent l'usurpation d'e-mails (phishing) ou la fuite de la cartographie DNS \
+— signale-les explicitement.
 
 Produis une analyse OSINT corrélée et structurée selon le format JSON défini dans tes instructions.
 Identifie les éléments utiles pour les phases suivantes du pentest (Scanning, Web App Testing, \
