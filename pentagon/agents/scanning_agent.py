@@ -24,6 +24,7 @@ from pentagon.tools.nmap_tool import run_nmap_scan
 from pentagon.tools.whatweb_tool import run_whatweb_scan
 from pentagon.tools.tls_analyzer_tool import run_tls_analysis
 from pentagon.tools.network_exposure_tool import analyze_network_exposure
+from pentagon.tools.cve_lookup_tool import run_cve_analysis
 
 SCANNING_SYSTEM_PROMPT = """Tu es l'Agent Scanning & Enumeration de PENTAGON, un système \
 multi-agent de test d'intrusion automatisé.
@@ -183,10 +184,16 @@ class ScanningAgent:
         if net_data.get("status") == "success":
             print(f"[{self.name}]   → {len(net_data.get('findings', []))} finding(s) exposition réseau")
 
+        # 2quater. Corrélation CVE (versions détectées → failles connues, OWASP A06)
+        print(f"[{self.name}] Corrélation CVE des composants détectés (NVD)...")
+        cve_data = run_cve_analysis(whatweb_data, nmap_data)
+        print(f"[{self.name}]   → {len(cve_data.get('findings', []))} composant(s) à CVE connues")
+
         # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des résultats du scan...")
         analysis = self._analyze_with_llm(
-            target, nmap_data, whatweb_data, tls_data, net_data, osint_context)
+            target, nmap_data, whatweb_data, tls_data, net_data, cve_data,
+            osint_context)
         
         # 3. Construction du résultat final
         ended_at = datetime.now(timezone.utc)
@@ -203,12 +210,13 @@ class ScanningAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["nmap", "whatweb", "tls", "network_exposure"],
+            "tools_used": ["nmap", "whatweb", "tls", "network_exposure", "cve_lookup"],
             "raw_data": {
                 "nmap": nmap_data,
                 "whatweb": whatweb_data,
                 "tls": tls_data,
                 "network_exposure": net_data,
+                "cve_lookup": cve_data,
             },
             "analysis": analysis,
         }
@@ -227,10 +235,11 @@ class ScanningAgent:
         whatweb_data: dict[str, Any],
         tls_data: dict[str, Any] | None = None,
         net_data: dict[str, Any] | None = None,
+        cve_data: dict[str, Any] | None = None,
         osint_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Analyse LLM corrélée : Nmap, WhatWeb, TLS et exposition réseau.
+        Analyse LLM corrélée : Nmap, WhatWeb, TLS, exposition réseau et CVE.
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
@@ -250,6 +259,8 @@ l'hébergeur a déjà été identifié par l'OSINT, ne le devine pas — utilise
         tls_block = json.dumps(tls_data or {}, indent=2, ensure_ascii=False,
                                default=str)
         net_block = json.dumps(net_data or {}, indent=2, ensure_ascii=False,
+                               default=str)
+        cve_block = json.dumps(cve_data or {}, indent=2, ensure_ascii=False,
                                default=str)
 
         user_prompt = f"""Date actuelle : {current_date}
@@ -279,6 +290,15 @@ Chaque entrée de 'findings' d'exposition réseau (base de données exposée, RD
 Telnet/FTP, Docker API, SMB/NFS, panneau d'admin) DOIT apparaître dans tes \
 'key_findings' avec le type 'exposed_service' et la sévérité fournie — c'est une \
 surface d'attaque réseau hors OWASP Top 10 applicatif.
+
+=== CORRÉLATION CVE (composants versionnés → failles connues, OWASP A06) ===
+```json
+{cve_block}
+```
+Chaque entrée de 'findings' CVE (composant avec des CVE connues) DOIT apparaître \
+dans tes 'key_findings' avec le type 'vulnerable_component', la sévérité fournie et \
+les identifiants CVE cités dans la preuve. C'est l'OWASP A06:2021 (composants \
+vulnérables/obsolètes).
 
 Produis une analyse de scanning structurée selon le format JSON défini dans tes instructions.
 
