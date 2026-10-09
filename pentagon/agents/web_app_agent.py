@@ -29,6 +29,7 @@ from pentagon.core.llm_client import LLMClient
 from pentagon.tools.js_analyzer_tool import run_js_analysis
 from pentagon.tools.api_prober_tool import run_api_probe
 from pentagon.tools.security_headers_tool import run_security_headers_scan
+from pentagon.tools.http_methods_tool import run_http_methods_scan
 from pentagon.tools.data_analyzer_tool import run_data_analysis
 
 WEBAPP_SYSTEM_PROMPT = """Tu es l'Agent Web App de PENTAGON, un système multi-agent \
@@ -168,6 +169,12 @@ class WebAppAgent:
         # === Outil 3 : Analyse des headers de sécurité ===
         print(f"[{self.name}] Analyse des headers de sécurité...")
         headers_data = run_security_headers_scan(target_url)
+        # === Outil 3bis : Méthodes HTTP dangereuses (hors OWASP Top 10) ===
+        print(f"[{self.name}] Analyse des méthodes HTTP...")
+        methods_data = run_http_methods_scan(target_url)
+        if methods_data.get("status") == "success":
+            n_m = len(methods_data.get("findings", []))
+            print(f"[{self.name}]   → {n_m} finding(s) méthodes HTTP")
         # === Outil 4 : Analyse approfondie des données exposées ===
         # Analyse les données JSON récupérées par l'api_prober pour détecter
         # hashes faibles, mots de passe cassables, cartes bancaires.
@@ -194,7 +201,7 @@ class WebAppAgent:
         # === Analyse LLM contextuelle ===
         print(f"[{self.name}] Analyse LLM des résultats...")
         analysis = self._analyze_with_llm(
-            target_url, js_data, api_data, headers_data,
+            target_url, js_data, api_data, headers_data, methods_data,
             data_analysis_results,  osint_context, scanning_context,
         )
         
@@ -212,11 +219,13 @@ class WebAppAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration,
-            "tools_used": ["js_analyzer", "api_prober", "security_headers", "data_analyzer"],
+            "tools_used": ["js_analyzer", "api_prober", "security_headers",
+                           "http_methods", "data_analyzer"],
             "raw_data": {
                 "js_analysis": js_data,
                 "api_probe": api_data,
                 "security_headers": headers_data,
+                "http_methods": methods_data,
                 "data_analysis": data_analysis_results,
             },
             "analysis": analysis,
@@ -235,11 +244,12 @@ class WebAppAgent:
         js_data: dict[str, Any],
         api_data: dict[str, Any],
         headers_data: dict[str, Any],
+        methods_data: dict[str, Any],
         data_analysis_results: list[dict[str, Any]],
         osint_context: dict[str, Any] | None,
         scanning_context: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """Analyse contextuelle des résultats des 3 outils par le LLM."""
+        """Analyse contextuelle des résultats des outils par le LLM."""
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
         # Contexte des agents précédents (si fourni par l'orchestrateur)
@@ -270,6 +280,15 @@ Analyse la sécurité de l'application web '{target}' à partir des résultats d
 ```json
 {json.dumps(headers_data, indent=2, ensure_ascii=False, default=str)}
 ```
+
+=== ANALYSE DES MÉTHODES HTTP (config serveur, hors OWASP Top 10) ===
+```json
+{json.dumps(methods_data, indent=2, ensure_ascii=False, default=str)}
+```
+Chaque entrée de 'findings' des méthodes HTTP (TRACE/XST, PUT/DELETE exposées) \
+DOIT apparaître dans tes 'vulnerabilities' avec la sévérité fournie. C'est une \
+faille de CONFIGURATION du serveur (CWE-650), distincte des failles applicatives.
+
 === ANALYSE APPROFONDIE DES DONNÉES EXPOSÉES (hashes, mots de passe, cartes) ===
 ```json
 {json.dumps(data_analysis_results, indent=2, ensure_ascii=False, default=str)}
