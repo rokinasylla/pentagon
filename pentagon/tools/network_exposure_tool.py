@@ -72,6 +72,10 @@ RISKY_SERVICE_NAMES = {
 # Ports d'administration/management sur alternatives HTTP (confiance moindre).
 ADMIN_ALT_PORTS = {8080, 8000, 8081, 8443, 8888, 9000, 9090, 7001, 7070}
 
+# CDN/WAF : ces services ouvrent des ports alt-HTTP standards (ex. Cloudflare
+# 8080/8443) qui NE sont PAS des panneaux d'admin de la cible → à ne pas signaler.
+CDN_MARKERS = ("cloudflare", "akamai", "fastly", "cloudfront", "incapsula", "sucuri")
+
 # Mots-clés de panneaux d'administration dans le produit/service détecté.
 ADMIN_PANEL_KEYWORDS = (
     "webmin", "phpmyadmin", "adminer", "jenkins", "grafana", "kibana",
@@ -131,6 +135,7 @@ def analyze_network_exposure(nmap_data: dict[str, Any]) -> dict[str, Any]:
             version = (p.get("version") or "")
             prod_low = f"{product} {service}".lower()
 
+            is_cdn = any(m in prod_low for m in CDN_MARKERS)
             severity = None
             reason = None
             label = service or str(port)
@@ -142,11 +147,16 @@ def analyze_network_exposure(nmap_data: dict[str, Any]) -> dict[str, Any]:
             elif service in RISKY_SERVICE_NAMES:
                 severity = RISKY_SERVICE_NAMES[service]
                 reason = f"Service sensible '{service}' exposé sur le port {port}"
-            # 3) Port d'admin/management alternatif.
+            # 3) Port HTTP alternatif.
             elif port in ADMIN_ALT_PORTS and port not in WEB_PORTS:
-                severity = "medium"
-                reason = f"Port d'administration/alternatif HTTP exposé ({port})"
-                label = f"admin/{service or port}"
+                if is_cdn:
+                    # Port alt-HTTP standard d'un CDN (ex. Cloudflare) → pas une
+                    # exposition de la cible : on n'émet aucun finding.
+                    continue
+                # Sans indice d'admin, un port alt-HTTP ouvert est informatif.
+                severity = "low"
+                reason = f"Port HTTP alternatif ouvert ({port})"
+                label = f"alt-http/{service or port}"
 
             # 4) Panneau d'administration détecté par produit.
             if any(k in prod_low for k in ADMIN_PANEL_KEYWORDS):

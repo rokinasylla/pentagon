@@ -59,9 +59,20 @@ def test_admin_alt_port():
     out = analyze_network_exposure(_nmap([
         {"port": 8080, "state": "open", "service": "http-proxy", "product": "", "version": ""},
     ]))
-    check("port admin alternatif signalé", "net-exposed-8080" in _ids(out))
-    check("sévérité medium",
-          any(f["severity"] == "medium" for f in out["findings"]))
+    check("port alt-HTTP signalé", "net-exposed-8080" in _ids(out))
+    check("sévérité low (informatif)",
+          any(f["severity"] == "low" for f in out["findings"]))
+
+
+def test_cdn_alt_port_ignored():
+    print("test_cdn_alt_port_ignored")
+    # Ports alt-HTTP d'un CDN (Cloudflare) → ne doivent PAS être signalés.
+    out = analyze_network_exposure(_nmap([
+        {"port": 8080, "state": "open", "service": "http-proxy", "product": "cloudflare", "version": ""},
+        {"port": 8443, "state": "open", "service": "https-alt", "product": "cloudflare", "version": ""},
+    ]))
+    check("ports CDN non signalés", out["findings"] == [])
+    check("ports quand même comptés", out["open_ports_total"] == 2)
 
 
 def test_closed_ports_skipped():
@@ -84,7 +95,8 @@ if __name__ == "__main__":
     print("=" * 70)
     for t in (test_database_exposed, test_cleartext_and_risky,
               test_web_ports_ignored, test_admin_alt_port,
-              test_closed_ports_skipped, test_error_input):
+              test_cdn_alt_port_ignored, test_closed_ports_skipped,
+              test_error_input):
         t()
     print("=" * 70)
     ok, total = sum(results), len(results)
