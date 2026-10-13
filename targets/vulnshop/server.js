@@ -18,6 +18,7 @@
  */
 
 const path = require("path");
+const fs = require("fs");
 const crypto = require("crypto");
 const express = require("express");
 const { createDb } = require("./db");
@@ -214,6 +215,21 @@ async function main() {
   });
   app.get("/orders", (_req, res) => {
     res.json(store.all("SELECT * FROM orders"));
+  });
+
+  // VULN path traversal / LFI : telecharge un "fichier" sous ./files, mais le
+  // parametre `file` est concatene SANS assainissement → `../../..` permet de
+  // sortir du dossier et de lire n'importe quel fichier (ex: /etc/passwd).
+  // (path.join resout les `..`, donc la traversee fonctionne.)
+  app.get("/api/download", (req, res) => {
+    const file = String(req.query.file || "readme.txt");
+    try {
+      const full = path.join(__dirname, "files", file);
+      const content = fs.readFileSync(full, "utf8");
+      res.type("text/plain").send(content);
+    } catch (e) {
+      res.status(404).type("text/plain").send("Fichier introuvable: " + e.message);
+    }
   });
 
   // ------------------------------- Front (SPA) ------------------------------
