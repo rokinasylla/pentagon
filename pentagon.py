@@ -235,23 +235,31 @@ def _print_summary(state, output_file: str | None) -> None:
 
 def run_mission(targets: list[str], actions: list[str], operator: str,
                 scan_profile: str, output_dir: str, save: bool,
-                scope_authorizer=None, report: bool = False):
+                scope_authorizer=None, report: bool = False,
+                engine: str = "seq"):
     """
     Construit le RoE depuis la saisie opérateur puis lance la campagne.
 
     Le code générique (Orchestrator/agents) ne connaît aucune cible : tout
     vient d'ici. C'est la séparation code/config en action.
-    """
-    # Import différé : ne charge la stack LLM qu'au moment du lancement réel.
-    from pentagon.core.orchestrator import Orchestrator
 
+    engine : "seq" (orchestrateur séquentiel, défaut) ou "langgraph" (moteur
+    graphe : Scanning ∥ Web App, routage conditionnel, checkpointing).
+    """
     roe = RoEEnforcer.from_user_input(
         authorized_targets=targets,
         authorized_actions=actions,
         operator_name=operator,
     )
 
-    orchestrator = Orchestrator(roe_enforcer=roe)
+    # Import différé : ne charge la stack (LLM / langgraph) qu'au lancement réel.
+    if engine == "langgraph":
+        from pentagon.core.orchestrator_graph import GraphOrchestrator
+        print("[PENTAGON] Moteur d'orchestration : LangGraph (parallèle)")
+        orchestrator = GraphOrchestrator(roe_enforcer=roe)
+    else:
+        from pentagon.core.orchestrator import Orchestrator
+        orchestrator = Orchestrator(roe_enforcer=roe)
     state = orchestrator.run_campaign(
         target=targets[0],
         scan_profile=scan_profile,
@@ -302,6 +310,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--report", action="store_true",
                    help="Générer un rapport PDF en fin de campagne "
                         "(nécessite reportlab).")
+    p.add_argument("--engine", choices=["seq", "langgraph"], default="seq",
+                   help="Moteur d'orchestration : 'seq' (séquentiel, défaut) ou "
+                        "'langgraph' (parallèle Scanning∥Web App, routage "
+                        "conditionnel, checkpointing).")
     p.add_argument("--yes", "-y", action="store_true",
                    help="Confirmer automatiquement (mode non-interactif).")
     return p
@@ -356,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
             save=not args.no_save,
             scope_authorizer=scope_authorizer,
             report=args.report,
+            engine=args.engine,
         )
     except Exception as e:
         print(f"\n❌ Échec de la campagne : {type(e).__name__}: {e}")
