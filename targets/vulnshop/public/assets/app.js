@@ -16,6 +16,7 @@ const API = {
   orders: "/api/orders",
   users: "/api/users",
   download: "/api/download",
+  go: "/api/go",
 };
 
 // Routes de l'application (SPA).

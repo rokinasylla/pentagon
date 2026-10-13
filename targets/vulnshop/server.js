@@ -232,6 +232,15 @@ async function main() {
     }
   });
 
+  // VULN open redirect : redirige vers l'URL fournie SANS validation du domaine
+  // → un attaquant peut forger un lien vers la cible qui renvoie vers un site
+  // malveillant (phishing credible). Preuve non destructive : on inspecte le
+  // header Location (pas besoin de suivre la redirection).
+  app.get("/api/go", (req, res) => {
+    const url = String(req.query.url || "/");
+    res.redirect(url); // aucune verification que l'URL reste sur le domaine
+  });
+
   // ------------------------------- Front (SPA) ------------------------------
 
   app.use(express.static(path.join(__dirname, "public")));
