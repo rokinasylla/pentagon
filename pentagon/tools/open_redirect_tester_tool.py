@@ -34,17 +34,15 @@ DEFAULT_TIMEOUT = 15
 # Domaine canari externe, neutre et inexistant (preuve sans nuisance).
 CANARY_HOST = "pentagon-redirect-test.example"
 
-# Charges de redirection (variantes de contournement usuelles).
+# Charges de redirection (les plus efficaces en tête).
 PAYLOADS = [
     f"https://{CANARY_HOST}/",
     f"//{CANARY_HOST}/",
-    f"https:/{CANARY_HOST}/",
 ]
 
-# Noms de paramètres de redirection usuels.
+# Noms de paramètres de redirection usuels (les plus courants en tête).
 REDIRECT_PARAMS = ["url", "next", "redirect", "redirect_uri", "return",
-                   "returnUrl", "return_to", "dest", "destination",
-                   "continue", "go", "target", "r", "u", "to"]
+                   "dest", "continue", "go", "target", "u"]
 
 # Endpoints de redirection courants (sondés même sans découverte).
 COMMON_REDIRECT_PATHS = ["/api/go", "/go", "/redirect", "/api/redirect",
@@ -90,7 +88,7 @@ def run_open_redirect_test(target_base: str,
                            candidate_urls: list[str] | None = None,
                            token: str | None = None,
                            timeout: int = DEFAULT_TIMEOUT,
-                           delay_between_requests: float = 0.5) -> dict[str, Any]:
+                           delay_between_requests: float = 0.3) -> dict[str, Any]:
     """
     Teste la redirection ouverte sur des endpoints candidats.
 

