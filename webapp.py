@@ -75,6 +75,9 @@ def _require_login():
         return jsonify({"error": "Authentification requise."}), 401
     return redirect(url_for("login"))
 
+# Moteurs d'orchestration proposables dans la console (défaut : séquentiel).
+SELECTABLE_ENGINES = {"seq", "langgraph"}
+
 # Catégories RoE proposables (destructive jamais offerte — charte éthique).
 SELECTABLE_CATEGORIES = ["passive", "active_scan", "exploitation"]
 CATEGORY_LABELS = {
@@ -282,15 +285,33 @@ class _JobLogWriter(io.TextIOBase):
 
 # ─────────────────────────────── Worker campagne ───────────────────────────
 
+def _make_orchestrator(engine: str, roe):
+    """
+    Fabrique l'orchestrateur selon le moteur demandé.
+
+    Les deux moteurs partagent le MÊME contrat (run_campaign/save_campaign) et
+    les MÊMES agents + RoE ; seul l'enchaînement change :
+      - "seq"       : moteur séquentiel (défaut, sans dépendance).
+      - "langgraph" : machine à états LangGraph (Scanning ∥ Web App, routage
+                      conditionnel RoE, checkpointing). Import DIFFÉRÉ pour que
+                      la console tourne sans langgraph tant qu'on ne le choisit pas.
+    """
+    if engine == "langgraph":
+        from pentagon.core.orchestrator_graph import GraphOrchestrator
+        return GraphOrchestrator(roe_enforcer=roe)
+    from pentagon.core.orchestrator import Orchestrator
+    return Orchestrator(roe_enforcer=roe)
+
+
 def _run_campaign_job(job_id: str, target: str, actions: list[str],
-                      operator: str, scan_profile: str) -> None:
+                      operator: str, scan_profile: str,
+                      engine: str = "seq") -> None:
     """Exécute une campagne en tâche de fond, en streamant sa sortie."""
     import contextlib
     import sys
 
     job = JOBS[job_id]
-    # Imports différés : la stack LLM n'est chargée qu'ici, au lancement réel.
-    from pentagon.core.orchestrator import Orchestrator
+    # Import différé : la stack LLM n'est chargée qu'ici, au lancement réel.
     from pentagon.core.roe_enforcer import RoEEnforcer
 
     writer = _JobLogWriter(job, sys.stdout)
@@ -300,8 +321,12 @@ def _run_campaign_job(job_id: str, target: str, actions: list[str],
             authorized_actions=actions,
             operator_name=operator or "web",
         )
-        orchestrator = Orchestrator(roe_enforcer=roe)
+        orchestrator = _make_orchestrator(engine, roe)
+        label = "LangGraph (parallèle)" if engine == "langgraph" else "séquentiel"
+        job["log"].append(f"[web] Moteur d'orchestration : {label}")
 
+        # langgraph est importé de façon différée (dans run_campaign) → une
+        # absence ne se manifeste qu'ici. On la traduit en message clair.
         with contextlib.redirect_stdout(writer):
             state = orchestrator.run_campaign(
                 target=target, scan_profile=scan_profile)
@@ -310,8 +335,18 @@ def _run_campaign_job(job_id: str, target: str, actions: list[str],
         job["state"] = state.to_dict()
         job["json_path"] = json_path
         job["summary"] = summarize_state(job["state"])
+        job["summary"]["engine"] = engine
         job["status"] = "done"
         job["log"].append(f"[web] Campagne terminée. JSON : {json_path}")
+    except ModuleNotFoundError as e:
+        job["status"] = "error"
+        if "langgraph" in str(e).lower():
+            job["error"] = ("Moteur LangGraph indisponible : la librairie "
+                            "« langgraph » n'est pas installée sur le serveur "
+                            "(pip install langgraph). Utilisez le moteur séquentiel.")
+        else:
+            job["error"] = f"{type(e).__name__}: {e}"
+        job["log"].append(f"[web] ❌ Échec : {job['error']}")
     except Exception as e:
         job["status"] = "error"
         job["error"] = f"{type(e).__name__}: {e}"
@@ -387,6 +422,9 @@ def api_start():
     actions = sanitize_actions(data.get("actions"))
     operator = (data.get("operator") or "").strip()
     scan_profile = (data.get("scan_profile") or "web_focused").strip()
+    engine = (data.get("engine") or "seq").strip().lower()
+    if engine not in SELECTABLE_ENGINES:
+        engine = "seq"
 
     if not target:
         return jsonify({"error": "URL cible requise."}), 400
@@ -411,6 +449,7 @@ def api_start():
             "target": target,
             "actions": actions,
             "operator": operator,
+            "engine": engine,
             "started_at": datetime.now(timezone.utc).isoformat(),
             "state": None,
             "json_path": None,
@@ -421,7 +460,7 @@ def api_start():
 
     thread = threading.Thread(
         target=_run_campaign_job,
-        args=(job_id, target, actions, operator, scan_profile),
+        args=(job_id, target, actions, operator, scan_profile, engine),
         daemon=True,
     )
     thread.start()

@@ -95,6 +95,18 @@
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
   @media(max-width:620px){.grid2{grid-template-columns:1fr}}
 
+  /* Sélecteur de moteur d'orchestration */
+  .engine{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px}
+  @media(max-width:620px){.engine{grid-template-columns:1fr}}
+  .eng{padding:15px 16px; cursor:pointer; border:1px solid var(--border); border-radius:14px;
+    background:rgba(12,18,30,.5); transition:.16s}
+  .eng:hover{border-color:var(--border-strong); transform:translateY(-1px)}
+  .eng.on{border-color:var(--accent2); background:linear-gradient(180deg,rgba(99,102,241,.12),rgba(99,102,241,.02)); box-shadow:inset 0 0 0 1px rgba(99,102,241,.22)}
+  .eng-top{display:flex; align-items:center; gap:9px; font-weight:650; font-size:14.5px}
+  .eng-dot{width:14px;height:14px;border-radius:50%;border:2px solid #39456a;flex:none;transition:.2s}
+  .eng.on .eng-dot{border-color:var(--accent2); background:radial-gradient(circle,var(--accent2) 40%,transparent 46%)}
+  .eng .desc{color:var(--muted); font-size:12.5px; margin-top:4px}
+
   .row{display:flex; gap:12px; flex-wrap:wrap; margin-top:24px}
   .btn{display:inline-flex; align-items:center; gap:9px; padding:13px 22px; border:none; border-radius:12px;
     font-size:14.5px; font-weight:700; cursor:pointer; transition:.18s; letter-spacing:.2px}
@@ -256,6 +268,18 @@
       </div>
     </div>
 
+    <label class="fld">Moteur d'orchestration</label>
+    <div class="engine" id="engine">
+      <div class="eng on" data-engine="seq">
+        <div class="eng-top"><span class="eng-dot"></span><span class="eng-name">Séquentiel</span><span class="tag safe">défaut</span></div>
+        <div class="desc">Phases l'une après l'autre. Déterministe, sans dépendance.</div>
+      </div>
+      <div class="eng" data-engine="langgraph">
+        <div class="eng-top"><span class="eng-dot"></span><span class="eng-name">LangGraph</span><span class="tag warn">parallèle</span></div>
+        <div class="desc">Scanning ∥ Web App en parallèle, routage conditionnel RoE, checkpointing.</div>
+      </div>
+    </div>
+
     <div class="row">
       <button class="btn btn-primary" id="btn-plan">Prévisualiser le plan
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -338,6 +362,18 @@ function selectedActions(){
   return [...document.querySelectorAll('#roe .toggle.on')].map(t => t.dataset.cat);
 }
 
+/* Sélecteur de moteur (comportement radio) */
+document.querySelectorAll('#engine .eng').forEach(e => {
+  e.addEventListener('click', () => {
+    document.querySelectorAll('#engine .eng').forEach(x => x.classList.remove('on'));
+    e.classList.add('on');
+  });
+});
+function selectedEngine(){
+  const el = document.querySelector('#engine .eng.on');
+  return el ? el.dataset.engine : 'seq';
+}
+
 /* Étape 1 → 2 */
 $('#btn-plan').onclick = async () => {
   $('#config-err').classList.add('hidden');
@@ -376,6 +412,12 @@ function finishTracker(){
   document.querySelectorAll('#tracker .node').forEach(n=>{n.classList.remove('active');n.classList.add('done')});
   document.querySelectorAll('#tracker .bar').forEach(b=>b.classList.add('fill'));
 }
+/* Moteur LangGraph : Scanning ∥ Web App en parallèle → les deux nœuds actifs. */
+function setPhasesParallel(){
+  const nodes=document.querySelectorAll('#tracker .node');
+  nodes.forEach((n,i)=>{ n.classList.toggle('done', i===0); n.classList.toggle('active', i===1||i===2); });
+  document.querySelectorAll('#tracker .bar').forEach((b,i)=> b.classList.toggle('fill', i===0));
+}
 function classifyLine(t){
   if(/PHASE\s+\d/.test(t)) return 'phase';
   if(/^\[RoE\]/.test(t)) return 'roe';
@@ -385,6 +427,8 @@ function classifyLine(t){
   return '';
 }
 function trackFromLine(t){
+  // Moteur LangGraph : phases 2 & 3 annoncées « (parallèle) » → deux nœuds actifs.
+  if(/parallèle/i.test(t) && /PHASE [23]/.test(t)){ setPhasesParallel(); return; }
   if(/PHASE 1|OSINT & Rec/i.test(t)) setPhase('osint');
   else if(/PHASE 2|Scanning & Enum/i.test(t)) setPhase('scan');
   else if(/PHASE 3|Web Application/i.test(t)) setPhase('web');
@@ -393,7 +437,8 @@ function trackFromLine(t){
 
 /* Étape 2 → 3 */
 $('#btn-launch').onclick = async () => {
-  const body={target:$('#target').value.trim(),actions:selectedActions(),operator:$('#operator').value.trim(),scan_profile:$('#profile').value};
+  const engine=selectedEngine();
+  const body={target:$('#target').value.trim(),actions:selectedActions(),operator:$('#operator').value.trim(),scan_profile:$('#profile').value,engine};
   let d;
   try{
     const r = await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -404,7 +449,8 @@ $('#btn-launch').onclick = async () => {
 
   $('#term').innerHTML=''; document.querySelectorAll('#tracker .node,#tracker .bar').forEach(n=>n.classList.remove('active','done','fill'));
   show('#step-plan', false); show('#step-run', true);
-  $('#run-status').innerHTML = '<svg class="spin-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-3px"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg> Campagne en cours…';
+  const engLabel = engine==='langgraph' ? ' · moteur LangGraph (parallèle)' : ' · moteur séquentiel';
+  $('#run-status').innerHTML = '<svg class="spin-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-3px"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg> Campagne en cours…<span style="font-size:13px;color:var(--muted);font-weight:500">'+engLabel+'</span>';
   $('#step-run').scrollIntoView({behavior:'smooth',block:'start'});
 
   // Finalisation unique (depuis le flux SSE OU le sondage de secours).
@@ -477,7 +523,8 @@ function renderFindings(list){
 }
 function renderResults(s){
   if(!s) return;
-  $('#res-target').innerHTML='Cible : <b>'+s.target+'</b> &nbsp;•&nbsp; Campagne '+(s.campaign_id||'').slice(0,8);
+  const eng = s.engine==='langgraph' ? ' &nbsp;•&nbsp; moteur <b>LangGraph</b>' : (s.engine==='seq' ? ' &nbsp;•&nbsp; moteur séquentiel' : '');
+  $('#res-target').innerHTML='Cible : <b>'+s.target+'</b> &nbsp;•&nbsp; Campagne '+(s.campaign_id||'').slice(0,8)+eng;
   const risk=(s.overall_risk||'unknown');
   const rb=$('#res-risk'); rb.className='risk-badge risk-'+risk; rb.textContent=(risk||'—').toUpperCase();
   $('#res-risk-txt').textContent=({critical:'action immédiate requise',high:'sérieux',medium:'à corriger',low:'faible',unknown:'indéterminé'})[risk]||'';
