@@ -129,6 +129,12 @@
   .badge.off{background:rgba(120,130,150,.12); color:var(--faint)}
   .warnbox{margin-top:16px; padding:14px 16px; border-radius:12px; font-size:13px;
     background:linear-gradient(180deg,rgba(251,146,60,.12),transparent); border:1px solid rgba(251,146,60,.3); color:#ffd0a6}
+  /* Bandeau de reprise (récupération d'une campagne terminée) */
+  .recover{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:0 0 18px; padding:13px 16px;
+    border-radius:12px; font-size:13.5px; background:linear-gradient(180deg,rgba(56,189,248,.12),transparent);
+    border:1px solid var(--border-strong); color:#bfe6ff}
+  .recover b{color:#eaf6ff}
+  .recover .btn{margin-left:auto; padding:9px 16px; font-size:13px}
 
   /* Tracker phases (live) */
   .tracker{display:flex; align-items:center; gap:6px; margin:4px 0 20px}
@@ -229,6 +235,11 @@
     <div class="eyebrow"><span class="step-num">1</span> Cible &amp; règles d'engagement</div>
     <h2 class="title">Définir la mission</h2>
     <p class="sub">Saisis la cible et les catégories d'action autorisées. <b>Deny by default</b> : tout ce qui n'est pas activé est refusé.</p>
+
+    <div class="recover hidden" id="recover">
+      <span>↩ Une campagne terminée est disponible : <b id="recover-target"></b></span>
+      <button class="btn btn-ghost" id="btn-recover">Reprendre &amp; voir les résultats</button>
+    </div>
 
     <label class="fld" for="target">URL ou domaine de la cible</label>
     <div class="with-icon">
@@ -540,19 +551,62 @@ function renderResults(s){
   $('#step-results').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-$('#btn-json').onclick = () => { if(currentJob) window.location='/api/download/'+currentJob+'/json'; };
+function showResErr(msg){ const e=$('#res-err'); e.textContent=msg; e.classList.remove('hidden'); }
+$('#btn-json').onclick = () => {
+  if(!currentJob){ showResErr("Aucune campagne active. Relance ou reprends une campagne terminée."); return; }
+  window.location='/api/download/'+currentJob+'/json';
+};
 $('#btn-pdf').onclick = async () => {
   $('#res-err').classList.add('hidden');
+  // Garde explicite : plus jamais de clic « sans effet » si le fil est perdu.
+  if(!currentJob){ showResErr("Aucune campagne active (onglet rechargé ?). Clique « Reprendre » en haut, puis régénère le PDF."); return; }
   const b=$('#btn-pdf'); b.disabled=true; b.textContent='⏳ Génération…';
-  let d;
-  try{ const r=await fetch('/api/report/'+currentJob,{method:'POST'}); d=await r.json();
-    if(!r.ok){ $('#res-err').textContent=d.error; $('#res-err').classList.remove('hidden'); return; }
+  try{
+    const r=await fetch('/api/report/'+currentJob,{method:'POST'});
+    let d=null; try{ d=await r.json(); }catch(_){}
+    if(!r.ok){
+      if(r.status===404) showResErr("Cette campagne n'est plus en mémoire (serveur redémarré). Reprends-en une via « Reprendre » ou relance.");
+      else showResErr((d&&d.error) ? d.error : ("Échec de génération (HTTP "+r.status+")."));
+      return;
+    }
     show('#btn-pdf-dl', true);
-  }catch(e){ $('#res-err').textContent='Erreur réseau.'; $('#res-err').classList.remove('hidden'); }
-  finally{ b.disabled=false; b.textContent='📄 Générer le rapport PDF'; }
+    $('#btn-pdf').textContent='✅ PDF généré';
+  }catch(e){ showResErr('Erreur réseau pendant la génération.'); }
+  finally{ b.disabled=false; if(b.textContent==='⏳ Génération…') b.textContent='📄 Générer le rapport PDF'; }
 };
 $('#btn-pdf-dl').onclick = () => { if(currentJob) window.location='/api/download/'+currentJob+'/pdf'; };
-$('#btn-new').onclick = () => { currentJob=null; show('#step-results',false); show('#btn-pdf-dl',false); show('#step-config',true); window.scrollTo({top:0,behavior:'smooth'}); };
+$('#btn-new').onclick = () => { currentJob=null; show('#step-results',false); show('#btn-pdf-dl',false); show('#step-config',true); window.scrollTo({top:0,behavior:'smooth'}); checkRecover(); };
+
+/* Récupération : au chargement, propose de reprendre la dernière campagne
+   terminée si le fil a été perdu (reload, onglet gelé). Évite de reperdre un
+   rapport déjà calculé. */
+let recoverJobId = null;
+async function checkRecover(){
+  try{
+    const r = await fetch('/api/jobs'); if(!r.ok) return;
+    const d = await r.json();
+    const done = (d.jobs||[]).find(j => j.status==='done' && j.has_summary);
+    if(done){
+      recoverJobId = done.job_id;
+      $('#recover-target').textContent = done.target + (done.engine==='langgraph'?' · LangGraph':'');
+      show('#recover', true);
+    } else { show('#recover', false); }
+  }catch(_){}
+}
+$('#btn-recover').onclick = async () => {
+  if(!recoverJobId) return;
+  try{
+    const r = await fetch('/api/result/'+recoverJobId);
+    if(!r.ok) return;
+    const s = await r.json();
+    if(s.status==='done' && s.summary){
+      currentJob = recoverJobId;
+      show('#btn-pdf-dl', !!s.has_pdf);
+      renderResults(s.summary);
+    }
+  }catch(_){}
+};
+checkRecover();
 </script>
 </body>
 </html>

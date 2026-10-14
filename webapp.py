@@ -517,6 +517,34 @@ def api_result(job_id: str):
     })
 
 
+@app.route("/api/jobs")
+def api_jobs():
+    """
+    Liste des campagnes récentes (en mémoire), pour la RÉCUPÉRATION côté UI.
+
+    Si l'onglet a perdu le fil (rechargement, onglet gelé par le navigateur en
+    arrière-plan), la page peut retrouver la dernière campagne terminée et
+    réafficher ses résultats + le bouton de génération PDF — sans relancer une
+    campagne. Trié du plus récent au plus ancien.
+    """
+    with _JOBS_LOCK:
+        items = [
+            {
+                "job_id": jid,
+                "target": j.get("target", ""),
+                "status": j.get("status"),
+                "operator": j.get("operator", ""),
+                "engine": j.get("engine", "seq"),
+                "started_at": j.get("started_at", ""),
+                "has_summary": bool(j.get("summary")),
+                "has_pdf": bool(j.get("pdf_path")),
+            }
+            for jid, j in JOBS.items()
+        ]
+    items.sort(key=lambda x: x["started_at"], reverse=True)
+    return jsonify({"jobs": items[:10]})
+
+
 @app.route("/api/report/<job_id>", methods=["POST"])
 def api_report(job_id: str):
     """Génère le rapport PDF de la campagne (import reportlab différé)."""
