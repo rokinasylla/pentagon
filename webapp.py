@@ -21,6 +21,7 @@ Note : l'import de l'Orchestrator (stack LLM) est DIFFÉRÉ dans le worker, donc
 ce module s'importe sans la stack — seule une campagne réelle la charge.
 """
 
+import glob
 import io
 import json
 import os
@@ -96,6 +97,84 @@ PHASE_CATEGORY = [
 # Registre des campagnes en mémoire (outil local mono-utilisateur).
 JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
+
+# ─────────────────── Persistance : disque → registre (Lot 5) ────────────────
+# Les campagnes vivaient UNIQUEMENT en mémoire → perdues au moindre redémarrage
+# du service (rapport soudain « introuvable »). Or chaque campagne terminée est
+# déjà sauvegardée en JSON complet dans results/. On fait donc du DISQUE la
+# source de vérité : au démarrage (et à chaque /api/jobs) on recharge les
+# campagnes terminées dans JOBS → elles SURVIVENT aux redémarrages, et les
+# campagnes lancées en CLI apparaissent aussi dans la console.
+
+RESULTS_DIR = os.getenv("PENTAGON_RESULTS_DIR", "results")
+# Chemins déjà traités (fichier chargé OU illisible) → scan bon marché ensuite.
+_PERSISTED_PATHS: set[str] = set()
+
+
+def _persisted_job_id(state: dict, path: str) -> str:
+    """ID stable d'une campagne persistée (dérivé du campaign_id, sinon du nom)."""
+    cid = (state.get("campaign_id") or "").replace("-", "")
+    return cid[:12] if cid else os.path.splitext(os.path.basename(path))[0][:12]
+
+
+def lookup_job(job_id: str):
+    """Retrouve un job ; sur échec, resynchronise le disque puis réessaie.
+
+    Rend les liens directs (/api/result|report|download) robustes après un
+    redémarrage du service, même si l'UI n'a pas encore appelé /api/jobs.
+    """
+    job = JOBS.get(job_id)
+    if job is None:
+        sync_persisted_jobs()
+        job = JOBS.get(job_id)
+    return job
+
+
+def sync_persisted_jobs() -> None:
+    """
+    Charge dans JOBS les campagnes terminées de results/*.json absentes du
+    registre. Idempotent : ignore les fichiers déjà vus. Sans stack LLM (seul
+    summarize_state, pur, est utilisé) → n'alourdit pas l'import du module.
+    """
+    try:
+        # Uniquement les campagnes COMPLÈTES (save_campaign -> campaign_*.json),
+        # jamais les sorties d'agents isolées (osint_*.json, scanning_*.json…).
+        paths = glob.glob(os.path.join(RESULTS_DIR, "campaign_*.json"))
+    except Exception:
+        return
+    for path in paths:
+        if path in _PERSISTED_PATHS:
+            continue
+        _PERSISTED_PATHS.add(path)  # marqué quoi qu'il arrive (évite de retenter)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception:
+            continue
+        job_id = _persisted_job_id(state, path)
+        with _JOBS_LOCK:
+            if job_id in JOBS:
+                continue
+            try:
+                summary = summarize_state(state)
+                summary["engine"] = "seq"
+            except Exception:
+                summary = None
+            JOBS[job_id] = {
+                "status": "done",
+                "log": [],
+                "target": state.get("target", ""),
+                "actions": [],
+                "operator": "",
+                "engine": "seq",
+                "started_at": state.get("started_at") or state.get("ended_at") or "",
+                "state": state,
+                "json_path": path,
+                "pdf_path": None,
+                "summary": summary,
+                "error": None,
+                "persisted": True,
+            }
 
 
 # ─────────────────────────── Logique pure (testable) ───────────────────────
@@ -505,7 +584,7 @@ def api_stream(job_id: str):
 
 @app.route("/api/result/<job_id>")
 def api_result(job_id: str):
-    job = JOBS.get(job_id)
+    job = lookup_job(job_id)
     if job is None:
         abort(404)
     return jsonify({
@@ -527,9 +606,12 @@ def api_jobs():
     réafficher ses résultats + le bouton de génération PDF — sans relancer une
     campagne. Trié du plus récent au plus ancien.
     """
+    sync_persisted_jobs()  # intègre les campagnes terminées trouvées sur disque
     with _JOBS_LOCK:
-        items = [
-            {
+        items = []
+        for jid, j in JOBS.items():
+            s = j.get("summary") or {}
+            items.append({
                 "job_id": jid,
                 "target": j.get("target", ""),
                 "status": j.get("status"),
@@ -538,9 +620,11 @@ def api_jobs():
                 "started_at": j.get("started_at", ""),
                 "has_summary": bool(j.get("summary")),
                 "has_pdf": bool(j.get("pdf_path")),
-            }
-            for jid, j in JOBS.items()
-        ]
+                # Résumé compact pour l'historique (sans réouvrir la campagne).
+                "proven_count": s.get("proven_count", 0),
+                "detected_count": s.get("detected_count", 0),
+                "overall_risk": s.get("overall_risk", "unknown"),
+            })
     items.sort(key=lambda x: x["started_at"], reverse=True)
     return jsonify({"jobs": items[:10]})
 
@@ -548,7 +632,7 @@ def api_jobs():
 @app.route("/api/report/<job_id>", methods=["POST"])
 def api_report(job_id: str):
     """Génère le rapport PDF de la campagne (import reportlab différé)."""
-    job = JOBS.get(job_id)
+    job = lookup_job(job_id)
     if job is None:
         abort(404)
     if job["status"] != "done" or not job.get("state"):
@@ -565,13 +649,18 @@ def api_report(job_id: str):
 
 @app.route("/api/download/<job_id>/<kind>")
 def api_download(job_id: str, kind: str):
-    job = JOBS.get(job_id)
+    job = lookup_job(job_id)
     if job is None:
         abort(404)
     path = job.get("json_path") if kind == "json" else job.get("pdf_path")
     if not path or not os.path.exists(path):
         abort(404)
     return send_file(os.path.abspath(path), as_attachment=True)
+
+
+# Au chargement du module (service systemd ou gunicorn), on recharge les
+# campagnes terminées déjà sur disque → la reprise fonctionne dès la 1re page.
+sync_persisted_jobs()
 
 
 if __name__ == "__main__":

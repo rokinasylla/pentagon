@@ -129,12 +129,26 @@
   .badge.off{background:rgba(120,130,150,.12); color:var(--faint)}
   .warnbox{margin-top:16px; padding:14px 16px; border-radius:12px; font-size:13px;
     background:linear-gradient(180deg,rgba(251,146,60,.12),transparent); border:1px solid rgba(251,146,60,.3); color:#ffd0a6}
-  /* Bandeau de reprise (récupération d'une campagne terminée) */
-  .recover{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:0 0 18px; padding:13px 16px;
-    border-radius:12px; font-size:13.5px; background:linear-gradient(180deg,rgba(56,189,248,.12),transparent);
-    border:1px solid var(--border-strong); color:#bfe6ff}
-  .recover b{color:#eaf6ff}
-  .recover .btn{margin-left:auto; padding:9px 16px; font-size:13px}
+  /* Historique des campagnes (persistance — récupération) */
+  .recover{margin:0 0 18px; padding:14px 16px; border-radius:14px;
+    background:linear-gradient(180deg,rgba(56,189,248,.09),transparent);
+    border:1px solid var(--border-strong)}
+  .recover-head{display:flex; align-items:center; gap:10px; font-size:13.5px; font-weight:700; color:#dff1ff; margin-bottom:10px}
+  .recover-head .cnt{font-size:11px; font-weight:600; color:var(--muted); padding:2px 9px; border:1px solid var(--border); border-radius:100px}
+  .recover-hint{margin-left:auto; font-size:11.5px; font-weight:500; color:var(--faint)}
+  .recover-list{display:flex; flex-direction:column; gap:8px}
+  .rcard{display:flex; align-items:center; gap:12px; padding:10px 13px; border-radius:11px;
+    border:1px solid var(--border); background:rgba(10,16,28,.55); transition:.15s}
+  .rcard:hover{border-color:var(--border-strong)}
+  .rcard .rc-main{min-width:0; flex:1}
+  .rcard .rc-target{font-weight:600; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .rcard .rc-meta{font-size:11px; color:var(--faint); margin-top:2px; font-family:ui-monospace,Consolas,monospace}
+  .rcard .rc-risk{font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; padding:3px 9px; border-radius:100px; flex:none}
+  .rc-risk.critical{color:#ff8a97;background:rgba(244,63,94,.14)} .rc-risk.high{color:#ffb782;background:rgba(251,146,60,.14)}
+  .rc-risk.medium{color:#ffe066;background:rgba(250,204,21,.12)} .rc-risk.low{color:#6ee7b7;background:rgba(52,211,153,.12)}
+  .rc-risk.unknown{color:var(--faint);background:rgba(120,130,150,.12)}
+  .rcard .btn{padding:7px 14px; font-size:12.5px; flex:none}
+  @media(max-width:620px){.recover-hint{display:none} .rcard{flex-wrap:wrap}}
 
   /* Tracker phases (live) */
   .tracker{display:flex; align-items:center; gap:6px; margin:4px 0 20px}
@@ -237,8 +251,10 @@
     <p class="sub">Saisis la cible et les catégories d'action autorisées. <b>Deny by default</b> : tout ce qui n'est pas activé est refusé.</p>
 
     <div class="recover hidden" id="recover">
-      <span>↩ Une campagne terminée est disponible : <b id="recover-target"></b></span>
-      <button class="btn btn-ghost" id="btn-recover">Reprendre &amp; voir les résultats</button>
+      <div class="recover-head">🗂️ Campagnes précédentes <span class="cnt" id="recover-count"></span>
+        <span class="recover-hint">reprends une campagne terminée (rapport, bilan) sans la relancer</span>
+      </div>
+      <div class="recover-list" id="recover-list"></div>
     </div>
 
     <label class="fld" for="target">URL ou domaine de la cible</label>
@@ -580,32 +596,43 @@ $('#btn-new').onclick = () => { currentJob=null; show('#step-results',false); sh
 /* Récupération : au chargement, propose de reprendre la dernière campagne
    terminée si le fil a été perdu (reload, onglet gelé). Évite de reperdre un
    rapport déjà calculé. */
-let recoverJobId = null;
 async function checkRecover(){
   try{
-    const r = await fetch('/api/jobs'); if(!r.ok) return;
+    const r = await fetch('/api/jobs'); if(!r.ok){ show('#recover',false); return; }
     const d = await r.json();
-    const done = (d.jobs||[]).find(j => j.status==='done' && j.has_summary);
-    if(done){
-      recoverJobId = done.job_id;
-      $('#recover-target').textContent = done.target + (done.engine==='langgraph'?' · LangGraph':'');
-      show('#recover', true);
-    } else { show('#recover', false); }
-  }catch(_){}
+    const done = (d.jobs||[]).filter(j => j.status==='done' && j.has_summary);
+    if(!done.length){ show('#recover', false); return; }
+    $('#recover-count').textContent = done.length;
+    $('#recover-list').innerHTML = done.map(j => {
+      const risk = esc(j.overall_risk||'unknown');
+      const when = esc((j.started_at||'').replace('T',' ').slice(0,16));
+      const eng = j.engine==='langgraph' ? 'LangGraph' : 'séquentiel';
+      return `<div class="rcard">
+        <div class="rc-main">
+          <div class="rc-target">${esc(j.target)}</div>
+          <div class="rc-meta">${when} · 💥 ${j.proven_count||0} prouvées · 🔎 ${j.detected_count||0} détectées · ${eng}</div>
+        </div>
+        <span class="rc-risk ${risk}">${risk}</span>
+        <button class="btn btn-ghost rc-open" data-job="${esc(j.job_id)}">Voir</button>
+      </div>`;
+    }).join('');
+    document.querySelectorAll('#recover-list .rc-open').forEach(b => b.onclick = () => openJob(b.dataset.job));
+    show('#recover', true);
+  }catch(_){ show('#recover', false); }
 }
-$('#btn-recover').onclick = async () => {
-  if(!recoverJobId) return;
+/* Rouvre une campagne persistée : réaffiche le bilan + réactive PDF/JSON. */
+async function openJob(jobId){
   try{
-    const r = await fetch('/api/result/'+recoverJobId);
-    if(!r.ok) return;
+    const r = await fetch('/api/result/'+jobId);
+    if(!r.ok){ alert("Cette campagne n'est plus disponible."); return; }
     const s = await r.json();
     if(s.status==='done' && s.summary){
-      currentJob = recoverJobId;
+      currentJob = jobId;
       show('#btn-pdf-dl', !!s.has_pdf);
       renderResults(s.summary);
     }
   }catch(_){}
-};
+}
 checkRecover();
 </script>
 </body>
