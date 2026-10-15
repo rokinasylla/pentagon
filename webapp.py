@@ -647,6 +647,41 @@ def api_report(job_id: str):
         return jsonify({"error": str(e)}), 500
 
 
+GROUND_TRUTH_PATH = os.path.join("benchmark", "vulnshop_ground_truth.json")
+
+
+@app.route("/api/evaluate/<job_id>")
+def api_evaluate(job_id: str):
+    """
+    Évalue une campagne terminée contre la vérité terrain (Lot 6) et renvoie
+    les métriques précision/rappel/F1 + le rapport Markdown (pour téléchargement
+    côté client). 100% pur (aucun LLM, aucun réseau).
+    """
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    if job["status"] != "done" or not job.get("state"):
+        return jsonify({"error": "Campagne non terminée."}), 400
+    try:
+        from pentagon.tools.evaluation_tool import score_campaign
+        from evaluate import render_markdown
+        with open(GROUND_TRUTH_PATH, "r", encoding="utf-8") as f:
+            ground_truth = json.load(f)
+    except Exception as e:
+        return jsonify({
+            "error": f"Banc de vérité terrain indisponible : {e}"}), 500
+
+    res = score_campaign(job["state"], ground_truth)
+    # Avertissement si la cible ne correspond pas au banc (métriques non
+    # pertinentes hors VulnShop).
+    hint = (ground_truth.get("target_hint") or "").lower()
+    tgt = str(res.get("target", "")).lower()
+    res["off_benchmark"] = bool(hint and hint not in tgt)
+    res["benchmark_hint"] = ground_truth.get("target_hint", "")
+    res["markdown"] = render_markdown(res)
+    return jsonify(res)
+
+
 @app.route("/api/download/<job_id>/<kind>")
 def api_download(job_id: str, kind: str):
     job = lookup_job(job_id)

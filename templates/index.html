@@ -6,12 +6,14 @@
 <title>PENTAGON — Console opérateur</title>
 <style>
   :root{
-    --bg:#070b14; --bg2:#0b1220; --panel:rgba(20,28,45,.72); --panel-solid:#111a2b;
-    --border:rgba(120,140,180,.16); --border-strong:rgba(120,160,220,.34);
-    --text:#e8eef8; --muted:#8a99b3; --faint:#5a6a86;
-    --accent:#38bdf8; --accent2:#6366f1; --accent3:#22d3ee;
+    /* Thème « moyen sombre » : ardoise plutôt que quasi-noir, panneaux plus
+       lisibles, accents cyan/indigo modernes. */
+    --bg:#181d27; --bg2:#1f2733; --panel:rgba(38,47,63,.74); --panel-solid:#273142;
+    --border:rgba(150,170,205,.18); --border-strong:rgba(150,182,238,.36);
+    --text:#eef2f9; --muted:#a2b0c6; --faint:#74839c;
+    --accent:#3ec6f0; --accent2:#7c83ff; --accent3:#2dd4d4;
     --crit:#f43f5e; --high:#fb923c; --med:#facc15; --low:#34d399; --info:#64748b;
-    --ok:#34d399; --glow:0 0 0 1px rgba(56,189,248,.35), 0 8px 40px -12px rgba(56,189,248,.45);
+    --ok:#34d399; --glow:0 0 0 1px rgba(62,198,240,.32), 0 10px 44px -14px rgba(62,198,240,.5);
     --radius:18px;
   }
   *{box-sizing:border-box}
@@ -23,10 +25,10 @@
   }
   /* Fond animé */
   .bg{position:fixed; inset:0; z-index:-2; background:
-      radial-gradient(1100px 600px at 12% -8%, rgba(56,189,248,.16), transparent 60%),
-      radial-gradient(1000px 700px at 100% 0%, rgba(99,102,241,.18), transparent 55%),
-      radial-gradient(900px 700px at 50% 120%, rgba(34,211,238,.10), transparent 60%),
-      linear-gradient(180deg,#070b14,#0a0f1c);}
+      radial-gradient(1100px 600px at 12% -8%, rgba(62,198,240,.14), transparent 60%),
+      radial-gradient(1000px 700px at 100% 0%, rgba(124,131,255,.16), transparent 55%),
+      radial-gradient(900px 700px at 50% 120%, rgba(45,212,212,.10), transparent 60%),
+      linear-gradient(180deg,#181d27,#1e2735);}
   .bg::after{content:""; position:absolute; inset:0; opacity:.4;
     background-image:linear-gradient(rgba(120,150,200,.05) 1px,transparent 1px),
       linear-gradient(90deg,rgba(120,150,200,.05) 1px,transparent 1px);
@@ -65,9 +67,9 @@
   .sub{color:var(--muted); font-size:13.5px; margin:0 0 20px}
 
   label.fld{display:block; font-size:12px; color:var(--muted); margin:16px 0 7px; letter-spacing:.4px; text-transform:uppercase}
-  .input, select{width:100%; padding:13px 15px; background:rgba(8,13,22,.7); color:var(--text);
+  .input, select{width:100%; padding:13px 15px; background:rgba(18,24,34,.6); color:var(--text);
     border:1px solid var(--border); border-radius:12px; font-size:14.5px; transition:.18s}
-  .input:focus, select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(56,189,248,.14)}
+  .input:focus, select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(62,198,240,.16)}
   .input.big{font-size:16px; padding:15px 17px}
   .with-icon{position:relative}
   .with-icon svg{position:absolute; left:15px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--faint)}
@@ -167,7 +169,7 @@
   .term-head{display:flex; align-items:center; gap:8px; margin-bottom:8px; color:var(--muted); font-size:12px}
   .term-head .lights{display:flex; gap:6px}
   .term-head .lights i{width:11px;height:11px;border-radius:50%;display:block}
-  #term{background:#04070e; border:1px solid var(--border); border-radius:14px; padding:16px;
+  #term{background:#111722; border:1px solid var(--border); border-radius:14px; padding:16px;
     height:360px; overflow:auto; font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
     font-size:12.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word}
   #term .l{opacity:0; animation:fadein .25s forwards}
@@ -225,6 +227,29 @@
 
   footer{color:var(--faint); font-size:12px; text-align:center; margin-top:26px; letter-spacing:.3px}
   .spin-ic{animation:spin 1s linear infinite}
+
+  /* Panneau d'évaluation qualité (Lot 6) */
+  .eval{margin-top:20px; padding:20px; border-radius:16px; border:1px solid var(--border);
+    background:rgba(12,18,30,.5)}
+  .eval h3{margin:0 0 4px; font-size:15px; font-weight:750; display:flex; align-items:center; gap:9px}
+  .eval .evsub{color:var(--muted); font-size:12.5px; margin:0 0 16px}
+  .eval-warn{margin:0 0 14px; padding:11px 14px; border-radius:11px; font-size:12.5px;
+    background:linear-gradient(180deg,rgba(250,204,21,.12),transparent); border:1px solid rgba(250,204,21,.3); color:#ffe29a}
+  .ev-tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px}
+  @media(max-width:560px){.ev-tiles{grid-template-columns:1fr}}
+  .ev-tile{padding:16px; border-radius:14px; border:1px solid var(--border); background:rgba(8,13,22,.5); text-align:center}
+  .ev-tile .v{font-size:30px; font-weight:850; line-height:1}
+  .ev-tile .k{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-top:6px}
+  .ev-tile.recall .v{color:var(--accent3)} .ev-tile.prec .v{color:var(--ok)} .ev-tile.f1 .v{color:var(--accent2)}
+  .ev-counts{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px}
+  .ev-counts .pill{font-size:12px}
+  .ev-table{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:14px}
+  .ev-table th,.ev-table td{text-align:left; padding:7px 9px; border-bottom:1px solid var(--border)}
+  .ev-table th{color:var(--muted); font-weight:600; text-transform:uppercase; font-size:10.5px; letter-spacing:.5px}
+  .ev-table td.c{text-align:center}
+  .ev-sec{font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin:14px 0 8px}
+  .ev-missed li{font-size:12.5px; color:#ffb782; margin-bottom:3px}
+  .ev-unmatched li{font-size:12px; color:var(--muted); margin-bottom:3px}
 </style>
 </head>
 <body>
@@ -367,9 +392,11 @@
     <div class="row">
       <button class="btn btn-primary" id="btn-pdf">📄 Générer le rapport PDF</button>
       <button class="btn btn-ghost hidden" id="btn-pdf-dl">⬇ Télécharger le PDF</button>
+      <button class="btn btn-ghost" id="btn-eval">📊 Évaluer la qualité</button>
       <button class="btn btn-ghost" id="btn-json">⬇ JSON</button>
       <button class="btn btn-ghost" id="btn-new">↺ Nouvelle campagne</button>
     </div>
+    <div class="eval hidden" id="eval-panel"></div>
     <div class="err hidden" id="res-err"></div>
   </section>
 
@@ -550,6 +577,7 @@ function renderFindings(list){
 }
 function renderResults(s){
   if(!s) return;
+  show('#eval-panel', false);  // repart propre à chaque affichage de résultats
   const eng = s.engine==='langgraph' ? ' &nbsp;•&nbsp; moteur <b>LangGraph</b>' : (s.engine==='seq' ? ' &nbsp;•&nbsp; moteur séquentiel' : '');
   $('#res-target').innerHTML='Cible : <b>'+s.target+'</b> &nbsp;•&nbsp; Campagne '+(s.campaign_id||'').slice(0,8)+eng;
   const risk=(s.overall_risk||'unknown');
@@ -591,6 +619,70 @@ $('#btn-pdf').onclick = async () => {
   finally{ b.disabled=false; if(b.textContent==='⏳ Génération…') b.textContent='📄 Générer le rapport PDF'; }
 };
 $('#btn-pdf-dl').onclick = () => { if(currentJob) window.location='/api/download/'+currentJob+'/pdf'; };
+
+/* Évaluation qualité (Lot 6) — rappel/précision/F1 vs vérité terrain. */
+let lastEvalMd = null;
+$('#btn-eval').onclick = async () => {
+  $('#res-err').classList.add('hidden');
+  if(!currentJob){ showResErr("Aucune campagne active."); return; }
+  const b=$('#btn-eval'); b.disabled=true; b.textContent='⏳ Évaluation…';
+  try{
+    const r=await fetch('/api/evaluate/'+currentJob);
+    let d=null; try{ d=await r.json(); }catch(_){}
+    if(!r.ok){ showResErr((d&&d.error)||('Échec (HTTP '+r.status+')')); return; }
+    renderEval(d);
+  }catch(e){ showResErr('Erreur réseau pendant l\'évaluation.'); }
+  finally{ b.disabled=false; b.textContent='📊 Évaluer la qualité'; }
+};
+function pct(x){ return (x*100).toFixed(1)+' %'; }
+function renderEval(d){
+  const m=d.metrics, c=d.counts;
+  lastEvalMd = d.markdown || null;
+  const warn = d.off_benchmark
+    ? `<div class="eval-warn">⚠️ La cible ne correspond pas au banc de vérité terrain (<b>${esc(d.benchmark_hint||'')}</b>) : ces métriques ne sont pertinentes que sur cette cible.</div>` : '';
+  const items = (d.per_item||[]).map(pi=>{
+    const found = pi.found ? '✅' : '❌';
+    const depth = pi.found ? (pi.depth_ok ? '✅' : '⚠️') : '—';
+    return `<tr><td>${esc(pi.title)}</td><td class="c">${esc(pi.owasp||'—')}</td>
+      <td class="c">${esc(pi.expected)}</td><td class="c">${found}</td><td class="c">${depth}</td></tr>`;
+  }).join('');
+  const missed = (d.per_item||[]).filter(pi=>!pi.found).map(pi=>`<li>${esc(pi.title)}</li>`).join('');
+  const unmatched = (d.unmatched_findings||[]).map(f=>`<li>${esc(f.title)} <span style="opacity:.6">(${esc(f.source)}${f.owasp?' · '+esc(f.owasp):''})</span></li>`).join('');
+  const owasp = Object.keys(d.recall_by_owasp||{}).sort().map(k=>{
+    const o=d.recall_by_owasp[k]; return `<span class="pill ${o.found===o.total?'low':'medium'}">${esc(k)} · ${o.found}/${o.total}</span>`;
+  }).join('');
+  $('#eval-panel').innerHTML = `
+    <h3>📊 Évaluation qualité <span style="font-size:11px;color:var(--muted);font-weight:600">vs vérité terrain ${esc(d.benchmark||'')}</span></h3>
+    <p class="evsub">Comparaison des findings à un catalogue de vulnérabilités connues.</p>
+    ${warn}
+    <div class="ev-tiles">
+      <div class="ev-tile recall"><div class="v">${pct(m.recall)}</div><div class="k">Rappel (${c.true_positives}/${c.ground_truth_items})</div></div>
+      <div class="ev-tile prec"><div class="v">${pct(m.precision_lower_bound)}</div><div class="k">Précision (borne basse)</div></div>
+      <div class="ev-tile f1"><div class="v">${pct(m.f1_lower_bound)}</div><div class="k">F1 (borne basse)</div></div>
+    </div>
+    <div class="ev-counts">
+      <span class="pill low">TP ${c.true_positives}</span>
+      <span class="pill high">FN ${c.false_negatives}</span>
+      <span class="pill medium">non catalogués ${c.unmatched_findings}</span>
+      <span class="pill info">findings ${c.findings_total}</span>
+    </div>
+    <div class="ev-sec">Couverture par item</div>
+    <table class="ev-table"><thead><tr><th>Item</th><th class="c">OWASP</th><th class="c">Attendu</th><th class="c">Trouvé</th><th class="c">Prof.</th></tr></thead><tbody>${items}</tbody></table>
+    ${missed?`<div class="ev-sec">Manqués (faux négatifs)</div><ul class="ev-missed">${missed}</ul>`:''}
+    ${unmatched?`<div class="ev-sec">Findings non catalogués (à qualifier)</div><ul class="ev-unmatched">${unmatched}</ul>`:''}
+    <div class="ev-sec">Rappel par catégorie OWASP</div><div class="sevbar">${owasp||'—'}</div>
+    <div class="row"><button class="btn btn-ghost" id="btn-eval-dl">⬇ Télécharger le rapport (.md)</button></div>
+  `;
+  show('#eval-panel', true);
+  const dl=$('#btn-eval-dl'); if(dl) dl.onclick = () => {
+    if(!lastEvalMd) return;
+    const blob=new Blob([lastEvalMd],{type:'text/markdown'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='rapport_qualite_'+(d.target||'campagne').replace(/[^a-z0-9]+/gi,'_')+'.md';
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+  $('#eval-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 $('#btn-new').onclick = () => { currentJob=null; show('#step-results',false); show('#btn-pdf-dl',false); show('#step-config',true); window.scrollTo({top:0,behavior:'smooth'}); checkRecover(); };
 
 /* Récupération : au chargement, propose de reprendre la dernière campagne
