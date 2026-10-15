@@ -37,17 +37,23 @@ from flask import (
     Flask, jsonify, render_template, request, Response, send_file, abort,
     session, redirect, url_for,
 )
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 # Charge .env (clé DeepSeek, identifiants opérateur, secret de session).
 load_dotenv()
 
 app = Flask(__name__)
 
-# ─────────────────────────── Authentification opérateur ────────────────────
+# ──────────────────── Authentification multi-utilisateur + rôles ────────────
 # La console est une interface OFFENSIVE : elle ne doit JAMAIS être ouverte
-# sans authentification. Un seul compte opérateur, dont le HASH du mot de passe
-# est stocké dans .env (jamais en clair). Configurez-le via set_password.py.
+# sans authentification. Deux RÔLES :
+#   - "admin" : gère les AUTORISATIONS (cibles de roe_policy.json, catégories)
+#               et les comptes ; peut aussi lancer des campagnes.
+#   - "user"  : lance des campagnes UNIQUEMENT sur les cibles autorisées.
+# Les comptes {username: {password_hash, role}} vivent dans pentagon/config/
+# users.json (jamais de mot de passe en clair). Configurez-les via
+# set_password.py. Compat : si users.json est absent mais OPERATOR_* est défini
+# dans .env, ce compte est traité comme ADMIN.
 
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.config.update(
@@ -60,8 +66,50 @@ app.config.update(
 OPERATOR_USERNAME = os.getenv("OPERATOR_USERNAME", "admin")
 OPERATOR_PASSWORD_HASH = os.getenv("OPERATOR_PASSWORD_HASH", "")
 
+USERS_PATH = os.path.join("pentagon", "config", "users.json")
+POLICY_PATH = os.path.join("pentagon", "config", "roe_policy.json")
+VALID_ROLES = ("admin", "user")
+
 # Points d'accès joignables SANS être authentifié.
 _PUBLIC_ENDPOINTS = {"login", "static"}
+
+
+def load_users() -> dict:
+    """Charge {username: {password_hash, role}} depuis users.json (relu à chaud).
+
+    Repli de compatibilité : si users.json est absent/vide mais OPERATOR_* est
+    défini dans .env, ce compte unique est présenté comme ADMIN.
+    """
+    try:
+        with open(USERS_PATH, "r", encoding="utf-8") as f:
+            users = (json.load(f) or {}).get("users", {}) or {}
+        if users:
+            return users
+    except Exception:
+        pass
+    if OPERATOR_PASSWORD_HASH:
+        return {OPERATOR_USERNAME: {"password_hash": OPERATOR_PASSWORD_HASH,
+                                    "role": "admin"}}
+    return {}
+
+
+def save_users(users: dict) -> None:
+    """Écrit users.json (indenté) et restreint les permissions si possible."""
+    os.makedirs(os.path.dirname(USERS_PATH), exist_ok=True)
+    with open(USERS_PATH, "w", encoding="utf-8") as f:
+        json.dump({"users": users}, f, ensure_ascii=False, indent=2)
+    try:
+        os.chmod(USERS_PATH, 0o600)
+    except OSError:
+        pass
+
+
+def authenticate(username: str, password: str):
+    """Retourne le rôle si les identifiants sont valides, sinon None."""
+    u = load_users().get(username)
+    if u and u.get("password_hash") and check_password_hash(u["password_hash"], password):
+        return u.get("role", "user")
+    return None
 
 
 @app.before_request
@@ -75,6 +123,28 @@ def _require_login():
     if request.path.startswith("/api/"):
         return jsonify({"error": "Authentification requise."}), 401
     return redirect(url_for("login"))
+
+
+def require_admin():
+    """Garde de rôle pour les routes d'administration (à appeler en tête).
+
+    Retourne une réponse d'erreur si l'utilisateur n'est pas admin, sinon None.
+    """
+    if session.get("role") == "admin":
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Action réservée à l'administrateur."}), 403
+    return redirect(url_for("index"))
+
+
+def load_policy() -> dict:
+    with open(POLICY_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_policy(policy: dict) -> None:
+    with open(POLICY_PATH, "w", encoding="utf-8") as f:
+        json.dump(policy, f, ensure_ascii=False, indent=2)
 
 # Moteurs d'orchestration proposables dans la console (défaut : séquentiel).
 SELECTABLE_ENGINES = {"seq", "langgraph"}
@@ -436,18 +506,20 @@ def _run_campaign_job(job_id: str, target: str, actions: list[str],
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """Connexion opérateur (identifiants vérifiés contre le hash du .env)."""
-    if not OPERATOR_PASSWORD_HASH:
+    """Connexion (identifiants vérifiés contre users.json, repli .env)."""
+    if not load_users():
         return render_template(
             "login.html",
-            error="Aucun mot de passe opérateur configuré. "
+            error="Aucun compte configuré. "
                   "Exécutez « python set_password.py » sur le serveur."), 503
     error = None
     if request.method == "POST":
         user = (request.form.get("username") or "").strip()
         pwd = request.form.get("password") or ""
-        if user == OPERATOR_USERNAME and check_password_hash(OPERATOR_PASSWORD_HASH, pwd):
+        role = authenticate(user, pwd)
+        if role:
             session["operator"] = user
+            session["role"] = role
             return redirect(url_for("index"))
         error = "Identifiants invalides."
     return render_template("login.html", error=error)
@@ -466,7 +538,115 @@ def index():
         categories=SELECTABLE_CATEGORIES,
         category_labels=CATEGORY_LABELS,
         operator=session.get("operator", ""),
+        role=session.get("role", "user"),
     )
+
+
+# ─────────────────────────── Administration (rôle admin) ────────────────────
+
+@app.route("/api/admin/policy")
+def api_admin_policy():
+    """Lit la politique RoE (cibles autorisées + catégories). Admin only."""
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    try:
+        p = load_policy()
+    except Exception as e:
+        return jsonify({"error": f"Politique illisible : {e}"}), 500
+    return jsonify({
+        "targets": p.get("authorized_targets", []) or [],
+        "categories": p.get("authorized_action_categories", []) or [],
+        "all_categories": SELECTABLE_CATEGORIES,
+    })
+
+
+@app.route("/api/admin/targets", methods=["POST", "DELETE"])
+def api_admin_targets():
+    """Ajoute (POST) ou retire (DELETE) une cible autorisée. Admin only."""
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    data = request.get_json(force=True, silent=True) or {}
+    target = (data.get("target") or "").strip()
+    if not target:
+        return jsonify({"error": "Cible requise."}), 400
+    try:
+        p = load_policy()
+        tg = p.setdefault("authorized_targets", [])
+        if request.method == "POST":
+            if target not in tg:
+                tg.append(target)
+        else:
+            p["authorized_targets"] = [t for t in tg if t != target]
+        save_policy(p)
+    except Exception as e:
+        return jsonify({"error": f"Écriture impossible : {e}"}), 500
+    return jsonify({"targets": p.get("authorized_targets", [])})
+
+
+@app.route("/api/admin/categories", methods=["POST"])
+def api_admin_categories():
+    """Définit les catégories d'action autorisées par l'admin. Admin only."""
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    data = request.get_json(force=True, silent=True) or {}
+    given = {str(c).strip().lower() for c in (data.get("categories") or [])}
+    cats = [c for c in SELECTABLE_CATEGORIES if c in given]
+    try:
+        p = load_policy()
+        p["authorized_action_categories"] = cats
+        save_policy(p)
+    except Exception as e:
+        return jsonify({"error": f"Écriture impossible : {e}"}), 500
+    return jsonify({"categories": cats})
+
+
+@app.route("/api/admin/users", methods=["GET", "POST", "DELETE"])
+def api_admin_users():
+    """Liste / crée / supprime des comptes. Admin only.
+
+    Création : le mot de passe (transmis via TLS) est HACHÉ côté serveur et
+    jamais stocké en clair. On empêche de supprimer le dernier admin.
+    """
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    users = load_users()
+    if request.method == "GET":
+        return jsonify({"users": [
+            {"username": u, "role": users[u].get("role", "user")}
+            for u in sorted(users)
+        ]})
+
+    data = request.get_json(force=True, silent=True) or {}
+    username = (data.get("username") or "").strip()
+    if not username:
+        return jsonify({"error": "Nom d'utilisateur requis."}), 400
+
+    if request.method == "DELETE":
+        if username not in users:
+            return jsonify({"error": "Compte introuvable."}), 404
+        admins = [u for u, v in users.items() if v.get("role") == "admin"]
+        if users[username].get("role") == "admin" and len(admins) <= 1:
+            return jsonify({"error": "Impossible de supprimer le dernier admin."}), 400
+        if username == session.get("operator"):
+            return jsonify({"error": "Impossible de supprimer son propre compte."}), 400
+        del users[username]
+        save_users(users)
+        return jsonify({"ok": True})
+
+    # POST : création / mise à jour
+    password = data.get("password") or ""
+    role = (data.get("role") or "user").strip().lower()
+    if role not in VALID_ROLES:
+        role = "user"
+    if len(password) < 6:
+        return jsonify({"error": "Mot de passe trop court (min. 6 caractères)."}), 400
+    users[username] = {"password_hash": generate_password_hash(password), "role": role}
+    save_users(users)
+    return jsonify({"ok": True, "username": username, "role": role})
 
 
 @app.route("/api/plan", methods=["POST"])

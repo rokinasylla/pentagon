@@ -272,6 +272,32 @@
   .ev-sec{font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin:14px 0 8px}
   .ev-missed li{font-size:12.5px; color:#b45309; margin-bottom:3px}
   .ev-unmatched li{font-size:12px; color:var(--muted); margin-bottom:3px}
+
+  /* Administration */
+  .admin-card{border-top:3px solid #f59e0b}
+  .admin-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:4px}
+  @media(max-width:620px){.admin-grid{grid-template-columns:1fr}}
+  .admin-box{padding:15px 16px; border:1px solid var(--border); border-radius:14px; background:var(--surface)}
+  .admin-h{font-size:13px; font-weight:750; margin-bottom:11px}
+  .chip-list,.user-list{display:flex; flex-direction:column; gap:7px; margin-bottom:12px; min-height:20px}
+  .chip{display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:10px;
+    background:#fff; border:1px solid var(--border); font-size:13px}
+  .chip .t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:ui-monospace,Consolas,monospace}
+  .chip .role{font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; padding:2px 8px; border-radius:100px}
+  .chip .role.admin{background:rgba(245,158,11,.16); color:#b45309}
+  .chip .role.user{background:rgba(14,165,233,.14); color:#0369a1}
+  .x-btn{border:none; background:rgba(225,29,72,.1); color:#be123c; width:26px; height:26px; border-radius:8px; cursor:pointer; font-size:14px; flex:none; transition:.15s}
+  .x-btn:hover{background:rgba(225,29,72,.2)}
+  .admin-add{display:flex; gap:9px; flex-wrap:wrap}
+  .admin-add .input{flex:1; min-width:140px}
+  .admin-add .btn{flex:none}
+  .admin-add-user{align-items:center}
+  .admin-add-user select{width:auto; flex:none}
+  .cat-checks{display:flex; flex-direction:column; gap:9px; margin-bottom:12px}
+  .cat-check{display:flex; align-items:center; gap:10px; font-size:13.5px; cursor:pointer}
+  .cat-check input{width:17px; height:17px; accent-color:var(--accent); cursor:pointer}
+  .muted-note{color:var(--faint); font-size:12.5px}
+  .adm-ok{color:#15803d; font-size:13px; margin-top:12px}
 </style>
 </head>
 <body>
@@ -291,6 +317,7 @@
       </div>
       <div class="hero-badges">
         <span class="hbadge"><span class="dot"></span> Prêt{% if operator %} · {{ operator }}{% endif %}</span>
+        <span class="hbadge soft">{% if role == 'admin' %}👑 admin{% else %}🧪 testeur{% endif %}</span>
         <span class="hbadge soft">🛡️ deny-by-default</span>
         <span class="hbadge soft">🤖 multi-agent LLM</span>
         {% if operator %}<a class="hbadge soft" href="{{ url_for('logout') }}" style="text-decoration:none">⎋ déconnexion</a>{% endif %}
@@ -335,6 +362,45 @@
     </div>
   </header>
   </header>
+
+  {% if role == 'admin' %}
+  <!-- ADMINISTRATION (rôle admin) -->
+  <section class="card admin-card" id="admin">
+    <div class="eyebrow"><span class="step-num" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">★</span> Administration</div>
+    <h2 class="title">Autorisations &amp; comptes</h2>
+    <p class="sub">En tant qu'<b>admin</b>, tu définis les cibles qu'un testeur peut scanner et tu gères les comptes.</p>
+
+    <div class="admin-grid">
+      <div class="admin-box">
+        <div class="admin-h">🎯 Cibles autorisées</div>
+        <div class="chip-list" id="adm-targets"><span class="muted-note">Chargement…</span></div>
+        <div class="admin-add">
+          <input class="input" id="adm-target-in" placeholder="https://exemple.com" autocomplete="off" />
+          <button class="btn btn-primary" id="adm-target-add">Ajouter</button>
+        </div>
+      </div>
+
+      <div class="admin-box">
+        <div class="admin-h">⚙️ Catégories autorisées</div>
+        <div class="cat-checks" id="adm-cats"></div>
+        <button class="btn btn-ghost" id="adm-cats-save">Enregistrer les catégories</button>
+      </div>
+    </div>
+
+    <div class="admin-box" style="margin-top:14px">
+      <div class="admin-h">👥 Comptes</div>
+      <div class="user-list" id="adm-users"><span class="muted-note">Chargement…</span></div>
+      <div class="admin-add admin-add-user">
+        <input class="input" id="adm-user-name" placeholder="nom d'utilisateur" autocomplete="off" />
+        <input class="input" id="adm-user-pw" type="password" placeholder="mot de passe (min. 6)" autocomplete="new-password" />
+        <select id="adm-user-role"><option value="user">user (testeur)</option><option value="admin">admin</option></select>
+        <button class="btn btn-primary" id="adm-user-add">Créer</button>
+      </div>
+    </div>
+    <div class="err hidden" id="adm-err"></div>
+    <div class="adm-ok hidden" id="adm-ok"></div>
+  </section>
+  {% endif %}
 
   <!-- ÉTAPE 1 : Configuration -->
   <section class="card" id="step-config">
@@ -793,6 +859,76 @@ async function openJob(jobId){
   }catch(_){}
 }
 checkRecover();
+
+/* ───────────────────────── Administration (rôle admin) ───────────────────── */
+if($('#admin')){
+  const admErr = (m)=>{ const e=$('#adm-err'); e.textContent=m; e.classList.remove('hidden'); $('#adm-ok').classList.add('hidden'); };
+  const admOk  = (m)=>{ const e=$('#adm-ok'); e.textContent=m; e.classList.remove('hidden'); $('#adm-err').classList.add('hidden'); };
+  const CAT_LABELS = {passive:'Reconnaissance passive', active_scan:'Scan actif', exploitation:'Exploitation'};
+
+  async function loadPolicy(){
+    try{
+      const r=await fetch('/api/admin/policy'); if(!r.ok) return; const d=await r.json();
+      const tl=$('#adm-targets');
+      tl.innerHTML = (d.targets && d.targets.length)
+        ? d.targets.map(t=>`<div class="chip"><span class="t">${esc(t)}</span><button class="x-btn" data-t="${esc(t)}" title="Retirer">✕</button></div>`).join('')
+        : '<span class="muted-note">Aucune cible autorisée.</span>';
+      tl.querySelectorAll('.x-btn').forEach(b=> b.onclick=()=>delTarget(b.dataset.t));
+      $('#adm-cats').innerHTML = (d.all_categories||[]).map(c=>
+        `<label class="cat-check"><input type="checkbox" value="${esc(c)}" ${d.categories.includes(c)?'checked':''}> ${esc(CAT_LABELS[c]||c)}</label>`).join('');
+    }catch(_){}
+  }
+  async function addTarget(){
+    const v=$('#adm-target-in').value.trim(); if(!v){ admErr('Saisis une cible.'); return; }
+    try{ const r=await fetch('/api/admin/targets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:v})});
+      const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
+      $('#adm-target-in').value=''; admOk('Cible ajoutée.'); loadPolicy();
+    }catch(_){ admErr('Erreur réseau.'); }
+  }
+  async function delTarget(t){
+    try{ const r=await fetch('/api/admin/targets',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t})});
+      const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
+      admOk('Cible retirée.'); loadPolicy();
+    }catch(_){ admErr('Erreur réseau.'); }
+  }
+  async function saveCats(){
+    const cats=[...document.querySelectorAll('#adm-cats input:checked')].map(i=>i.value);
+    try{ const r=await fetch('/api/admin/categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:cats})});
+      const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
+      admOk('Catégories autorisées enregistrées.');
+    }catch(_){ admErr('Erreur réseau.'); }
+  }
+  async function loadUsers(){
+    try{
+      const r=await fetch('/api/admin/users'); if(!r.ok) return; const d=await r.json();
+      const ul=$('#adm-users');
+      ul.innerHTML = (d.users && d.users.length)
+        ? d.users.map(u=>`<div class="chip"><span class="t">${esc(u.username)}</span><span class="role ${esc(u.role)}">${esc(u.role)}</span><button class="x-btn" data-u="${esc(u.username)}" title="Supprimer">✕</button></div>`).join('')
+        : '<span class="muted-note">Aucun compte.</span>';
+      ul.querySelectorAll('.x-btn').forEach(b=> b.onclick=()=>delUser(b.dataset.u));
+    }catch(_){}
+  }
+  async function addUser(){
+    const name=$('#adm-user-name').value.trim(), pw=$('#adm-user-pw').value, role=$('#adm-user-role').value;
+    if(!name){ admErr("Nom d'utilisateur requis."); return; }
+    try{ const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name,password:pw,role})});
+      const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
+      $('#adm-user-name').value=''; $('#adm-user-pw').value=''; admOk('Compte « '+name+' » enregistré.'); loadUsers();
+    }catch(_){ admErr('Erreur réseau.'); }
+  }
+  async function delUser(u){
+    if(!confirm('Supprimer le compte « '+u+' » ?')) return;
+    try{ const r=await fetch('/api/admin/users',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u})});
+      const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
+      admOk('Compte supprimé.'); loadUsers();
+    }catch(_){ admErr('Erreur réseau.'); }
+  }
+  $('#adm-target-add').onclick=addTarget;
+  $('#adm-target-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addTarget(); });
+  $('#adm-cats-save').onclick=saveCats;
+  $('#adm-user-add').onclick=addUser;
+  loadPolicy(); loadUsers();
+}
 </script>
 </body>
 </html>
