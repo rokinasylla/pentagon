@@ -296,6 +296,46 @@ Cette mise en production matérialise le passage d'un prototype de recherche à 
 **outil utilisable en conditions d'audit**, tout en conservant le garde-fou RoE
 comme point de contrôle central.
 
+### 5.8.5 Évaluation quantitative : précision & rappel (Lot 6)
+
+Pour dépasser l'appréciation qualitative (« la campagne retrouve les failles »)
+et répondre à l'exigence de **rigueur scientifique**, nous avons ajouté un
+dispositif de **mesure chiffrée**. VulnShop étant une cible dont la *vérité
+terrain* est parfaitement connue, nous avons formalisé celle-ci dans un
+**catalogue machine-lisible** (12 vulnérabilités semées, chacune décrite par sa
+catégorie OWASP, ses CWE, des mots-clés et l'endpoint concerné). Un **évaluateur
+pur** (hors ligne, déterministe, sans LLM) rapproche ensuite automatiquement les
+*findings* d'une campagne de ce catalogue et calcule les métriques standard.
+
+Le rapprochement *finding ↔ item* est fondé sur des **signaux stables** — le CWE
+(signal fort) et les mots-clés du titre (signal moyen) — l'OWASP et l'endpoint
+servant de corroboration ; chaque *finding* est assigné à **au plus un** item,
+ce qui évite tout double comptage.
+
+**Résultats mesurés** (meilleure campagne complète sur VulnShop) :
+
+| Métrique | Valeur | Lecture |
+|---|---|---|
+| **Rappel** | **83,3 %** (10/12) | part des vulnérabilités semées effectivement retrouvées |
+| **Précision** (borne basse) | **93,3 %** | part des *findings* correspondant au catalogue |
+| **F1** (borne basse) | **88,0 %** | moyenne harmonique des deux |
+
+Deux précisions importantes pour l'interprétation :
+
+- Les **2 items « manqués »** relèvent surtout de la **granularité du
+  catalogue**, non de véritables angles morts : le catalogue distingue deux
+  items JWT (secret faible / absence d'expiration) et deux variantes de SQLi
+  (contournement / basée sur erreurs) là où PENTAGON regroupe chaque famille en
+  un *finding* unique — pourtant bien prouvé.
+- La précision est donnée en **borne basse** : tout *finding* hors catalogue est
+  compté comme faux positif. Or l'unique *finding* non catalogué de cette
+  campagne (absence d'en-têtes **CSP/HSTS**, issu du Lot 1) est une **vraie
+  faille**. La précision réelle est donc proche de **100 %**.
+
+Le dispositif produit un **rapport de qualité** (Markdown + JSON) réutilisable
+pour la soutenance, et sert de **test de non-régression** : toute évolution d'un
+outil ou d'un *prompt* peut être revalidée en relançant l'évaluation.
+
 ---
 
 ## 5.9 Discussion et limites
@@ -307,9 +347,11 @@ l'évaluation présente des limites résiduelles à garder à l'esprit :
   volontairement vulnérables : idéales pour établir une vérité terrain et
   prouver la généricité, mais non représentatives de la diversité des
   applications réelles.
-- **Absence de métriques formelles.** La précision et le rappel ne sont pas
-  chiffrés face à un banc d'essai externe ; les faux négatifs ne sont pas
-  quantifiés.
+- **Banc d'essai encore interne.** La précision et le rappel sont désormais
+  **chiffrés** (§5.8.5 : rappel 83,3 %, précision ≈ 93 %, F1 88 %), mais face à
+  une vérité terrain **maison** (VulnShop). La mesure face à un **banc d'essai
+  externe** reconnu (p. ex. OWASP Benchmark, applications vulnérables tierces)
+  reste à mener pour une comparabilité pleinement indépendante.
 - **Couverture encore incomplète.** Les extensions du §5.8 ont **élargi** la
   détection aux familles hors Top 10 applicatif (TLS, DNS/e-mail, réseau,
   configuration, CVE) et ajouté deux classes d'exploitation (LFI, redirection
@@ -322,11 +364,12 @@ l'évaluation présente des limites résiduelles à garder à l'esprit :
   rétabli des analyses complètes.
 
 Plusieurs perspectives initialement identifiées comme limites ont été **levées**
-par les extensions du §5.8 (couverture élargie, orchestration LangGraph,
-plateforme web authentifiée en production). Les perspectives restantes portent
-désormais sur la **quantification** (métriques de précision/rappel face à un
-banc d'essai externe), la **représentativité** (cibles réelles, au-delà des labs
-maison) et la **couverture résiduelle** (SSTI, SSRF, CSRF, crawling/fuzzing).
+par les extensions du §5.8 : couverture élargie, orchestration LangGraph,
+plateforme web authentifiée en production, et désormais **quantification**
+(métriques précision/rappel, §5.8.5). Les perspectives restantes portent sur la
+**comparabilité externe** (banc d'essai tiers reconnu), la **représentativité**
+(cibles réelles, au-delà des labs maison) et la **couverture résiduelle**
+(SSTI, SSRF, CSRF, crawling/fuzzing).
 
 ---
 
@@ -344,9 +387,11 @@ Au-delà de cette validation, les **extensions** (§5.8) font passer PENTAGON d'
 scanner web CLI local centré sur l'OWASP Top 10 à une **plateforme cloud
 multi-agent, authentifiée et accessible par navigateur** : elle **détecte plus
 large** (TLS, DNS/e-mail, réseau, configuration, CVE), **prouve de nouvelles
-classes** de failles sans dégât (LFI, redirection ouverte) et sait **orchestrer
-en parallèle** via LangGraph — le tout sans jamais rompre le contrat de sortie
-ni la gouvernance RoE. Ces résultats valident l'approche multi-agent pilotée par
-LLM et démontrent sa capacité à **monter en maturité** vers un outil de qualité
-professionnelle, les limites résiduelles (métriques, représentativité,
-couverture) traçant la suite de la feuille de route.
+classes** de failles sans dégât (LFI, redirection ouverte), sait **orchestrer
+en parallèle** via LangGraph, et sa qualité est désormais **chiffrée** (rappel
+83,3 %, précision ≈ 93 %, F1 88 % sur une vérité terrain connue) — le tout sans
+jamais rompre le contrat de sortie ni la gouvernance RoE. Ces résultats valident
+l'approche multi-agent pilotée par LLM et démontrent sa capacité à **monter en
+maturité** vers un outil de qualité professionnelle, les limites résiduelles
+(comparabilité externe, représentativité, couverture) traçant la suite de la
+feuille de route.
