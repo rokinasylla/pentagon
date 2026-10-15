@@ -288,6 +288,7 @@
   .chip .role.user{background:rgba(14,165,233,.14); color:#0369a1}
   .x-btn{border:none; background:rgba(225,29,72,.1); color:#be123c; width:26px; height:26px; border-radius:8px; cursor:pointer; font-size:14px; flex:none; transition:.15s}
   .x-btn:hover{background:rgba(225,29,72,.2)}
+  .lock-note{font-size:10.5px; font-weight:700; color:var(--faint); flex:none; padding:3px 8px; border:1px solid var(--border); border-radius:100px}
   .admin-add{display:flex; gap:9px; flex-wrap:wrap}
   .admin-add .input{flex:1; min-width:140px}
   .admin-add .btn{flex:none}
@@ -388,14 +389,14 @@
     </div>
 
     <div class="admin-box" style="margin-top:14px">
-      <div class="admin-h">👥 Comptes</div>
+      <div class="admin-h">👥 Comptes testeurs</div>
       <div class="user-list" id="adm-users"><span class="muted-note">Chargement…</span></div>
       <div class="admin-add admin-add-user">
-        <input class="input" id="adm-user-name" placeholder="nom d'utilisateur" autocomplete="off" />
+        <input class="input" id="adm-user-name" placeholder="nom du testeur" autocomplete="off" />
         <input class="input" id="adm-user-pw" type="password" placeholder="mot de passe (min. 6)" autocomplete="new-password" />
-        <select id="adm-user-role"><option value="user">user (testeur)</option><option value="admin">admin</option></select>
-        <button class="btn btn-primary" id="adm-user-add">Créer</button>
+        <button class="btn btn-primary" id="adm-user-add">Créer un testeur</button>
       </div>
+      <p class="muted-note" style="margin-top:9px">🔒 Les comptes <b>admin</b> se créent uniquement en ligne de commande sur le serveur (<code>set_password.py</code>) — jamais depuis l'interface, pour éviter toute escalade de privilèges.</p>
     </div>
     <div class="err hidden" id="adm-err"></div>
     <div class="adm-ok hidden" id="adm-ok"></div>
@@ -903,17 +904,23 @@ if($('#admin')){
       const r=await fetch('/api/admin/users'); if(!r.ok) return; const d=await r.json();
       const ul=$('#adm-users');
       ul.innerHTML = (d.users && d.users.length)
-        ? d.users.map(u=>`<div class="chip"><span class="t">${esc(u.username)}</span><span class="role ${esc(u.role)}">${esc(u.role)}</span><button class="x-btn" data-u="${esc(u.username)}" title="Supprimer">✕</button></div>`).join('')
+        ? d.users.map(u=>{
+            const act = u.role==='admin'
+              ? '<span class="lock-note" title="Géré en ligne de commande">🔒 CLI</span>'
+              : `<button class="x-btn" data-u="${esc(u.username)}" title="Supprimer">✕</button>`;
+            return `<div class="chip"><span class="t">${esc(u.username)}</span><span class="role ${esc(u.role)}">${esc(u.role)}</span>${act}</div>`;
+          }).join('')
         : '<span class="muted-note">Aucun compte.</span>';
       ul.querySelectorAll('.x-btn').forEach(b=> b.onclick=()=>delUser(b.dataset.u));
     }catch(_){}
   }
   async function addUser(){
-    const name=$('#adm-user-name').value.trim(), pw=$('#adm-user-pw').value, role=$('#adm-user-role').value;
-    if(!name){ admErr("Nom d'utilisateur requis."); return; }
-    try{ const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name,password:pw,role})});
+    const name=$('#adm-user-name').value.trim(), pw=$('#adm-user-pw').value;
+    if(!name){ admErr("Nom du testeur requis."); return; }
+    // Rôle non envoyé : le serveur force « user » (les admins se créent en CLI).
+    try{ const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name,password:pw})});
       const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
-      $('#adm-user-name').value=''; $('#adm-user-pw').value=''; admOk('Compte « '+name+' » enregistré.'); loadUsers();
+      $('#adm-user-name').value=''; $('#adm-user-pw').value=''; admOk('Testeur « '+name+' » enregistré.'); loadUsers();
     }catch(_){ admErr('Erreur réseau.'); }
   }
   async function delUser(u){

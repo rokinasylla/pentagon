@@ -605,10 +605,16 @@ def api_admin_categories():
 
 @app.route("/api/admin/users", methods=["GET", "POST", "DELETE"])
 def api_admin_users():
-    """Liste / crée / supprime des comptes. Admin only.
+    """Liste / crée / supprime des comptes UTILISATEUR. Admin only.
 
-    Création : le mot de passe (transmis via TLS) est HACHÉ côté serveur et
-    jamais stocké en clair. On empêche de supprimer le dernier admin.
+    SÉCURITÉ — séparation des privilèges :
+      - Les comptes ADMIN se provisionnent EXCLUSIVEMENT côté serveur, en ligne
+        de commande (set_password.py). L'interface ne peut NI créer, NI
+        promouvoir, NI modifier, NI supprimer un compte admin — sinon un accès
+        web compromis permettrait une escalade de privilèges.
+      - L'interface ne crée que des comptes « user » (rôle forcé), et ne peut
+        supprimer que des comptes « user ».
+    Le mot de passe (transmis via TLS) est HACHÉ côté serveur, jamais en clair.
     """
     guard = require_admin()
     if guard is not None:
@@ -628,25 +634,24 @@ def api_admin_users():
     if request.method == "DELETE":
         if username not in users:
             return jsonify({"error": "Compte introuvable."}), 404
-        admins = [u for u, v in users.items() if v.get("role") == "admin"]
-        if users[username].get("role") == "admin" and len(admins) <= 1:
-            return jsonify({"error": "Impossible de supprimer le dernier admin."}), 400
-        if username == session.get("operator"):
-            return jsonify({"error": "Impossible de supprimer son propre compte."}), 400
+        if users[username].get("role") == "admin":
+            return jsonify({"error": "Compte admin : géré uniquement en ligne "
+                                     "de commande (set_password.py)."}), 403
         del users[username]
         save_users(users)
         return jsonify({"ok": True})
 
-    # POST : création / mise à jour
+    # POST : création / réinitialisation d'un compte USER (jamais admin).
     password = data.get("password") or ""
-    role = (data.get("role") or "user").strip().lower()
-    if role not in VALID_ROLES:
-        role = "user"
     if len(password) < 6:
         return jsonify({"error": "Mot de passe trop court (min. 6 caractères)."}), 400
-    users[username] = {"password_hash": generate_password_hash(password), "role": role}
+    if username in users and users[username].get("role") == "admin":
+        return jsonify({"error": "Compte admin : géré uniquement en ligne de "
+                                 "commande (set_password.py)."}), 403
+    users[username] = {"password_hash": generate_password_hash(password),
+                       "role": "user"}
     save_users(users)
-    return jsonify({"ok": True, "username": username, "role": role})
+    return jsonify({"ok": True, "username": username, "role": "user"})
 
 
 @app.route("/api/plan", methods=["POST"])
