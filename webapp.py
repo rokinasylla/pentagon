@@ -29,7 +29,7 @@ import secrets
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -55,13 +55,42 @@ app = Flask(__name__)
 # set_password.py. Compat : si users.json est absent mais OPERATOR_* est défini
 # dans .env, ce compte est traité comme ADMIN.
 
+# Délai d'inactivité (minutes) : au-delà, la session expire côté serveur et
+# l'opérateur est renvoyé au login — même si le navigateur a conservé le cookie
+# (Chrome restaure les cookies de session via « reprendre là où vous en étiez »).
+SESSION_IDLE_MINUTES = int(os.getenv("SESSION_IDLE_MINUTES", "30"))
+
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     # Passé à True en production derrière TLS (via COOKIE_SECURE=1).
     SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "0") == "1",
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=SESSION_IDLE_MINUTES),
 )
+
+
+@app.before_request
+def _enforce_idle_timeout():
+    """Expire les sessions inactives (fenêtre glissante) et rafraîchit l'horodatage.
+
+    Chaque requête d'un opérateur connecté repousse l'échéance de
+    SESSION_IDLE_MINUTES ; passé ce délai sans activité, la session est vidée et
+    l'utilisateur doit se reconnecter (il peut alors choisir un autre compte)."""
+    if not session.get("operator"):
+        return
+    now = datetime.now(timezone.utc)
+    last = session.get("last_seen")
+    if last is not None:
+        try:
+            if now - datetime.fromisoformat(last) > timedelta(minutes=SESSION_IDLE_MINUTES):
+                session.clear()
+                return
+        except (ValueError, TypeError):
+            session.clear()
+            return
+    session.permanent = True
+    session["last_seen"] = now.isoformat()
 
 OPERATOR_USERNAME = os.getenv("OPERATOR_USERNAME", "admin")
 OPERATOR_PASSWORD_HASH = os.getenv("OPERATOR_PASSWORD_HASH", "")
@@ -518,8 +547,11 @@ def login():
         pwd = request.form.get("password") or ""
         role = authenticate(user, pwd)
         if role:
+            session.clear()
+            session.permanent = True
             session["operator"] = user
             session["role"] = role
+            session["last_seen"] = datetime.now(timezone.utc).isoformat()
             return redirect(url_for("index"))
         error = "Identifiants invalides."
     return render_template("login.html", error=error)
