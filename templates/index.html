@@ -37,18 +37,33 @@
 
   .wrap{max-width:1000px; margin:0 auto; padding:0 20px 80px}
 
-  /* Topbar */
-  header.top{display:flex; align-items:center; gap:16px; padding:26px 4px 30px}
-  .logo{display:flex; align-items:center; gap:13px}
-  .mark{width:44px;height:44px;border-radius:13px;position:relative;flex:none;
-    background:conic-gradient(from 200deg,var(--accent2),var(--accent),var(--accent3),var(--accent2));
-    box-shadow:var(--glow); display:grid; place-items:center}
-  .mark svg{width:24px;height:24px}
-  .brand h1{margin:0; font-size:21px; font-weight:800; letter-spacing:3px}
-  .brand p{margin:0; font-size:12px; color:var(--muted); letter-spacing:.6px}
-  .status{margin-left:auto; display:flex; align-items:center; gap:9px; font-size:12.5px;
-    color:var(--muted); padding:8px 14px; border:1px solid var(--border); border-radius:100px;
-    background:var(--panel); backdrop-filter:blur(8px)}
+  /* Hero coloré */
+  .hero{position:relative; overflow:hidden; margin:24px 0 24px; padding:26px 28px;
+    border-radius:24px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+    background:linear-gradient(120deg,#4f46e5 0%,#2563eb 38%,#0ea5e9 70%,#06b6d4 100%);
+    box-shadow:0 22px 50px -24px rgba(37,99,235,.6)}
+  .hero::before{content:""; position:absolute; inset:0; opacity:.5; pointer-events:none;
+    background-image:radial-gradient(circle at 18% 20%,rgba(255,255,255,.18),transparent 40%),
+      radial-gradient(circle at 85% 90%,rgba(255,255,255,.12),transparent 45%),
+      linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);
+    background-size:auto,auto,26px 26px,26px 26px}
+  .hero-left{position:relative; z-index:1; flex:1 1 300px}
+  .logo{display:flex; align-items:center; gap:14px}
+  .mark{width:52px;height:52px;border-radius:15px;position:relative;flex:none;
+    background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.35);
+    backdrop-filter:blur(6px); display:grid; place-items:center}
+  .mark svg{width:28px;height:28px}
+  .brand h1{margin:0; font-size:26px; font-weight:850; letter-spacing:4px; color:#fff}
+  .brand p{margin:2px 0 0; font-size:12.5px; color:rgba(255,255,255,.82); letter-spacing:.5px}
+  .hero-badges{display:flex; flex-wrap:wrap; gap:9px; margin-top:16px}
+  .hbadge{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:#fff;
+    padding:7px 13px; border-radius:100px; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.28)}
+  .hbadge.soft{background:rgba(255,255,255,.10)}
+  .hero-art{position:relative; z-index:1; flex:0 0 auto; width:300px; max-width:46%}
+  .hero-art svg{width:100%; height:auto; display:block; filter:drop-shadow(0 10px 20px rgba(0,0,0,.25))}
+  @media(max-width:620px){.hero-art{display:none} .brand h1{font-size:22px}}
+  /* conservé pour compat (ancienne barre de statut) */
+  .status{display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--muted)}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(52,211,153,.6);
     animation:pulse 2s infinite}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 8px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
@@ -62,8 +77,9 @@
   .hidden{display:none!important}
   .eyebrow{display:flex; align-items:center; gap:10px; font-size:12px; text-transform:uppercase;
     letter-spacing:1.6px; color:var(--accent); font-weight:700; margin-bottom:6px}
-  .step-num{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;
-    background:rgba(56,189,248,.14); border:1px solid var(--border-strong); color:var(--accent)}
+  .step-num{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:12px;
+    background:linear-gradient(135deg,var(--accent2),var(--accent)); border:none; color:#fff; font-weight:800;
+    box-shadow:0 5px 12px -4px rgba(14,165,233,.55)}
   h2.title{margin:0 0 4px; font-size:20px; font-weight:750}
   .sub{color:var(--muted); font-size:13.5px; margin:0 0 20px}
 
@@ -81,13 +97,18 @@
   .toggle{display:flex; align-items:flex-start; gap:14px; padding:15px 16px; cursor:pointer;
     border:1px solid var(--border); border-radius:14px; background:var(--surface); transition:.16s}
   .toggle:hover{border-color:var(--border-strong); transform:translateY(-1px)}
-  .toggle.on{border-color:var(--accent); background:linear-gradient(180deg,rgba(56,189,248,.09),rgba(56,189,248,.02)); box-shadow:inset 0 0 0 1px rgba(56,189,248,.15)}
-  .toggle.exploit.on{border-color:var(--high); background:linear-gradient(180deg,rgba(251,146,60,.10),transparent); box-shadow:inset 0 0 0 1px rgba(251,146,60,.2)}
+  .toggle.on{border-color:var(--accent); background:linear-gradient(180deg,rgba(14,165,233,.10),transparent); box-shadow:inset 0 0 0 1px rgba(14,165,233,.18)}
+  /* Color-codage par catégorie : passif=vert, actif=orange, exploitation=rouge */
+  .toggle[data-cat="passive"].on{border-color:var(--low); background:linear-gradient(180deg,rgba(22,163,74,.11),transparent); box-shadow:inset 0 0 0 1px rgba(22,163,74,.2)}
+  .toggle[data-cat="active_scan"].on{border-color:var(--med); background:linear-gradient(180deg,rgba(202,138,4,.12),transparent); box-shadow:inset 0 0 0 1px rgba(202,138,4,.22)}
+  .toggle.exploit.on{border-color:var(--crit); background:linear-gradient(180deg,rgba(225,29,72,.11),transparent); box-shadow:inset 0 0 0 1px rgba(225,29,72,.22)}
   .switch{width:42px;height:24px;border-radius:100px;background:#cbd3e2;position:relative;flex:none;margin-top:2px;transition:.2s}
   .switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#ffffff;box-shadow:0 1px 3px rgba(20,40,80,.25);transition:.2s}
   .toggle.on .switch{background:var(--accent)}
   .toggle.on .switch::after{left:21px;background:#ffffff}
-  .toggle.exploit.on .switch{background:var(--high)}
+  .toggle[data-cat="passive"].on .switch{background:var(--low)}
+  .toggle[data-cat="active_scan"].on .switch{background:var(--med)}
+  .toggle.exploit.on .switch{background:var(--crit)}
   .toggle .cat{font-weight:650; font-size:14.5px; display:flex; align-items:center; gap:8px}
   .toggle .desc{color:var(--muted); font-size:12.5px; margin-top:2px}
   .tag{font-size:10px; padding:2px 8px; border-radius:100px; letter-spacing:.5px; text-transform:uppercase; font-weight:700}
@@ -113,7 +134,7 @@
   .row{display:flex; gap:12px; flex-wrap:wrap; margin-top:24px}
   .btn{display:inline-flex; align-items:center; gap:9px; padding:13px 22px; border:none; border-radius:12px;
     font-size:14.5px; font-weight:700; cursor:pointer; transition:.18s; letter-spacing:.2px}
-  .btn-primary{color:#04121f; background:linear-gradient(135deg,var(--accent),var(--accent3)); box-shadow:0 10px 30px -10px rgba(56,189,248,.6)}
+  .btn-primary{color:#fff; background:linear-gradient(135deg,var(--accent2),var(--accent)); box-shadow:0 10px 26px -10px rgba(79,70,229,.6)}
   .btn-primary:hover{transform:translateY(-2px); box-shadow:0 16px 40px -12px rgba(56,189,248,.7)}
   .btn-ghost{background:var(--surface); color:var(--text); border:1px solid var(--border)}
   .btn-ghost:hover{border-color:var(--accent)}
@@ -257,17 +278,62 @@
 <div class="bg"></div>
 <div class="wrap">
 
-  <header class="top">
-    <div class="logo">
-      <div class="mark">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 4 5v6c0 5 3.4 8.4 8 11 4.6-2.6 8-6 8-11V5l-8-3Z" fill="#05121f" stroke="#eaf6ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 12l2 2 4-4.5" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <header class="hero">
+    <div class="hero-left">
+      <div class="logo">
+        <div class="mark">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 4 5v6c0 5 3.4 8.4 8 11 4.6-2.6 8-6 8-11V5l-8-3Z" fill="#0b1020" stroke="#eaf6ff" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 12l2 2 4-4.5" stroke="#5de0ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="brand">
+          <h1>PENTAGON</h1>
+          <p>Console opérateur — pentest multi-agent gouverné par le RoE</p>
+        </div>
       </div>
-      <div class="brand">
-        <h1>PENTAGON</h1>
-        <p>Console opérateur — pentest multi-agent gouverné par le RoE</p>
+      <div class="hero-badges">
+        <span class="hbadge"><span class="dot"></span> Prêt{% if operator %} · {{ operator }}{% endif %}</span>
+        <span class="hbadge soft">🛡️ deny-by-default</span>
+        <span class="hbadge soft">🤖 multi-agent LLM</span>
+        {% if operator %}<a class="hbadge soft" href="{{ url_for('logout') }}" style="text-decoration:none">⎋ déconnexion</a>{% endif %}
       </div>
     </div>
-    <div class="status"><span class="dot"></span> Prêt{% if operator %} <span style="color:var(--muted,#8aa0b8);margin-left:8px">· {{ operator }}</span> <a href="{{ url_for('logout') }}" style="color:#4aa3ff;margin-left:8px;text-decoration:none;font-size:12px">déconnexion</a>{% endif %}</div>
+    <div class="hero-art" aria-hidden="true">
+      <svg viewBox="0 0 320 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="rad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#7cf7ff" stop-opacity=".55"/>
+            <stop offset="70%" stop-color="#38bdf8" stop-opacity=".06"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="shield" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#a5f3fc"/><stop offset="55%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#6366f1"/>
+          </linearGradient>
+          <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7cf7ff" stop-opacity=".9"/><stop offset="100%" stop-color="#7cf7ff" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- radar -->
+        <g transform="translate(110 105)">
+          <circle r="92" fill="url(#rad)"/>
+          <circle r="86" stroke="#bfe9ff" stroke-opacity=".5" stroke-width="1.4"/>
+          <circle r="60" stroke="#bfe9ff" stroke-opacity=".4" stroke-width="1.2"/>
+          <circle r="32" stroke="#bfe9ff" stroke-opacity=".35" stroke-width="1.1"/>
+          <line x1="-86" y1="0" x2="86" y2="0" stroke="#bfe9ff" stroke-opacity=".3"/>
+          <line x1="0" y1="-86" x2="0" y2="86" stroke="#bfe9ff" stroke-opacity=".3"/>
+          <path d="M0 0 L86 0 A86 86 0 0 0 36 -78 Z" fill="url(#sweep)">
+            <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="5s" repeatCount="indefinite"/>
+          </path>
+          <!-- nodes -->
+          <circle cx="54" cy="-30" r="4.5" fill="#f9a8d4"/><circle cx="-48" cy="24" r="4" fill="#fcd34d"/>
+          <circle cx="22" cy="58" r="4" fill="#86efac"/><circle cx="-30" cy="-52" r="3.6" fill="#93c5fd"/>
+        </g>
+        <!-- shield -->
+        <g transform="translate(206 70)">
+          <path d="M34 2 6 12v28c0 24 16 40 28 50 12-10 28-26 28-50V12L34 2Z" fill="url(#shield)" stroke="#fff" stroke-opacity=".8" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M22 40l9 9 18-21" stroke="#0b1020" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+  </header>
   </header>
 
   <!-- ÉTAPE 1 : Configuration -->
