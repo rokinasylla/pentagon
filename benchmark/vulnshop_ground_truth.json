@@ -1,0 +1,116 @@
+{
+  "benchmark": "VulnShop",
+  "version": "1.0",
+  "description": "Vérité terrain de la cible d'entraînement VulnShop : catalogue des vulnérabilités SEMÉES volontairement, servant de référence pour mesurer précision/rappel des campagnes PENTAGON. Le rapprochement finding<->item est fondé sur des SIGNAUX stables (CWE ou mots-clés du titre), l'OWASP et l'endpoint servant de corroboration.",
+  "target_hint": "vulnshop.rokina-sylla.me",
+  "items": [
+    {
+      "id": "a01-idor-orders",
+      "title": "IDOR / BOLA sur /api/orders/:id",
+      "owasp": "A01",
+      "cwe": ["CWE-639", "CWE-284", "CWE-863"],
+      "keywords": ["idor", "bola", "direct object", "référence directe", "contrôle d'accès", "broken access", "ordres", "orders", "commande"],
+      "endpoint": "/api/orders",
+      "expected": "proven"
+    },
+    {
+      "id": "a01-idor-users",
+      "title": "IDOR / BOLA sur /api/users/:id",
+      "owasp": "A01",
+      "cwe": ["CWE-639", "CWE-284", "CWE-863"],
+      "keywords": ["idor", "bola", "direct object", "référence directe", "contrôle d'accès", "broken access", "profil", "users", "utilisateur"],
+      "endpoint": "/api/users",
+      "expected": "proven"
+    },
+    {
+      "id": "a02-data-exposure",
+      "title": "Exposition de données sensibles sans authentification (MD5 + cartes)",
+      "owasp": "A02",
+      "cwe": ["CWE-200", "CWE-311", "CWE-312", "CWE-327", "CWE-916"],
+      "keywords": ["exposition", "données sensibles", "sensitive data", "md5", "hash", "cartes", "card", "dump", "sans authentification", "fuite"],
+      "endpoint": "/users",
+      "expected": "detected"
+    },
+    {
+      "id": "a02-jwt-weak-secret",
+      "title": "JWT HS256 à secret faible, forgeable",
+      "owasp": "A02",
+      "cwe": ["CWE-347", "CWE-798", "CWE-326", "CWE-330"],
+      "keywords": ["jwt", "secret", "forgé", "forgeable", "signature", "token", "hs256", "cassé", "faible"],
+      "endpoint": "",
+      "expected": "proven"
+    },
+    {
+      "id": "a02-jwt-no-exp",
+      "title": "JWT sans expiration / claim de debug",
+      "owasp": "A02",
+      "cwe": ["CWE-613", "CWE-215"],
+      "keywords": ["jwt", "expiration", "exp", "sans expiration", "debug", "claim", "durée de vie"],
+      "endpoint": "",
+      "expected": "proven"
+    },
+    {
+      "id": "a03-sqli-authbypass",
+      "title": "Injection SQL — contournement d'authentification",
+      "owasp": "A03",
+      "cwe": ["CWE-89"],
+      "keywords": ["sql", "injection", "sqli", "contournement", "bypass", "authentification", "login"],
+      "endpoint": "/api/auth/login",
+      "expected": "proven"
+    },
+    {
+      "id": "a03-sqli-error",
+      "title": "Injection SQL — basée sur erreurs",
+      "owasp": "A03",
+      "cwe": ["CWE-89"],
+      "keywords": ["sql", "injection", "sqli", "erreur", "error", "recherche", "search"],
+      "endpoint": "/api/products/search",
+      "expected": "proven"
+    },
+    {
+      "id": "a03-xss-reflected",
+      "title": "XSS réfléchi (paramètre q)",
+      "owasp": "A03",
+      "cwe": ["CWE-79"],
+      "keywords": ["xss", "réfléchi", "reflected", "cross-site scripting", "cross site"],
+      "endpoint": "q",
+      "expected": "proven"
+    },
+    {
+      "id": "a03-xss-stored",
+      "title": "XSS stocké (commentaires)",
+      "owasp": "A03",
+      "cwe": ["CWE-79"],
+      "keywords": ["xss", "stocké", "stored", "persistant", "commentaire", "comment"],
+      "endpoint": "/api/comments",
+      "expected": "proven"
+    },
+    {
+      "id": "a07-default-creds",
+      "title": "Identifiants par défaut (admin/admin123)",
+      "owasp": "A07",
+      "cwe": ["CWE-798", "CWE-1392", "CWE-521"],
+      "keywords": ["identifiants par défaut", "default credential", "mot de passe faible", "admin", "compte par défaut", "weak password"],
+      "endpoint": "/api/auth/login",
+      "expected": "proven"
+    },
+    {
+      "id": "lot2-lfi",
+      "title": "LFI / path traversal (/api/download)",
+      "owasp": "A03",
+      "cwe": ["CWE-22", "CWE-98"],
+      "keywords": ["lfi", "traversal", "traversée", "inclusion", "path", "fichier local", "local file", "/etc/passwd", "download", "répertoire"],
+      "endpoint": "/api/download",
+      "expected": "proven"
+    },
+    {
+      "id": "lot2-open-redirect",
+      "title": "Redirection ouverte (/api/go)",
+      "owasp": "A01",
+      "cwe": ["CWE-601"],
+      "keywords": ["redirect", "redirection", "ouverte", "open redirect", "unvalidated redirect"],
+      "endpoint": "/api/go",
+      "expected": "proven"
+    }
+  ]
+}
