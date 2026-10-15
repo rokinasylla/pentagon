@@ -603,23 +603,27 @@ def api_admin_categories():
     return jsonify({"categories": cats})
 
 
-@app.route("/api/admin/users", methods=["GET", "POST", "DELETE"])
-def api_admin_users():
-    """Liste / crée / supprime des comptes UTILISATEUR. Admin only.
+def _admin_count(users: dict) -> int:
+    return sum(1 for v in users.values() if v.get("role") == "admin")
 
-    SÉCURITÉ — séparation des privilèges :
-      - Les comptes ADMIN se provisionnent EXCLUSIVEMENT côté serveur, en ligne
-        de commande (set_password.py). L'interface ne peut NI créer, NI
-        promouvoir, NI modifier, NI supprimer un compte admin — sinon un accès
-        web compromis permettrait une escalade de privilèges.
-      - L'interface ne crée que des comptes « user » (rôle forcé), et ne peut
-        supprimer que des comptes « user ».
-    Le mot de passe (transmis via TLS) est HACHÉ côté serveur, jamais en clair.
+
+@app.route("/api/admin/users", methods=["GET", "POST", "PATCH", "DELETE"])
+def api_admin_users():
+    """Gestion complète des comptes (users ET admins). Admin only.
+
+    Un admin connecté peut créer/réinitialiser (POST), changer le rôle (PATCH)
+    et supprimer (DELETE) n'importe quel compte. Le TOUT PREMIER admin est
+    amorcé en ligne de commande (set_password.py / repli .env) ; ensuite tout
+    se gère ici. Le mot de passe (via TLS) est HACHÉ côté serveur, jamais en
+    clair. Garde-fous anti-verrouillage : impossible de supprimer/rétrograder
+    le DERNIER admin, ni de supprimer/rétrograder SON PROPRE compte.
     """
     guard = require_admin()
     if guard is not None:
         return guard
     users = load_users()
+    me = session.get("operator")
+
     if request.method == "GET":
         return jsonify({"users": [
             {"username": u, "role": users[u].get("role", "user")}
@@ -634,24 +638,39 @@ def api_admin_users():
     if request.method == "DELETE":
         if username not in users:
             return jsonify({"error": "Compte introuvable."}), 404
-        if users[username].get("role") == "admin":
-            return jsonify({"error": "Compte admin : géré uniquement en ligne "
-                                     "de commande (set_password.py)."}), 403
+        if username == me:
+            return jsonify({"error": "Impossible de supprimer son propre compte."}), 400
+        if users[username].get("role") == "admin" and _admin_count(users) <= 1:
+            return jsonify({"error": "Impossible de supprimer le dernier admin."}), 400
         del users[username]
         save_users(users)
         return jsonify({"ok": True})
 
-    # POST : création / réinitialisation d'un compte USER (jamais admin).
+    role = (data.get("role") or "user").strip().lower()
+    if role not in VALID_ROLES:
+        role = "user"
+
+    if request.method == "PATCH":  # changement de rôle (sans toucher au mot de passe)
+        if username not in users:
+            return jsonify({"error": "Compte introuvable."}), 404
+        if username == me and role != "admin":
+            return jsonify({"error": "Impossible de retirer son propre rôle admin."}), 400
+        if users[username].get("role") == "admin" and role != "admin" and _admin_count(users) <= 1:
+            return jsonify({"error": "Impossible de rétrograder le dernier admin."}), 400
+        users[username]["role"] = role
+        save_users(users)
+        return jsonify({"ok": True, "username": username, "role": role})
+
+    # POST : création / réinitialisation (mot de passe + rôle)
     password = data.get("password") or ""
     if len(password) < 6:
         return jsonify({"error": "Mot de passe trop court (min. 6 caractères)."}), 400
-    if username in users and users[username].get("role") == "admin":
-        return jsonify({"error": "Compte admin : géré uniquement en ligne de "
-                                 "commande (set_password.py)."}), 403
-    users[username] = {"password_hash": generate_password_hash(password),
-                       "role": "user"}
+    if (username in users and users[username].get("role") == "admin"
+            and role != "admin" and _admin_count(users) <= 1):
+        return jsonify({"error": "Impossible de rétrograder le dernier admin."}), 400
+    users[username] = {"password_hash": generate_password_hash(password), "role": role}
     save_users(users)
-    return jsonify({"ok": True, "username": username, "role": "user"})
+    return jsonify({"ok": True, "username": username, "role": role})
 
 
 @app.route("/api/plan", methods=["POST"])

@@ -289,6 +289,8 @@
   .x-btn{border:none; background:rgba(225,29,72,.1); color:#be123c; width:26px; height:26px; border-radius:8px; cursor:pointer; font-size:14px; flex:none; transition:.15s}
   .x-btn:hover{background:rgba(225,29,72,.2)}
   .lock-note{font-size:10.5px; font-weight:700; color:var(--faint); flex:none; padding:3px 8px; border:1px solid var(--border); border-radius:100px}
+  .role-btn{border:1px solid var(--border); background:#fff; color:var(--muted); font-size:11px; font-weight:700; padding:4px 10px; border-radius:8px; cursor:pointer; flex:none; transition:.15s}
+  .role-btn:hover{border-color:var(--accent); color:var(--accent)}
   .admin-add{display:flex; gap:9px; flex-wrap:wrap}
   .admin-add .input{flex:1; min-width:140px}
   .admin-add .btn{flex:none}
@@ -389,21 +391,23 @@
     </div>
 
     <div class="admin-box" style="margin-top:14px">
-      <div class="admin-h">👥 Comptes testeurs</div>
+      <div class="admin-h">👥 Comptes</div>
       <div class="user-list" id="adm-users"><span class="muted-note">Chargement…</span></div>
       <div class="admin-add admin-add-user">
-        <input class="input" id="adm-user-name" placeholder="nom du testeur" autocomplete="off" />
+        <input class="input" id="adm-user-name" placeholder="nom d'utilisateur" autocomplete="off" />
         <input class="input" id="adm-user-pw" type="password" placeholder="mot de passe (min. 6)" autocomplete="new-password" />
-        <button class="btn btn-primary" id="adm-user-add">Créer un testeur</button>
+        <select id="adm-user-role"><option value="user">user (testeur)</option><option value="admin">admin</option></select>
+        <button class="btn btn-primary" id="adm-user-add">Créer / réinitialiser</button>
       </div>
-      <p class="muted-note" style="margin-top:9px">🔒 Les comptes <b>admin</b> se créent uniquement en ligne de commande sur le serveur (<code>set_password.py</code>) — jamais depuis l'interface, pour éviter toute escalade de privilèges.</p>
+      <p class="muted-note" style="margin-top:9px">Le <b>tout premier admin</b> est créé en ligne de commande (<code>set_password.py</code>) ; ensuite tout se gère ici. Réutiliser un nom existant <b>réinitialise</b> son mot de passe. On ne peut ni supprimer le <b>dernier admin</b> ni <b>son propre compte</b>.</p>
     </div>
     <div class="err hidden" id="adm-err"></div>
     <div class="adm-ok hidden" id="adm-ok"></div>
   </section>
   {% endif %}
 
-  <!-- ÉTAPE 1 : Configuration -->
+  {% if role != 'admin' %}
+  <!-- ÉTAPE 1 : Configuration (interface TESTEUR uniquement) -->
   <section class="card" id="step-config">
     <div class="eyebrow"><span class="step-num">1</span> Cible &amp; règles d'engagement</div>
     <h2 class="title">Définir la mission</h2>
@@ -534,6 +538,8 @@
     <div class="err hidden" id="res-err"></div>
   </section>
 
+  {% endif %}
+
   <footer>PENTAGON · deny-by-default · « détecter en prouvant, jamais ravager »</footer>
 </div>
 
@@ -541,6 +547,11 @@
 const $ = s => document.querySelector(s);
 const show = (id,on=true) => $(id).classList.toggle('hidden', !on);
 let currentJob = null;
+/* Échappe le contenu (issu du LLM) — partagé par le pentest ET l'admin. */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ══ Interface TESTEUR (pentest) — absente côté admin, d'où la garde ══ */
+if($('#step-config')){
 
 /* Toggles RoE */
 document.querySelectorAll('#roe .toggle').forEach(t => {
@@ -686,8 +697,6 @@ function sevPills(obj){
   if(!keys.length) return '<span class="pill info">aucune</span>';
   return keys.map(k=>`<span class="pill ${k}">${k} · ${obj[k]}</span>`).join('');
 }
-/* Échappe le contenu (issu du LLM analysant une cible) → console non injectable. */
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function renderFindings(list){
   const el=$('#res-findings');
   if(!list||!list.length){ el.innerHTML=''; return; }
@@ -861,7 +870,9 @@ async function openJob(jobId){
 }
 checkRecover();
 
-/* ───────────────────────── Administration (rôle admin) ───────────────────── */
+} /* ══ fin interface testeur ══ */
+
+/* ══ Interface ADMIN — gestion des autorisations et des comptes ══ */
 if($('#admin')){
   const admErr = (m)=>{ const e=$('#adm-err'); e.textContent=m; e.classList.remove('hidden'); $('#adm-ok').classList.add('hidden'); };
   const admOk  = (m)=>{ const e=$('#adm-ok'); e.textContent=m; e.classList.remove('hidden'); $('#adm-err').classList.add('hidden'); };
@@ -905,22 +916,30 @@ if($('#admin')){
       const ul=$('#adm-users');
       ul.innerHTML = (d.users && d.users.length)
         ? d.users.map(u=>{
-            const act = u.role==='admin'
-              ? '<span class="lock-note" title="Géré en ligne de commande">🔒 CLI</span>'
-              : `<button class="x-btn" data-u="${esc(u.username)}" title="Supprimer">✕</button>`;
-            return `<div class="chip"><span class="t">${esc(u.username)}</span><span class="role ${esc(u.role)}">${esc(u.role)}</span>${act}</div>`;
+            const toRole = u.role==='admin' ? 'user' : 'admin';
+            const toLabel = u.role==='admin' ? '↓ user' : '↑ admin';
+            return `<div class="chip"><span class="t">${esc(u.username)}</span>`
+              + `<span class="role ${esc(u.role)}">${esc(u.role)}</span>`
+              + `<button class="role-btn" data-u="${esc(u.username)}" data-r="${toRole}" title="Changer le rôle">${toLabel}</button>`
+              + `<button class="x-btn" data-u="${esc(u.username)}" title="Supprimer">✕</button></div>`;
           }).join('')
         : '<span class="muted-note">Aucun compte.</span>';
       ul.querySelectorAll('.x-btn').forEach(b=> b.onclick=()=>delUser(b.dataset.u));
+      ul.querySelectorAll('.role-btn').forEach(b=> b.onclick=()=>changeRole(b.dataset.u, b.dataset.r));
     }catch(_){}
   }
   async function addUser(){
-    const name=$('#adm-user-name').value.trim(), pw=$('#adm-user-pw').value;
-    if(!name){ admErr("Nom du testeur requis."); return; }
-    // Rôle non envoyé : le serveur force « user » (les admins se créent en CLI).
-    try{ const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name,password:pw})});
+    const name=$('#adm-user-name').value.trim(), pw=$('#adm-user-pw').value, role=$('#adm-user-role').value;
+    if(!name){ admErr("Nom d'utilisateur requis."); return; }
+    try{ const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name,password:pw,role})});
       const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
-      $('#adm-user-name').value=''; $('#adm-user-pw').value=''; admOk('Testeur « '+name+' » enregistré.'); loadUsers();
+      $('#adm-user-name').value=''; $('#adm-user-pw').value=''; admOk('Compte « '+name+' » enregistré ('+(d.role||role)+').'); loadUsers();
+    }catch(_){ admErr('Erreur réseau.'); }
+  }
+  async function changeRole(u, role){
+    try{ const r=await fetch('/api/admin/users',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,role})});
+      const d=await r.json(); if(!r.ok){ admErr(d.error||'Échec'); return; }
+      admOk('Rôle de « '+u+' » → '+role+'.'); loadUsers();
     }catch(_){ admErr('Erreur réseau.'); }
   }
   async function delUser(u){
