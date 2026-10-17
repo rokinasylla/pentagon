@@ -427,7 +427,22 @@ button.link:hover { color: var(--accent); }
   display: flex; align-items: start; justify-content: space-between; gap: 12px;
   padding: 18px; border-bottom: 1px solid var(--border);
 }
+.dh-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.dh-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-faint); font-weight: 600; }
+.state-tag { text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+.state-tag.detected { background: var(--surface-2); color: var(--state-detected); }
+.state-tag.proven { background: var(--accent-weak); color: var(--state-proven); }
+.state-tag.confirmed { background: var(--accent-offensive-weak); color: var(--accent-offensive); }
+.dh-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .drawer-title { font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
+
+/* Parcours de preuve (timeline) */
+.journey { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.journey .jx { position: relative; padding-left: 16px; border-left: 2px solid var(--border); }
+.journey .jx.prove { border-color: var(--state-proven); }
+.journey .jx.confirm { border-color: var(--state-confirmed); }
+.jx-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+.jx-time { font-size: 11px; color: var(--fg-faint); font-family: var(--font-mono); }
 button.icon { all: unset; cursor: pointer; color: var(--fg-muted); font-size: 16px; padding: 2px 6px; }
 button.icon:hover { color: var(--fg); }
 .drawer-body { flex: 1; overflow-y: auto; padding: 18px; }
