@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import * as api from "../api/client.js";
-import Brand from "../components/Brand.jsx";
+import Rail from "../components/Rail.jsx";
 import FindingCard from "../components/FindingCard.jsx";
 import FindingDrawer from "../components/FindingDrawer.jsx";
 import CommandBar from "../components/CommandBar.jsx";
@@ -156,53 +156,59 @@ export default function Console({ user, onLogout }) {
     }
   };
 
-  return (
-    <div className="shell">
-      <header className="topbar">
-        <Brand />
-        <div className="session-pick">
-          <label htmlFor="sess" style={{ color: "var(--fg-faint)", fontSize: 12 }}>
-            Session
-          </label>
-          <select id="sess" value={activeId} onChange={(e) => setActiveId(e.target.value)}>
-            {sessions.length === 0 && <option value="">Aucune campagne</option>}
-            {sessions.map((s) => {
-              const d = s.started_at ? s.started_at.slice(0, 10) : "";
-              return (
-                <option key={s.job_id} value={s.job_id}>
-                  {s.target || s.job_id} — {s.overall_risk}
-                  {` · ${s.proven_count ?? 0}P/${s.detected_count ?? 0}D`}
-                  {d && ` · ${d}`}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-        <div className="who">
-          {user.role !== "admin" && (
-            <span className="sites-chip" title="Vos sites autorisés">
-              {(user.sites || []).length} site{(user.sites || []).length > 1 ? "s" : ""} autorisé{(user.sites || []).length > 1 ? "s" : ""}
-            </span>
-          )}
-          <button className="primary" onClick={() => navigate("/mission")}>+ Nouvelle mission</button>
-          <button onClick={() => navigate("/overview")}>Vue d'ensemble</button>
-          {user.role === "admin" && (
-            <button onClick={() => navigate("/admin")}>Administration</button>
-          )}
-          <span>
-            {user.operator} ({user.role})
-          </span>
-          <button onClick={doLogout}>Déconnexion</button>
-        </div>
-      </header>
+  const activeSession = sessions.find((s) => s.job_id === activeId);
 
-      <div className="panes">
-        {/* ─── FIL ─── */}
-        <section className="pane fil">
-          <div className="pane-head">Fil</div>
-          <div className="pane-body">
-            <Thread messages={messages} />
-          </div>
+  return (
+    <div className="layout">
+      <Rail active="sessions" user={user} onLogout={onLogout} />
+
+      <div className="main">
+        <div className="panes">
+          {/* ─── FIL ─── */}
+          <section className="pane fil">
+            {/* En-tête « Session active » */}
+            <div className="session-head">
+              <div className="sh-row">
+                <span className="sh-eyebrow">Session active</span>
+                <select
+                  className="sh-switch"
+                  value={activeId}
+                  onChange={(e) => setActiveId(e.target.value)}
+                  aria-label="Changer de session"
+                >
+                  {sessions.length === 0 && <option value="">Aucune campagne</option>}
+                  {sessions.map((s) => {
+                    const d = s.started_at ? s.started_at.slice(0, 10) : "";
+                    return (
+                      <option key={s.job_id} value={s.job_id}>
+                        {s.target || s.job_id}{d && ` · ${d}`}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              {activeSession && (
+                <>
+                  <div className="sh-target">{activeSession.target || activeId}</div>
+                  <div className="sh-meta">
+                    <span className={`risk ${activeSession.overall_risk}`}>
+                      risque {activeSession.overall_risk}
+                    </span>
+                    <span className="sh-counts">
+                      {activeSession.proven_count ?? 0} prouvées · {activeSession.detected_count ?? 0} détectées
+                    </span>
+                  </div>
+                </>
+              )}
+              <button className="primary sm sh-new" onClick={() => navigate("/mission")}>
+                + Nouvelle mission
+              </button>
+            </div>
+
+            <div className="pane-head">Fil</div>
+            <div className="pane-body">
+              <Thread messages={messages} />
+            </div>
           <div className="preprompts" style={{ padding: "0 18px 10px" }}>
             {PREPROMPTS.map((p) => (
               <button
@@ -274,8 +280,9 @@ export default function Console({ user, onLogout }) {
             )}
             {tab === "audit" && <AuditView sessionId={activeId} />}
             {tab === "report" && <ReportView sessionId={activeId} />}
-          </div>
-        </section>
+            </div>
+          </section>
+        </div>
       </div>
 
       <FindingDrawer

@@ -64,21 +64,100 @@ input:focus, textarea:focus {
 .brand .logo-mark { display: block; }
 .brand .sub { color: var(--fg-faint); font-weight: 500; font-size: 12px; }
 
-/* ─── Écran de connexion ─── */
-.login-wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
-.login-card {
-  width: 100%; max-width: 380px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); padding: 28px;
+/* ─── Écran de connexion (scindé : marque + formulaire) ─── */
+.login-split { min-height: 100%; display: flex; flex-wrap: wrap; }
+.brand-panel {
+  flex: 1 1 430px; min-width: 0; background: #141418; color: #f4f3ee;
+  padding: 56px 52px; display: flex; flex-direction: column;
+  justify-content: space-between; min-height: 100vh;
 }
-.login-card h1 { font-family: var(--font-display); font-weight: 600; font-size: 22px; margin: 16px 0 4px; letter-spacing: -0.01em; }
-.login-card p.hint { color: var(--fg-muted); margin: 0 0 20px; font-size: 13px; }
-.field { margin-bottom: 14px; }
-.field label { display: block; font-size: 12px; color: var(--fg-muted); margin-bottom: 6px; }
+.brand-logo { display: flex; align-items: center; gap: 13px; color: #f4f3ee; }
+.bp-mark { display: inline-flex; }
+.bp-word { font-weight: 600; letter-spacing: 0.2em; font-size: 17px; }
+.bp-pitch { max-width: 30ch; }
+.bp-pitch h1 { font-family: var(--font-display); font-size: 32px; font-weight: 500; line-height: 1.3; margin: 0 0 18px; letter-spacing: -0.01em; }
+.bp-pitch p { margin: 0; font-size: 15px; line-height: 1.65; color: #aeb0b6; }
+.bp-foot { display: flex; gap: 24px; flex-wrap: wrap; font-size: 12px; color: #7d808a; font-family: var(--font-mono); }
+
+.form-panel { flex: 1.2 1 460px; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 48px 32px; background: var(--bg); }
+.login-form { width: 100%; max-width: 392px; }
+.login-form h2 { margin: 0 0 7px; font-size: 23px; font-weight: 600; }
+.login-form .sub { margin: 0 0 30px; font-size: 14px; color: var(--fg-muted); line-height: 1.55; }
+.fld-label { display: block; font-size: 12.5px; font-weight: 600; color: #55596a; margin: 0 0 7px; }
+.fld {
+  display: flex; align-items: center; gap: 10px; border: 1px solid var(--border);
+  border-radius: 11px; padding: 12px 14px; background: var(--surface);
+  margin-bottom: 16px; color: var(--fg-faint); transition: border-color 0.15s;
+}
+.fld:focus-within { border-color: var(--accent); }
+.fld input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font-size: 14px; color: var(--fg); padding: 0; }
+.submit { width: 100%; justify-content: center; gap: 9px; border-radius: 11px; padding: 13px; font-size: 14.5px; display: inline-flex; align-items: center; }
+.foot-note { margin: 26px 0 0; font-size: 11.5px; color: var(--fg-faint); line-height: 1.55; }
 .err { color: var(--sev-critical); font-size: 13px; margin-top: 10px; }
 
 /* ─── Coquille console (fil + canevas) ─── */
 .shell { display: flex; flex-direction: column; height: 100%; }
+
+/* ─── Layout 3 colonnes : rail · fil · canevas ─── */
+.layout { display: flex; height: 100%; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.main .panes { flex: 1; }
+
+.rail {
+  flex: 0 0 216px; display: flex; flex-direction: column;
+  background: var(--surface); border-right: 1px solid var(--border);
+  padding: 18px 12px; gap: 8px;
+}
+.rail-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 14px; color: var(--accent); }
+.rail-brand .rail-word { font-weight: 700; letter-spacing: 0.12em; font-size: 14px; color: var(--fg); }
+.rail-nav { display: flex; flex-direction: column; gap: 3px; }
+.rail-item {
+  all: unset; cursor: pointer; display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px; border-radius: var(--radius-sm); color: var(--fg-muted);
+  font-size: 14px; font-weight: 500;
+}
+.rail-item:hover { background: var(--surface-2); color: var(--fg); }
+.rail-item.on { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+.rail-ico { width: 20px; text-align: center; font-family: var(--font-mono); font-size: 13px; opacity: 0.9; }
+.rail-user {
+  margin-top: auto; display: flex; align-items: center; gap: 10px;
+  padding: 12px 10px 4px; border-top: 1px solid var(--border);
+}
+.rail-avatar {
+  width: 32px; height: 32px; border-radius: 9px; background: var(--accent);
+  color: var(--accent-fg); display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: 0 0 auto;
+}
+.rail-id { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.rail-name { font-size: 13px; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
+.rail-role { font-size: 11px; color: var(--fg-faint); }
+.rail-logout { all: unset; cursor: pointer; color: var(--fg-faint); font-size: 16px; padding: 4px 6px; }
+.rail-logout:hover { color: var(--accent-offensive); }
+
+/* En-tête « Session active » (haut du fil) */
+.session-head { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.sh-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sh-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-faint); font-weight: 600; }
+.sh-switch { font: inherit; font-size: 12.5px; color: var(--fg-muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 8px; max-width: 55%; }
+.sh-target { font-family: var(--font-mono); font-size: 13px; color: var(--fg); margin: 8px 0 6px; word-break: break-all; }
+.sh-meta { display: flex; align-items: center; gap: 12px; font-size: 12.5px; flex-wrap: wrap; }
+.sh-counts { color: var(--fg-muted); }
+.sh-new { margin-top: 12px; }
+
+@media (max-width: 820px) {
+  .layout { flex-direction: column; }
+  .rail {
+    flex: 0 0 auto; flex-direction: row; align-items: center; gap: 4px;
+    border-right: none; border-bottom: 1px solid var(--border);
+    padding: 8px 10px; overflow-x: auto;
+  }
+  .rail-brand { padding: 0 8px 0 4px; }
+  .rail-brand .rail-word { display: none; }
+  .rail-nav { flex-direction: row; gap: 2px; }
+  .rail-item { padding: 8px 10px; }
+  .rail-item .rail-lbl { display: none; }
+  .rail-user { margin: 0 0 0 auto; padding: 0; border-top: none; }
+  .rail-id { display: none; }
+}
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border);
