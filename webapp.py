@@ -103,7 +103,7 @@ VALID_ROLES = ("admin", "user")
 # api_v1_login : connexion JSON du front SPA ; api_v1_me : sonde d'état de
 # session (répond authenticated:false plutôt que 401, pour afficher l'écran de
 # connexion sans erreur).
-_PUBLIC_ENDPOINTS = {"login", "static", "api_v1_login", "api_v1_me"}
+_PUBLIC_ENDPOINTS = {"login", "static", "api_v1_login", "api_v1_me", "console_spa"}
 
 
 def load_users() -> dict:
@@ -930,6 +930,38 @@ def api_download(job_id: str, kind: str):
     if not path or not os.path.exists(path):
         abort(404)
     return send_file(os.path.abspath(path), as_attachment=True)
+
+
+# ──────────────────── Front SPA (console React) servi par Flask ─────────────
+# La console dédiée (build Vite) est servie sous /console : un seul artefact, un
+# seul lien (nginx → Flask). L'ancienne interface Flask reste à /. La route est
+# PUBLIQUE (le SPA gère sa propre authentification via /api/v1/me|login) ; les
+# données restent protégées derrière les gardes des endpoints /api.
+
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "frontend", "dist")
+
+
+@app.route("/console")
+@app.route("/console/")
+@app.route("/console/<path:subpath>")
+def console_spa(subpath: str = ""):
+    """
+    Sert le build de la console React. Repli sur index.html pour les routes
+    gérées côté client (/console/login…). 404 propre si le front n'est pas
+    encore buildé.
+    """
+    index_path = os.path.join(FRONTEND_DIST, "index.html")
+    if not os.path.isfile(index_path):
+        return jsonify({
+            "error": "Console non buildée. Exécutez « npm run build » dans frontend/."
+        }), 404
+    if subpath:
+        candidate = os.path.normpath(os.path.join(FRONTEND_DIST, subpath))
+        # Confinement : interdit toute remontée hors de dist/.
+        if candidate.startswith(FRONTEND_DIST) and os.path.isfile(candidate):
+            return send_file(candidate)
+    return send_file(index_path)
 
 
 # ──────────────────── API v1 : authentification du front SPA ────────────────

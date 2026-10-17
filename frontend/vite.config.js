@@ -9,6 +9,9 @@ import react from "@vitejs/plugin-react";
 // on les sert depuis Flask (un seul artefact, pas de second serveur).
 export default defineConfig({
   plugins: [react()],
+  // La console est servie sous /console par Flask (nginx → Flask) : les assets
+  // et les routes du routeur portent ce préfixe. L'ancienne interface reste à /.
+  base: "/console/",
   server: {
     port: 5173,
     proxy: {
