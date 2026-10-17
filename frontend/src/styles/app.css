@@ -390,7 +390,11 @@ button.sm { padding: 6px 10px; font-size: 12.5px; }
   all: unset; cursor: pointer; display: block; flex: 1; min-width: 0;
 }
 .fc-title-btn:hover .fc-title { color: var(--accent); }
-.fc-trackline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fc-trace { background: var(--surface-2); border-radius: var(--radius-sm); padding: 9px 11px; margin-top: 10px; }
+.trace-req { font-family: var(--font-mono); font-size: 12px; color: var(--fg); word-break: break-all; }
+.trace-resp { font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); margin-top: 3px; word-break: break-word; }
+.fc-note { font-size: 11px; color: var(--fg-faint); margin-top: 8px; }
+.fc-trackline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .retest-badge {
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   padding: 2px 8px; border-radius: 999px; border: 1px solid transparent;

@@ -272,7 +272,7 @@ export default function Console({ user, onLogout }) {
                       onOpen={setSelected}
                       onProve={(fd) => exploit(fd, "prove")}
                       onConfirm={(fd) => exploit(fd, "confirm")}
-                      onRetest={retest}
+                      onDismiss={(fd) => setFindings((list) => list.filter((x) => x.id !== fd.id))}
                     />
                   ))}
                 </div>
