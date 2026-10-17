@@ -181,12 +181,20 @@ class Orchestrator:
         if osint_context:
             print(f"[Orchestrator] Transmission du contexte OSINT à l'agent Scanning")
             print(f"               Infrastructure connue : {list(osint_context.keys())}")
-        
+
+        # IP d'origine (hors-Cloudflare) découvertes par l'OSINT ET autorisées
+        # par le RoE : elles seront vérifiées activement par l'agent Scanning.
+        # Deny-by-default : une origine non autorisée n'est jamais transmise.
+        origin_candidates = self._collect_authorized_origins(state)
+        if origin_candidates:
+            print(f"[Orchestrator] Origines autorisées à vérifier : {origin_candidates}")
+
         try:
             scanning_result = self.scanning_agent.run(
                 target=target,
                 scan_profile=scan_profile,
                 osint_context=osint_context,
+                origin_candidates=origin_candidates,
             )
             state.scanning_result = scanning_result
             state.agents_executed.append("Scanning_Agent")
@@ -276,12 +284,20 @@ class Orchestrator:
         if web_app_context:
             print(f"[Orchestrator] Transmission du contexte Web App à l'agent Exploitation")
 
+        # L'évasion WAF n'a de sens que si un WAF a effectivement été détecté en
+        # phase Scanning. On l'active alors pour lever les faux négatifs — la
+        # cible est déjà autorisée (on est en phase exploitation, gâtée par le RoE).
+        use_waf_evasion = self._waf_detected(state)
+        if use_waf_evasion:
+            print(f"[Orchestrator] WAF détecté en amont → évasion WAF activée pour l'exploitation")
+
         try:
             exploitation_result = self.exploitation_agent.run(
                 target=target,
                 web_app_context=web_app_context,
                 osint_context=osint_context,
                 scanning_context=scanning_context,
+                use_waf_evasion=use_waf_evasion,
             )
             state.exploitation_result = exploitation_result
             state.agents_executed.append("Exploitation_Agent")
@@ -342,6 +358,48 @@ class Orchestrator:
                     assets.append(item)
 
         return assets
+
+    def _waf_detected(self, state: PentagonState) -> bool:
+        """
+        Indique si la phase Scanning a détecté un WAF/CDN devant la cible.
+
+        S'appuie sur la sortie de l'outil waf_detection portée par l'agent
+        Scanning. Sert à n'activer l'évasion WAF (phase Exploitation) que
+        lorsqu'un pare-feu est réellement en coupure.
+        """
+        if not state.scanning_result:
+            return False
+        waf = state.scanning_result.get("raw_data", {}).get("waf_detection", {})
+        return bool(waf.get("waf_detected"))
+
+    def _collect_authorized_origins(self, state: PentagonState) -> list[str]:
+        """
+        Renvoie les IP d'origine (hors-Cloudflare) découvertes par l'OSINT qui
+        sont ACTUELLEMENT autorisées par le RoE.
+
+        Ces IP proviennent de l'étage passif `origin_discovery`. Elles ne sont
+        transmises à la vérification active que si elles ont été autorisées —
+        soit dès la politique initiale, soit via l'élargissement supervisé
+        (interactive-scope). Sans autorisation, rien n'est vérifié
+        (deny-by-default).
+        """
+        if not state.osint_result:
+            return []
+
+        origin_data = (
+            state.osint_result.get("raw_data", {}).get("origin_discovery", {})
+        )
+        candidates = [
+            c.get("ip")
+            for c in origin_data.get("likely_origins", [])
+            if c.get("ip")
+        ]
+
+        authorized: list[str] = []
+        for ip in candidates:
+            if self.roe.check_target(ip)["allowed"] and ip not in authorized:
+                authorized.append(ip)
+        return authorized
 
     def _run_scope_authorization(
         self,
