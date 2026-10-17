@@ -20,6 +20,8 @@
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const http = require("http");
+const https = require("https");
 const express = require("express");
 const { createDb } = require("./db");
 
@@ -61,6 +63,33 @@ function decodeBearer(req) {
   }
 }
 
+// Moteur de template "maison" VOLONTAIREMENT vulnerable : les expressions
+// {{ ... }} sont EVALUEES cote serveur (Function) → injection de template
+// serveur (SSTI), avec potentiel d'execution de code. Preuve non destructive
+// attendue de PENTAGON : {{7331*7}} doit rendre "51317".
+function renderTemplate(tpl) {
+  return String(tpl).replace(/\{\{([\s\S]+?)\}\}/g, (_m, expr) => {
+    try {
+      // eslint-disable-next-line no-new-func
+      return String(Function('"use strict"; return (' + expr + ")")());
+    } catch (e) {
+      return "{{" + expr + "}}";
+    }
+  });
+}
+
+// Lit un cookie de la requete (parsing minimal, sans dependance).
+function getCookie(req, name) {
+  const raw = req.headers.cookie || "";
+  for (const part of raw.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const k = part.slice(0, idx).trim();
+    if (k === name) return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return null;
+}
+
 // ------------------------------ Application ---------------------------------
 
 async function main() {
@@ -69,6 +98,21 @@ async function main() {
 
   const app = express();
   app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
+
+  // Sessions en memoire (demo CSRF). Le cookie de session est pose SANS
+  // attribut SameSite ni HttpOnly → envoye automatiquement en cross-site.
+  const sessions = new Map();
+  function ensureSession(req, res) {
+    let sid = getCookie(req, "vs_session");
+    if (!sid || !sessions.has(sid)) {
+      sid = crypto.randomBytes(12).toString("hex");
+      sessions.set(sid, { subscribed: false, email: null });
+      // VULN CSRF : pas de SameSite → cookie ambiant exploitable cross-site.
+      res.setHeader("Set-Cookie", `vs_session=${sid}; Path=/`);
+    }
+    return sid;
+  }
 
   // A03 + A07 : login construit par CONCATENATION SQL (injection + creds faibles).
   app.post("/api/auth/login", (req, res) => {
@@ -239,6 +283,71 @@ async function main() {
   app.get("/api/go", (req, res) => {
     const url = String(req.query.url || "/");
     res.redirect(url); // aucune verification que l'URL reste sur le domaine
+  });
+
+  // VULN SSTI : "apercu de message personnalise". L'entree utilisateur `name`
+  // est concatenee dans un template rendu COTE SERVEUR par renderTemplate(),
+  // qui EVALUE les expressions {{...}} → injection de template serveur (A03,
+  // execution de code potentielle). Preuve non destructive : {{7331*7}} → 51317.
+  app.get("/api/render", (req, res) => {
+    const name = req.query.name == null ? "client" : String(req.query.name);
+    const tpl = `Bonjour ${name}, bienvenue sur VulnShop !`;
+    res.type("text/plain").send(renderTemplate(tpl));
+  });
+
+  // VULN SSRF : "apercu de lien / import depuis une URL". Le serveur va
+  // CHERCHER l'URL fournie SANS liste blanche → acces possible a des services
+  // internes ou aux metadonnees cloud (A10). Preuve non destructive : on pointe
+  // vers un domaine canari neutre, le serveur tente la requete sortante et
+  // renvoie l'issue (statut ou erreur de resolution/connexion).
+  app.get("/api/fetch", (req, res) => {
+    const target = String(req.query.url || "");
+    if (!/^https?:\/\//i.test(target)) {
+      return res.status(400).json({ error: "parametre url (http/https) requis" });
+    }
+    const lib = target.toLowerCase().startsWith("https:") ? https : http;
+    try {
+      const upstream = lib.get(target, (up) => {
+        let body = "";
+        up.on("data", (c) => (body += c));
+        up.on("end", () =>
+          res.json({ fetchedUrl: target, status: up.statusCode, body: body.slice(0, 2000) })
+        );
+      });
+      upstream.on("error", (e) =>
+        res.status(502).json({ fetchedUrl: target, error: e.message })
+      );
+      upstream.setTimeout(5000, () =>
+        upstream.destroy(new Error("ETIMEDOUT: outbound request timed out"))
+      );
+    } catch (e) {
+      res.status(502).json({ fetchedUrl: target, error: e.message });
+    }
+  });
+
+  // VULN CSRF : abonnement newsletter — action qui CHANGE L'ETAT, authentifiee
+  // par un simple cookie de session (sans SameSite), SANS jeton anti-CSRF ni
+  // verification d'origine → un site tiers peut declencher l'action a l'insu de
+  // l'utilisateur (A01 / CWE-352). /api/session amorce la session ; /status la
+  // lit ; POST /api/newsletter effectue le changement d'etat.
+  app.get("/api/session", (req, res) => {
+    const sid = ensureSession(req, res);
+    const s = sessions.get(sid);
+    res.json({ sessionId: sid, subscribed: s.subscribed });
+  });
+  app.get("/api/newsletter/status", (req, res) => {
+    const sid = ensureSession(req, res);
+    const s = sessions.get(sid);
+    res.json({ subscribed: s.subscribed, email: s.email });
+  });
+  app.post("/api/newsletter", (req, res) => {
+    const sid = ensureSession(req, res);
+    const s = sessions.get(sid);
+    // AUCUNE verification de jeton anti-CSRF ni d'en-tete Origin/Referer.
+    const email = (req.body && req.body.email) || `${sid}@vulnshop.test`;
+    s.subscribed = true;
+    s.email = String(email);
+    res.status(200).json({ subscribed: true, email: s.email });
   });
 
   // ------------------------------- Front (SPA) ------------------------------

@@ -17,6 +17,11 @@ const API = {
   users: "/api/users",
   download: "/api/download",
   go: "/api/go",
+  render: "/api/render",
+  fetch: "/api/fetch",
+  session: "/api/session",
+  newsletter: "/api/newsletter",
+  newsletterStatus: "/api/newsletter/status",
 };
 
 // Routes de l'application (SPA).

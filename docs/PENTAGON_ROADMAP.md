@@ -133,6 +133,14 @@ sequenceDiagram
 
 **Contenu :** CSRF, SSRF (A10), SSTI, path traversal / LFI, injection de commande, open redirect ; **tests multi-rôles** (escalade verticale de privilèges).
 
+> **État (avancement) :** ✅ LFI/path traversal, ✅ open redirect, ✅ SSTI
+> (A03/CWE-1336, preuve par évaluation d'expression serveur), ✅ SSRF
+> (A10/CWE-918, preuve par requête sortante vers un canari), ✅ CSRF
+> (A01/CWE-352, preuve par action d'état inter-site sans jeton). Chaque testeur
+> est non destructif et branché dans l'agent Exploitation, avec faille
+> correspondante semée dans VulnShop. **Reste :** injection de commande,
+> tests multi-rôles (escalade verticale).
+
 **Process — cycle « détecter → prouver » étendu (même patron que SQLi/XSS) :**
 
 ```mermaid
