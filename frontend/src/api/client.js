@@ -34,6 +34,8 @@ export const logout = () => request("/api/v1/logout", { method: "POST" });
 // ─── Sessions / campagnes ───
 // /api/jobs est l'inventaire existant des campagnes (récentes + persistées).
 export const listSessions = () => request("/api/jobs");
+// Vue d'ensemble multi-cas (pages d'index Audits/Rapports).
+export const getIndex = () => request("/api/v1/index");
 export const getFindings = (sessionId) =>
   request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/findings`);
 export const getAudit = (sessionId) =>

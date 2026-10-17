@@ -4,6 +4,7 @@ import * as api from "./api/client.js";
 import Login from "./views/Login.jsx";
 import Console from "./views/Console.jsx";
 import Admin from "./views/Admin.jsx";
+import Overview from "./views/Overview.jsx";
 
 // Racine : vérifie l'état de session (api/v1/me) puis route vers la connexion
 // ou la console. L'auth repose sur le cookie de session Flask.
@@ -49,6 +50,16 @@ export default function App() {
         element={
           auth.user ? (
             <Console user={auth.user} onLogout={refresh} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/overview"
+        element={
+          auth.user ? (
+            <Overview user={auth.user} onLogout={refresh} />
           ) : (
             <Navigate to="/login" replace />
           )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import * as api from "../api/client.js";
 import Brand from "../components/Brand.jsx";
 import FindingCard from "../components/FindingCard.jsx";
@@ -17,6 +17,7 @@ const PREPROMPTS = [
 
 export default function Console({ user, onLogout }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [sessions, setSessions] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [findings, setFindings] = useState([]);
@@ -45,6 +46,17 @@ export default function Console({ user, onLogout }) {
       }
     })();
   }, []);
+
+  // Pré-sélection depuis la vue d'ensemble (session + onglet).
+  useEffect(() => {
+    const st = location.state;
+    if (st && st.sessionId) {
+      setActiveId(st.sessionId);
+      if (st.tab) setTab(st.tab);
+      // Nettoie l'état de navigation pour ne pas le ré-appliquer.
+      navigate(".", { replace: true, state: null });
+    }
+  }, [location.state, navigate]);
 
   // Findings de la session active.
   useEffect(() => {
@@ -172,6 +184,7 @@ export default function Console({ user, onLogout }) {
               {(user.sites || []).length} site{(user.sites || []).length > 1 ? "s" : ""} autorisé{(user.sites || []).length > 1 ? "s" : ""}
             </span>
           )}
+          <button onClick={() => navigate("/overview")}>Vue d'ensemble</button>
           {user.role === "admin" && (
             <button onClick={() => navigate("/admin")}>Administration</button>
           )}

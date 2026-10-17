@@ -1216,6 +1216,34 @@ def api_v1_findings(job_id: str):
     })
 
 
+@app.route("/api/v1/index")
+def api_v1_index():
+    """
+    Vue d'ensemble multi-cas (pages d'index Audits/Rapports) : une ligne par
+    campagne, avec risque, compteurs, score de durcissement et dispo du rapport.
+    """
+    sync_persisted_jobs()
+    rows = []
+    with _JOBS_LOCK:
+        for jid, j in JOBS.items():
+            s = j.get("summary") or {}
+            sh = (((j.get("state") or {}).get("web_app_result") or {})
+                  .get("raw_data") or {}).get("security_headers") or {}
+            rows.append({
+                "job_id": jid,
+                "target": j.get("target", "") or s.get("target", ""),
+                "status": j.get("status"),
+                "started_at": j.get("started_at", ""),
+                "overall_risk": s.get("overall_risk", "unknown"),
+                "proven_count": s.get("proven_count", 0),
+                "detected_count": s.get("detected_count", 0),
+                "security_score": sh.get("security_score"),
+                "has_pdf": bool(j.get("pdf_path")),
+            })
+    rows.sort(key=lambda x: x["started_at"], reverse=True)
+    return jsonify({"sessions": rows})
+
+
 @app.route("/api/v1/sessions/<job_id>/audit")
 def api_v1_audit(job_id: str):
     """
