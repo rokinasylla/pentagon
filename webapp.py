@@ -929,6 +929,174 @@ def api_download(job_id: str, kind: str):
     return send_file(os.path.abspath(path), as_attachment=True)
 
 
+# ──────────────────── API v1 : console pilotable (Lot UI-2) ─────────────────
+# Jointure entre la console et le moteur : exposer les Findings d'une campagne
+# avec leur état de preuve, les exploiter À LA DEMANDE (prove/confirm) et router
+# les commandes (slash + langage naturel). Additif, versionné /api/v1, au-dessus
+# du même modèle de campagne (JOBS) et de la même gouvernance RoE.
+
+def _roe_check_for_target(target: str):
+    """
+    Fabrique le contrôle RoE (deny-by-default) utilisé par l'exploitation à la
+    demande et le dispatcher : une action n'est permise que si la cible figure
+    dans la liste blanche admin ET que sa catégorie y est autorisée.
+    """
+    def check(action_category: str, _target: str) -> dict:
+        auth = check_admin_authorization(target)
+        if not auth.get("allowed"):
+            return {"allowed": False,
+                    "reason": ADMIN_DENIED_MSG.format(t=target)}
+        cats = auth.get("categories") or []
+        if action_category not in cats:
+            return {"allowed": False,
+                    "reason": f"Catégorie d'action « {action_category} » non "
+                              f"autorisée par l'administrateur pour cette cible."}
+        return {"allowed": True, "reason": "Autorisé par la politique admin."}
+    return check
+
+
+def _session_findings(job: dict):
+    """Findings d'une session : état persisté s'il existe, sinon dérivé du résumé."""
+    from pentagon.core.finding_store import get_or_init_findings
+    job_id = job.get("_id") or job.get("campaign_id") or ""
+    return get_or_init_findings(RESULTS_DIR, job_id, job.get("summary"))
+
+
+def _exploit_on_session(job: dict, job_id: str, finding, mode: str) -> dict:
+    """
+    Exécute l'exploitation à la demande sur UN Finding de la session, persiste
+    l'état mis à jour et renvoie le résultat du moteur. Import LLM/offensif différé.
+    """
+    from pentagon.agents.exploitation_agent import ExploitationAgent
+    from pentagon.core.finding_store import (
+        load_findings, save_findings, replace_finding,
+    )
+    agent = ExploitationAgent()  # client LLM paresseux : exploit() n'en a pas besoin
+    roe_check = _roe_check_for_target(job.get("target", ""))
+    result = agent.exploit(finding, mode=mode, roe_check=roe_check)
+
+    # Persiste l'état mis à jour du Finding (survit aux redémarrages).
+    current = load_findings(RESULTS_DIR, job_id) or _session_findings(job)
+    updated = replace_finding(current, finding)
+    save_findings(RESULTS_DIR, job_id, updated)
+    return result
+
+
+@app.route("/api/v1/sessions/<job_id>/findings")
+def api_v1_findings(job_id: str):
+    """Liste les Findings de la session avec leur état de preuve."""
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    job["_id"] = job_id
+    findings = _session_findings(job)
+    return jsonify({
+        "session_id": job_id,
+        "findings": [f.to_dict() for f in findings],
+    })
+
+
+@app.route("/api/v1/sessions/<job_id>/findings/<finding_id>/exploit",
+           methods=["POST"])
+def api_v1_exploit(job_id: str, finding_id: str):
+    """Exploitation à la demande d'une faille (mode prove|confirm)."""
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    job["_id"] = job_id
+    data = request.get_json(force=True, silent=True) or {}
+    mode = (data.get("mode") or "prove").strip().lower()
+
+    from pentagon.core.finding_store import find_by_id
+    finding = find_by_id(_session_findings(job), finding_id)
+    if finding is None:
+        return jsonify({"error": "Faille introuvable dans cette session."}), 404
+
+    result = _exploit_on_session(job, job_id, finding, mode)
+    code = 403 if result.get("status") == "denied" else 200
+    return jsonify(result), code
+
+
+# Réponses des actions de flux/gouvernance : reconnues par le dispatcher, mais
+# exécutées par d'autres surfaces (formulaire de mission, demande admin, annulation).
+def _directive(kind: str, message: str) -> dict:
+    return {"directive": kind, "message": message}
+
+
+def _build_session_dispatcher(job: dict, job_id: str):
+    """Construit le CommandDispatcher de la session, handlers câblés au moteur."""
+    from pentagon.core.command_dispatcher import (
+        CommandDispatcher, EXPLOIT, CONFIRM, REPORT, AUDIT, SCAN, SCOPE, STOP,
+    )
+    from pentagon.core.finding_store import find_by_index
+
+    def _do_exploit(cmd, mode):
+        findings = _session_findings(job)
+        finding = find_by_index(findings, cmd.index)
+        if finding is None:
+            return {"status": "not_found",
+                    "reason": f"Aucune faille n° {cmd.index} dans cette session."}
+        return _exploit_on_session(job, job_id, finding, mode)
+
+    def _do_report(_cmd):
+        if job.get("status") != "done" or not job.get("state"):
+            return _directive("report", "Campagne non terminée : rapport indisponible.")
+        return _directive("report", "Génération du rapport demandée.")
+
+    def _do_audit(_cmd):
+        s = job.get("summary") or {}
+        return {"audit": {
+            "target": s.get("target", ""),
+            "overall_risk": s.get("overall_risk", "unknown"),
+            "proven_count": s.get("proven_count", 0),
+            "detected_count": s.get("detected_count", 0),
+        }}
+
+    handlers = {
+        EXPLOIT: lambda c: _do_exploit(c, "prove"),
+        CONFIRM: lambda c: _do_exploit(c, "confirm"),
+        REPORT: _do_report,
+        AUDIT: _do_audit,
+        SCAN: lambda c: _directive("scan", "Ouvrez une nouvelle mission pour "
+                                   "lancer un scan (périmètre + RoE)."),
+        SCOPE: lambda c: _directive("scope", f"Demande d'extension du périmètre "
+                                    f"à « {c.arg} » (validation admin requise)."),
+        STOP: lambda c: _directive("stop", "Arrêt de la campagne demandé."),
+    }
+    roe_check = _roe_check_for_target(job.get("target", ""))
+    return CommandDispatcher(handlers=handlers, roe_check=roe_check,
+                             target=job.get("target", ""))
+
+
+@app.route("/api/v1/sessions/<job_id>/command", methods=["POST"])
+def api_v1_command(job_id: str):
+    """Reçoit une commande (slash ou langage naturel) et la route vers le moteur."""
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    job["_id"] = job_id
+    data = request.get_json(force=True, silent=True) or {}
+    raw = (data.get("command") or "").strip()
+    if not raw:
+        return jsonify({"error": "Commande vide."}), 400
+    raw = raw[:2000]
+
+    dispatcher = _build_session_dispatcher(job, job_id)
+    outcome = dispatcher.dispatch(raw)
+    status = outcome.get("status")
+    code = 200
+    if status == "denied":
+        code = 403
+    elif status in ("unknown", "needs_index", "needs_arg"):
+        code = 400
+    # L'objet Command n'est pas sérialisable en JSON tel quel : on l'aplatit.
+    cmd = outcome.pop("command", None)
+    if cmd is not None:
+        outcome["command"] = {"action": cmd.action, "index": cmd.index,
+                              "arg": cmd.arg}
+    return jsonify(outcome), code
+
+
 # ───────────────────────── Assistant conversationnel ───────────────────────
 # Un assistant pentest GÉNÉRAL, accessible au testeur ET à l'admin : il répond
 # aux questions de sécurité web / pentest et, si une campagne est ouverte,

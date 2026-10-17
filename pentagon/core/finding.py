@@ -77,6 +77,67 @@ def roe_action_for(category: str) -> str:
     return CATEGORY_TO_ROE_ACTION.get(category, "exploitation")
 
 
+# --- Inférence de catégorie depuis un finding affiché ---------------------
+# Les findings unifiés de la console ne portent pas de catégorie machine, mais
+# un OWASP / CWE / titre interprétés par le LLM. Pour router une exploitation à
+# la demande vers le bon testeur, on en DÉDUIT la catégorie : d'abord par CWE
+# (signal le plus fiable), puis par mots-clés du titre en repli.
+_CWE_TO_CATEGORY = {
+    "22": "lfi", "98": "lfi",
+    "79": "xss",
+    "89": "sqli",
+    "287": "auth", "1392": "auth", "798": "auth",
+    "352": "csrf",
+    "601": "open_redirect",
+    "639": "idor", "566": "idor",
+    "918": "ssrf",
+    "1336": "ssti", "94": "ssti",
+    "347": "jwt", "345": "jwt",
+}
+
+_TITLE_KEYWORDS = [
+    ("ssti", ("ssti", "template côté serveur", "template cote serveur",
+              "server-side template")),
+    ("ssrf", ("ssrf", "server-side request", "requête côté serveur",
+              "requete cote serveur")),
+    ("csrf", ("csrf", "cross-site request", "inter-site")),
+    ("lfi", ("lfi", "traversée", "traversee", "path traversal",
+             "inclusion de fichier", "local file")),
+    ("open_redirect", ("redirection ouverte", "open redirect")),
+    ("sqli", ("sql",)),
+    ("xss", ("xss", "cross-site scripting", "script")),
+    ("jwt", ("jwt", "token", "jeton")),
+    ("idor", ("idor", "bola", "référence d'objet", "reference d'objet",
+              "accès horizontal", "acces horizontal")),
+    ("auth", ("authentification", "identifiant", "mot de passe par défaut",
+              "mot de passe par defaut", "credentials", "brute")),
+]
+
+
+def _accent_fold(text: str) -> str:
+    table = str.maketrans("àâäáãçéèêëíìîïñóòôöõúùûüýÿ",
+                          "aaaaaceeeeiiiinooooouuuuyy")
+    return text.translate(table)
+
+
+def infer_category(title: str = "", owasp: str = "", cwe: str = "") -> str:
+    """
+    Déduit la catégorie machine d'un finding (pour router l'exploitation à la
+    demande). Renvoie "" si rien ne correspond — l'exploitation refusera alors
+    proprement cette faille comme non prise en charge.
+    """
+    import re as _re
+    for num in _re.findall(r"\d+", str(cwe)):
+        if num in _CWE_TO_CATEGORY:
+            return _CWE_TO_CATEGORY[num]
+
+    hay = _accent_fold(f"{title} {owasp}".lower())
+    for category, needles in _TITLE_KEYWORDS:
+        if any(_accent_fold(n.lower()) in hay for n in needles):
+            return category
+    return ""
+
+
 @dataclass
 class Finding:
     """
