@@ -2,12 +2,15 @@ import ProofTracker from "./ProofTracker.jsx";
 
 const SEV = ["critical", "high", "medium", "low", "info"];
 
-export default function FindingCard({ finding, index }) {
+// Carte de faille : résumé + tracker + accès au détail et à l'exploitation.
+export default function FindingCard({ finding, index, busy, onOpen, onConfirm }) {
   const sev = SEV.includes(finding.severity) ? finding.severity : "info";
+  const confirmed = finding.proof_state === "confirmed";
+
   return (
     <article className="finding-card">
       <div className="fc-head">
-        <div>
+        <button className="fc-title-btn" onClick={() => onOpen(finding)}>
           <div className="fc-title">
             {index}. {finding.title || "Vulnérabilité"}
           </div>
@@ -16,7 +19,7 @@ export default function FindingCard({ finding, index }) {
             {finding.owasp && <span>· {finding.owasp}</span>}{" "}
             {finding.cwe && <span>· {finding.cwe}</span>}
           </div>
-        </div>
+        </button>
         <span className={`sev ${sev}`}>{sev}</span>
       </div>
 
@@ -25,6 +28,20 @@ export default function FindingCard({ finding, index }) {
       )}
 
       <ProofTracker state={finding.proof_state} />
+
+      <div className="fc-actions">
+        <button className="link" onClick={() => onOpen(finding)}>
+          Détail
+        </button>
+        <button
+          className="primary sm"
+          onClick={() => onConfirm(finding)}
+          disabled={busy || confirmed}
+          title={confirmed ? "Déjà confirmée" : "Démontrer l'impact réel (non destructif)"}
+        >
+          {confirmed ? "Confirmée ✓" : "Confirmer par exploitation"}
+        </button>
+      </div>
     </article>
   );
 }
