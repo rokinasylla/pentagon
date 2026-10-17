@@ -6,6 +6,7 @@ import FindingDrawer from "../components/FindingDrawer.jsx";
 import CommandBar from "../components/CommandBar.jsx";
 import Thread from "../components/Thread.jsx";
 import AuditView from "../components/AuditView.jsx";
+import ReportView from "../components/ReportView.jsx";
 
 const PREPROMPTS = [
   "/exploit 1",
@@ -191,7 +192,12 @@ export default function Console({ user, onLogout }) {
             >
               Audit
             </button>
-            <button className="tab" role="tab" disabled title="À venir (UI-3)">
+            <button
+              className={`tab ${tab === "report" ? "on" : ""}`}
+              role="tab"
+              aria-selected={tab === "report"}
+              onClick={() => setTab("report")}
+            >
               Rapport
             </button>
           </div>
@@ -219,6 +225,7 @@ export default function Console({ user, onLogout }) {
               </>
             )}
             {tab === "audit" && <AuditView sessionId={activeId} />}
+            {tab === "report" && <ReportView sessionId={activeId} />}
           </div>
         </section>
       </div>

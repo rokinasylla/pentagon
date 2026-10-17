@@ -38,6 +38,15 @@ export const getFindings = (sessionId) =>
   request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/findings`);
 export const getAudit = (sessionId) =>
   request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/audit`);
+export const getReport = (sessionId) =>
+  request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/report`);
+export const createShare = (sessionId) =>
+  request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/share`, { method: "POST" });
+// Génération du PDF (endpoint historique). Le téléchargement se fait par lien <a>.
+export const generatePdf = (sessionId) =>
+  request(`/api/report/${encodeURIComponent(sessionId)}`, { method: "POST" });
+export const downloadUrl = (sessionId, kind) =>
+  `/api/download/${encodeURIComponent(sessionId)}/${kind}`;
 
 // ─── Lot UI-2 (préparé, câblé plus tard dans l'UI) ───
 export const sendCommand = (sessionId, command) =>

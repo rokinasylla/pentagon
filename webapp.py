@@ -103,7 +103,8 @@ VALID_ROLES = ("admin", "user")
 # api_v1_login : connexion JSON du front SPA ; api_v1_me : sonde d'état de
 # session (répond authenticated:false plutôt que 401, pour afficher l'écran de
 # connexion sans erreur).
-_PUBLIC_ENDPOINTS = {"login", "static", "api_v1_login", "api_v1_me", "console_spa"}
+_PUBLIC_ENDPOINTS = {"login", "static", "api_v1_login", "api_v1_me",
+                     "console_spa", "share_public"}
 
 
 def load_users() -> dict:
@@ -1137,6 +1138,130 @@ def api_v1_audit(job_id: str):
         "info_disclosure": sh.get("info_disclosure_headers") or [],
         "cookie_issues": sh.get("cookie_issues") or [],
     })
+
+
+@app.route("/api/v1/sessions/<job_id>/report")
+def api_v1_report(job_id: str):
+    """Synthèse de campagne pour l'onglet Rapport (risque, compteurs, findings)."""
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    summary = job.get("summary") or {}
+    return jsonify({
+        "session_id": job_id,
+        "status": job.get("status"),
+        "summary": summary,
+        "has_pdf": bool(job.get("pdf_path")),
+        "has_json": bool(job.get("json_path")),
+    })
+
+
+# --- Partage public d'un rapport (lecture seule) --------------------------
+SHARES_PATH = os.path.join(RESULTS_DIR, "shares.json")
+
+
+def _load_shares() -> dict:
+    try:
+        with open(SHARES_PATH, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_shares(shares: dict) -> None:
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    with open(SHARES_PATH, "w", encoding="utf-8") as f:
+        json.dump(shares, f, ensure_ascii=False, indent=2)
+
+
+def _esc(s) -> str:
+    return (str(s if s is not None else "").replace("&", "&amp;")
+            .replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;"))
+
+
+@app.route("/api/v1/sessions/<job_id>/share", methods=["POST"])
+def api_v1_share(job_id: str):
+    """Crée (ou renvoie) un lien de partage public en lecture seule."""
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    shares = _load_shares()
+    # Réutilise un token existant pour cette session (évite les doublons).
+    token = next((t for t, v in shares.items()
+                  if isinstance(v, dict) and v.get("job_id") == job_id), None)
+    if not token:
+        token = secrets.token_urlsafe(9)
+        shares[token] = {"job_id": job_id,
+                         "created_at": datetime.now(timezone.utc).isoformat()}
+        _save_shares(shares)
+    return jsonify({"token": token, "path": f"/share/{token}"})
+
+
+@app.route("/share/<token>")
+def share_public(token: str):
+    """Rapport public en LECTURE SEULE (aucune action, aucune authentification)."""
+    entry = _load_shares().get(token)
+    if not isinstance(entry, dict):
+        abort(404)
+    job = lookup_job(entry.get("job_id", ""))
+    if job is None:
+        abort(404)
+    return Response(_render_share_html(job.get("summary") or {}),
+                   mimetype="text/html")
+
+
+def _render_share_html(summary: dict) -> str:
+    """Rend une page HTML autonome, sobre, à la charte (aucun script d'action)."""
+    sev_color = {"critical": "#6e1f2e", "high": "#b0541e", "medium": "#8a6a12",
+                 "low": "#3c6686", "info": "#55596a"}
+    rows = []
+    for f in (summary.get("findings") or []):
+        sev = str(f.get("severity") or "info")
+        color = sev_color.get(sev, "#55596a")
+        rows.append(
+            f'<tr><td><strong>{_esc(f.get("title"))}</strong>'
+            f'<div class="m">{_esc(f.get("owasp"))} {_esc(f.get("cwe"))}</div></td>'
+            f'<td><span class="sev" style="background:{color}">{_esc(sev)}</span></td>'
+            f'<td class="src">{_esc(f.get("source"))}</td></tr>'
+        )
+    body = "\n".join(rows) or '<tr><td colspan="3" class="m">Aucune vulnérabilité.</td></tr>'
+    target = _esc(summary.get("target") or "—")
+    risk = _esc(summary.get("overall_risk") or "inconnu")
+    proven = summary.get("proven_count", 0)
+    detected = summary.get("detected_count", 0)
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PENTAGON — Rapport public</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{{--bg:#f4f3ee;--fg:#141418;--mut:#595d67;--brd:#e4e2da;--accent:#2e3a59}}
+*{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--fg);
+font-family:'IBM Plex Sans',system-ui,sans-serif;padding:40px 20px}}
+.wrap{{max-width:820px;margin:0 auto}}
+.brand{{display:flex;align-items:center;gap:10px;color:var(--accent);font-weight:700}}
+h1{{font-family:'IBM Plex Serif',Georgia,serif;font-weight:600;margin:18px 0 2px}}
+.m{{color:var(--mut);font-size:13px}}
+.cards{{display:flex;gap:12px;margin:22px 0}}
+.card{{flex:1;background:#fff;border:1px solid var(--brd);border-radius:12px;padding:16px}}
+.card .n{{font-family:'IBM Plex Serif',serif;font-size:26px;font-weight:600}}
+table{{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--brd);border-radius:12px;overflow:hidden}}
+td,th{{text-align:left;padding:11px 14px;border-bottom:1px solid var(--brd);font-size:14px;vertical-align:top}}
+th{{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}}
+.sev{{color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:999px}}
+.src{{color:var(--mut);font-size:12px}} .foot{{color:var(--mut);font-size:12px;margin-top:22px}}
+</style></head><body><div class="wrap">
+<div class="brand"><svg width="22" height="22" viewBox="0 0 100 100"><polygon points="50,8 90,38 74.5,86 25.5,86 10,38" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/><path d="M31 50 L44 63 L70 35" fill="none" stroke="currentColor" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/></svg> PENTAGON</div>
+<h1>Rapport de sécurité</h1>
+<div class="m">Cible : {target} · Risque global : <strong>{risk}</strong> · lecture seule</div>
+<div class="cards">
+<div class="card"><div class="n">{proven}</div><div class="m">Prouvées</div></div>
+<div class="card"><div class="n">{detected}</div><div class="m">Détectées</div></div>
+</div>
+<table><thead><tr><th>Vulnérabilité</th><th>Sévérité</th><th>Source</th></tr></thead>
+<tbody>{body}</tbody></table>
+<p class="foot">Généré par PENTAGON — « détecter en prouvant, jamais ravager ». Lien de partage en lecture seule.</p>
+</div></body></html>"""
 
 
 @app.route("/api/v1/sessions/<job_id>/findings/<finding_id>/exploit",

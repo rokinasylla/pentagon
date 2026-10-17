@@ -147,6 +147,23 @@ input:focus, textarea:focus {
 .audit-check { color: var(--state-confirmed); font-weight: 700; }
 .mono { font-family: var(--font-mono); font-size: 12.5px; color: var(--fg); word-break: break-all; }
 
+/* Rapport */
+.report { display: flex; flex-direction: column; gap: 18px; }
+.cards { display: flex; gap: 12px; }
+.card { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.card-n { font-family: var(--font-display); font-size: 26px; font-weight: 600; line-height: 1; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+a.btn {
+  display: inline-flex; align-items: center; text-decoration: none;
+  border: 1px solid var(--border); background: var(--surface); color: var(--fg);
+  border-radius: var(--radius-sm); padding: 8px 14px; font-size: 13px;
+}
+a.btn:hover { background: var(--surface-2); }
+.share-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.share-row { display: flex; gap: 8px; margin-top: 8px; }
+.share-row input { font-family: var(--font-mono); font-size: 12.5px; }
+.share-row button { flex: 0 0 auto; }
+
 /* Fil : messages + pré-prompts + barre de commande */
 .msg { margin-bottom: 14px; }
 .msg .role { font-size: 11px; color: var(--fg-faint); text-transform: uppercase; letter-spacing: 0.05em; }
