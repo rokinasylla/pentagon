@@ -94,7 +94,34 @@ class LLMClient:
         response = self.client.chat.completions.create(**kwargs)
 
         return response.choices[0].message.content
-    
+
+    def chat_messages(
+        self,
+        messages: list[dict],
+        temperature: float = 0.3,
+        max_tokens: int = 2000,
+    ) -> str:
+        """
+        Variante multi-tours : envoie une liste de messages complète et renvoie
+        la réponse texte. Utilisée par l'assistant conversationnel (console web),
+        où l'historique de la discussion doit être conservé d'un tour à l'autre.
+
+        Args:
+            messages: liste [{"role": "system|user|assistant", "content": "..."}].
+            temperature: niveau de créativité.
+            max_tokens: longueur maximale de la réponse.
+
+        Returns:
+            La réponse texte du LLM.
+        """
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content
+
     def health_check(self) -> bool:
         """
         Vérifie que le LLM est joignable et fonctionnel.

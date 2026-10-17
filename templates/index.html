@@ -301,6 +301,27 @@
   .cat-check input{width:17px; height:17px; accent-color:var(--accent); cursor:pointer}
   .muted-note{color:var(--faint); font-size:12.5px}
   .adm-ok{color:#15803d; font-size:13px; margin-top:12px}
+
+  /* ── Assistant conversationnel ── */
+  .chat-suggest{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 14px}
+  .chip-sugg{border:1px solid var(--border); background:var(--surface); color:var(--accent3);
+    border-radius:999px; padding:7px 13px; font-size:12.5px; cursor:pointer; transition:.15s;
+    font-family:inherit}
+  .chip-sugg:hover{background:var(--surface2); border-color:var(--accent); transform:translateY(-1px)}
+  .chat-log{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px; max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:14px}
+  .chat-msg{display:flex; gap:10px; align-items:flex-start}
+  .chat-msg.user{flex-direction:row-reverse}
+  .chat-av{flex:none; width:34px; height:34px; border-radius:50%; display:grid; place-items:center;
+    font-size:17px; background:linear-gradient(135deg,var(--accent2),var(--accent)); box-shadow:0 4px 12px -4px rgba(99,102,241,.5)}
+  .chat-msg.user .chat-av{background:linear-gradient(135deg,#0891b2,#0ea5e9)}
+  .chat-bubble{max-width:78%; padding:11px 15px; border-radius:14px; font-size:14px; line-height:1.55;
+    background:var(--panel); border:1px solid var(--border); color:var(--text); white-space:pre-wrap; word-wrap:break-word}
+  .chat-msg.user .chat-bubble{background:linear-gradient(135deg,var(--accent2),var(--accent)); color:#fff; border:none}
+  .chat-bubble.typing{color:var(--muted); font-style:italic}
+  .chat-input{display:flex; gap:10px; margin-top:14px}
+  .chat-input .input{flex:1}
+  .chat-input .btn{flex:none}
 </style>
 </head>
 <body>
@@ -363,7 +384,6 @@
         </g>
       </svg>
     </div>
-  </header>
   </header>
 
   {% if role == 'admin' %}
@@ -539,6 +559,33 @@
   </section>
 
   {% endif %}
+
+  <!-- ASSISTANT CONVERSATIONNEL (testeur ET admin) -->
+  <section class="card" id="chat-panel">
+    <div class="eyebrow"><span class="step-num" style="background:linear-gradient(135deg,#0891b2,#6366f1)">💬</span> Assistant</div>
+    <h2 class="title">Pose une question sur ton pentest</h2>
+    <p class="sub">L'assistant répond à tes questions de sécurité web (failles, OWASP, correctifs…). Si une campagne est ouverte, il s'appuie dessus. <b>Conseil uniquement</b> — aucune attaque n'est lancée.</p>
+
+    <div class="chat-suggest" id="chat-suggest">
+      <button class="chip-sugg" type="button">C'est quoi une injection SQL&nbsp;?</button>
+      <button class="chip-sugg" type="button">Comment corriger un XSS stocké&nbsp;?</button>
+      <button class="chip-sugg" type="button">Mon JWT est-il vulnérable&nbsp;?</button>
+      <button class="chip-sugg" type="button">Quelles sont mes failles les plus graves&nbsp;?</button>
+    </div>
+
+    <div class="chat-log" id="chat-log" aria-live="polite">
+      <div class="chat-msg bot">
+        <div class="chat-av">🛡️</div>
+        <div class="chat-bubble">Bonjour&nbsp;! Je suis l'assistant PENTAGON. Pose-moi une question sur la sécurité de ton site ou sur tes résultats de campagne.</div>
+      </div>
+    </div>
+
+    <div class="chat-input">
+      <input class="input" id="chat-in" placeholder="Écris ta question…" autocomplete="off" maxlength="2000" />
+      <button class="btn btn-primary" id="chat-send">Envoyer</button>
+    </div>
+    <div class="err hidden" id="chat-err"></div>
+  </section>
 
   <footer>PENTAGON · deny-by-default · « détecter en prouvant, jamais ravager »</footer>
 </div>
@@ -954,6 +1001,58 @@ if($('#admin')){
   $('#adm-cats-save').onclick=saveCats;
   $('#adm-user-add').onclick=addUser;
   loadPolicy(); loadUsers();
+}
+
+/* ══ Assistant conversationnel — autonome, présent pour TESTEUR et ADMIN ══ */
+if($('#chat-panel')){
+  const log=$('#chat-log'), input=$('#chat-in'), sendBtn=$('#chat-send');
+  const history=[]; let busy=false;
+
+  function addMsg(role, text){
+    const wrap=document.createElement('div');
+    wrap.className='chat-msg '+(role==='user'?'user':'bot');
+    wrap.innerHTML='<div class="chat-av">'+(role==='user'?'🧑':'🛡️')+'</div>'+
+      '<div class="chat-bubble">'+esc(text)+'</div>';
+    log.appendChild(wrap); log.scrollTop=log.scrollHeight; return wrap;
+  }
+  function addTyping(){
+    const wrap=document.createElement('div');
+    wrap.className='chat-msg bot';
+    wrap.innerHTML='<div class="chat-av">🛡️</div><div class="chat-bubble typing">L\'assistant réfléchit…</div>';
+    log.appendChild(wrap); log.scrollTop=log.scrollHeight; return wrap;
+  }
+
+  async function send(text){
+    text=(text||input.value||'').trim();
+    if(!text || busy) return;
+    busy=true; sendBtn.disabled=true; show('#chat-err',false); input.value='';
+    addMsg('user',text);
+    history.push({role:'user',content:text});
+    const typing=addTyping();
+    try{
+      const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:text, history:history.slice(0,-1), job_id: currentJob||''})});
+      const d=await r.json();
+      typing.remove();
+      if(!r.ok){ $('#chat-err').textContent=d.error||"Échec de l'assistant."; show('#chat-err',true); }
+      else {
+        const ans=d.answer||'(réponse vide)';
+        addMsg('bot',ans);
+        history.push({role:'assistant',content:ans});
+        if(history.length>16) history.splice(0,history.length-16);
+      }
+    }catch(_){
+      typing.remove();
+      $('#chat-err').textContent='Erreur réseau.'; show('#chat-err',true);
+    }
+    busy=false; sendBtn.disabled=false; input.focus();
+  }
+
+  sendBtn.onclick=()=>send();
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); send(); } });
+  document.querySelectorAll('#chat-suggest .chip-sugg').forEach(b=>{
+    b.onclick=()=>send(b.textContent.replace(/ /g,' ').trim());
+  });
 }
 </script>
 </body>
