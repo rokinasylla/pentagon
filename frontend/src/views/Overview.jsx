@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import * as api from "../api/client.js";
-import Brand from "../components/Brand.jsx";
+import TopNav from "../components/TopNav.jsx";
 
 // Vue d'ensemble MULTI-CAS (pages d'index Audits / Rapports) : une ligne par
 // campagne. Un clic ouvre la console sur la session et l'onglet correspondant.
@@ -15,7 +15,8 @@ function scoreCls(score) {
 
 export default function Overview({ user, onLogout }) {
   const navigate = useNavigate();
-  const [view, setView] = useState("audits"); // audits | reports
+  const location = useLocation();
+  const [view, setView] = useState(location.state?.view === "reports" ? "reports" : "audits");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,20 +41,12 @@ export default function Overview({ user, onLogout }) {
   };
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <Brand />
-        <div className="who">
-          <button onClick={() => navigate("/")}>← Console</button>
-          <span>
-            {user.operator} ({user.role})
-          </span>
-          <button onClick={doLogout}>Déconnexion</button>
-        </div>
-      </header>
+    <div className="page">
+      <TopNav active={view === "reports" ? "rapports" : "audits"} user={user} onLogout={onLogout} />
 
-      <div className="admin-wrap">
-        <h1 className="admin-h1">Vue d'ensemble</h1>
+      <main className="page-main">
+        <div className="page-wrap">
+          <h1 className="page-title">Vue d'ensemble</h1>
         <div className="seg">
           <button
             className={view === "audits" ? "on" : ""}
@@ -113,7 +106,8 @@ export default function Overview({ user, onLogout }) {
             ))}
           </div>
         )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
