@@ -48,10 +48,16 @@ Finding = { id, session_id, title, severity, owasp, cwe, category,
 
 **F2 — Contrat d'API stable et versionné** (`/api/v1/...`), additif à l'existant. Voir §4.
 
-**F3 — Décision d'architecture front.** Deux options (à trancher par l'équipe, sans incidence sur le backend) :
-- *(a)* enrichir le front actuel (vanilla JS) — moindre coût, continuité ;
-- *(b)* front dédié consommant l'API — meilleure fidélité à la maquette.
-La feuille de route reste valable dans les deux cas : le backend expose la même API.
+**F3 — Décision d'architecture front : TRANCHÉE → front dédié React + Vite.**
+Options envisagées (sans incidence sur le backend) : *(a)* enrichir le front
+vanilla JS existant (moindre coût mais faible fidélité à la maquette
+conversationnelle et état des findings fragile) ; *(b)* front dédié consommant
+l'API (meilleure fidélité) ; *(c)* front dédié avec framework complet.
+**Choix retenu : (c) — SPA React + Vite** consommant l'API v1, pour l'état des
+findings (tracker Détecté→Prouvé→Confirmé en direct), le routing multi-écrans et
+la fidélité aux 12 artboards. Le backend expose la même API quel que soit le front.
+Recommandation de déploiement : build Vite → fichiers statiques servis par Flask
+(un seul artefact, pas de second serveur), ou dev-server Vite proxifiant `/api`.
 
 ---
 

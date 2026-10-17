@@ -100,7 +100,10 @@ POLICY_PATH = os.path.join("pentagon", "config", "roe_policy.json")
 VALID_ROLES = ("admin", "user")
 
 # Points d'accès joignables SANS être authentifié.
-_PUBLIC_ENDPOINTS = {"login", "static"}
+# api_v1_login : connexion JSON du front SPA ; api_v1_me : sonde d'état de
+# session (répond authenticated:false plutôt que 401, pour afficher l'écran de
+# connexion sans erreur).
+_PUBLIC_ENDPOINTS = {"login", "static", "api_v1_login", "api_v1_me"}
 
 
 def load_users() -> dict:
@@ -927,6 +930,47 @@ def api_download(job_id: str, kind: str):
     if not path or not os.path.exists(path):
         abort(404)
     return send_file(os.path.abspath(path), as_attachment=True)
+
+
+# ──────────────────── API v1 : authentification du front SPA ────────────────
+# Le front dédié (React/Vite) a besoin d'une auth JSON (le /login historique
+# répond en HTML/redirection, pour la page Flask). Ces routes réutilisent la
+# MÊME logique (authenticate + session), sans rien changer à la gouvernance.
+
+@app.route("/api/v1/login", methods=["POST"])
+def api_v1_login():
+    """Connexion JSON : pose la session opérateur, renvoie le rôle."""
+    if not load_users():
+        return jsonify({"error": "Aucun compte configuré sur le serveur."}), 503
+    data = request.get_json(force=True, silent=True) or {}
+    user = (data.get("username") or "").strip()
+    pwd = data.get("password") or ""
+    role = authenticate(user, pwd)
+    if not role:
+        return jsonify({"error": "Identifiants invalides."}), 401
+    session.clear()
+    session.permanent = True
+    session["operator"] = user
+    session["role"] = role
+    session["last_seen"] = datetime.now(timezone.utc).isoformat()
+    return jsonify({"ok": True, "operator": user, "role": role})
+
+
+@app.route("/api/v1/me")
+def api_v1_me():
+    """État de session courant (pour que le SPA sache s'il doit afficher le login)."""
+    if session.get("operator"):
+        return jsonify({"authenticated": True,
+                        "operator": session.get("operator"),
+                        "role": session.get("role")})
+    return jsonify({"authenticated": False})
+
+
+@app.route("/api/v1/logout", methods=["POST"])
+def api_v1_logout():
+    """Déconnexion JSON : vide la session."""
+    session.clear()
+    return jsonify({"ok": True})
 
 
 # ──────────────────── API v1 : console pilotable (Lot UI-2) ─────────────────

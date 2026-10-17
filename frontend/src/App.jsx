@@ -1,0 +1,59 @@
+import { useEffect, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import * as api from "./api/client.js";
+import Login from "./views/Login.jsx";
+import Console from "./views/Console.jsx";
+
+// Racine : vérifie l'état de session (api/v1/me) puis route vers la connexion
+// ou la console. L'auth repose sur le cookie de session Flask.
+export default function App() {
+  const [auth, setAuth] = useState({ loading: true, user: null });
+
+  const refresh = async () => {
+    try {
+      const data = await api.me();
+      setAuth({
+        loading: false,
+        user: data.authenticated
+          ? { operator: data.operator, role: data.role }
+          : null,
+      });
+    } catch {
+      setAuth({ loading: false, user: null });
+    }
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  if (auth.loading) {
+    return <div className="loading">Chargement…</div>;
+  }
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          auth.user ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Login onAuthed={refresh} />
+          )
+        }
+      />
+      <Route
+        path="/"
+        element={
+          auth.user ? (
+            <Console user={auth.user} onLogout={refresh} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
