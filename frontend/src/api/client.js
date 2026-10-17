@@ -50,6 +50,13 @@ export const generatePdf = (sessionId) =>
 export const downloadUrl = (sessionId, kind) =>
   `/api/download/${encodeURIComponent(sessionId)}/${kind}`;
 
+// ─── Nouvelle mission (lancer un pentest) ───
+export const getCatalog = () => request("/api/v1/catalog");
+export const startCampaign = (payload) =>
+  request("/api/start", { method: "POST", body: payload });
+// Flux de progression en direct (SSE). L'appelant gère l'EventSource.
+export const streamUrl = (jobId) => `/api/stream/${encodeURIComponent(jobId)}`;
+
 // ─── Administration (Lot UI-5) — admin only ───
 export const adminListUsers = () => request("/api/v1/admin/users");
 export const adminSetUserSites = (username, sites) =>
@@ -57,6 +64,13 @@ export const adminSetUserSites = (username, sites) =>
     method: "PUT",
     body: { sites },
   });
+// Gestion des comptes (endpoint historique /api/admin/users).
+export const adminCreateUser = (username, password, role) =>
+  request("/api/admin/users", { method: "POST", body: { username, password, role } });
+export const adminSetUserRole = (username, role) =>
+  request("/api/admin/users", { method: "PATCH", body: { username, role } });
+export const adminDeleteUser = (username) =>
+  request("/api/admin/users", { method: "DELETE", body: { username } });
 
 // ─── Lot UI-2 (préparé, câblé plus tard dans l'UI) ───
 export const sendCommand = (sessionId, command) =>

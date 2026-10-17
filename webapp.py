@@ -1216,6 +1216,36 @@ def api_v1_findings(job_id: str):
     })
 
 
+@app.route("/api/v1/catalog")
+def api_v1_catalog():
+    """
+    Catalogue pour le formulaire « Nouvelle mission », SELON LE RÔLE :
+    - cibles proposées : liste blanche globale pour un admin, sinon UNIQUEMENT
+      les sites autorisés de l'opérateur (il lance le pentest DE SON site) ;
+    - catégories RoE proposables (bornées par celles que l'admin autorise) ;
+    - moteurs d'orchestration disponibles.
+    """
+    operator = session.get("operator")
+    role = session.get("role", "user")
+    whitelist, admin_cats = [], []
+    try:
+        from pentagon.core.roe_enforcer import RoEEnforcer
+        pol = RoEEnforcer().policy
+        whitelist = pol.get("authorized_targets", []) or []
+        admin_cats = pol.get("authorized_action_categories", []) or []
+    except Exception:
+        pass
+    targets = whitelist if role == "admin" else user_sites(operator)
+    cats = [{"id": c, "label": CATEGORY_LABELS.get(c, c)}
+            for c in SELECTABLE_CATEGORIES if c in admin_cats]
+    return jsonify({
+        "role": role,
+        "targets": targets,
+        "categories": cats,
+        "engines": sorted(SELECTABLE_ENGINES),
+    })
+
+
 @app.route("/api/v1/index")
 def api_v1_index():
     """

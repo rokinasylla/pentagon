@@ -184,6 +184,7 @@ export default function Console({ user, onLogout }) {
               {(user.sites || []).length} site{(user.sites || []).length > 1 ? "s" : ""} autorisé{(user.sites || []).length > 1 ? "s" : ""}
             </span>
           )}
+          <button className="primary" onClick={() => navigate("/mission")}>+ Nouvelle mission</button>
           <button onClick={() => navigate("/overview")}>Vue d'ensemble</button>
           {user.role === "admin" && (
             <button onClick={() => navigate("/admin")}>Administration</button>
@@ -263,6 +264,7 @@ export default function Console({ user, onLogout }) {
                       index={i + 1}
                       acting={busyFinding === f.id}
                       onOpen={setSelected}
+                      onProve={(fd) => exploit(fd, "prove")}
                       onConfirm={(fd) => exploit(fd, "confirm")}
                       onRetest={retest}
                     />

@@ -4,9 +4,10 @@ import { lastRetest } from "../utils/findings.js";
 const SEV = ["critical", "high", "medium", "low", "info"];
 
 // Carte de faille : résumé + tracker + accès au détail, exploitation et re-test.
-export default function FindingCard({ finding, index, acting, onOpen, onConfirm, onRetest }) {
+export default function FindingCard({ finding, index, acting, onOpen, onProve, onConfirm, onRetest }) {
   const sev = SEV.includes(finding.severity) ? finding.severity : "info";
   const confirmed = finding.proof_state === "confirmed";
+  const detected = finding.proof_state === "detected";
   const rt = lastRetest(finding);
 
   return (
@@ -46,6 +47,16 @@ export default function FindingCard({ finding, index, acting, onOpen, onConfirm,
         <button className="ghost sm" onClick={() => onRetest(finding)} disabled={acting}>
           Re-tester
         </button>
+        {detected && (
+          <button
+            className="primary sm"
+            onClick={() => onProve(finding)}
+            disabled={acting}
+            title="Prouver la faille en direct (non destructif)"
+          >
+            Prouver en direct
+          </button>
+        )}
         <button
           className="offensive sm"
           onClick={() => onConfirm(finding)}
