@@ -226,7 +226,47 @@ input:focus, textarea:focus {
 .audit-check { color: var(--state-confirmed); font-weight: 700; }
 .mono { font-family: var(--font-mono); font-size: 12.5px; color: var(--fg); word-break: break-all; }
 
+/* Audit — posture de durcissement */
+.aud-title { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin-bottom: 14px; }
+.posture { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.posture-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-faint); font-weight: 600; }
+.posture-row { display: flex; align-items: baseline; gap: 14px; margin: 8px 0 12px; }
+.posture-label { font-family: var(--font-display); font-size: 24px; font-weight: 600; }
+.posture-label.critical { color: var(--sev-critical); }
+.posture-label.high { color: var(--sev-high); }
+.posture-label.medium { color: var(--sev-medium); }
+.posture-label.low { color: var(--sev-low); }
+.posture-score { margin-left: auto; font-family: var(--font-mono); font-size: 18px; color: var(--fg-muted); }
+.posture-score .s-max { font-size: 12px; }
+.posture-counts { display: flex; gap: 8px; flex-wrap: wrap; }
+.pc { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); }
+.pc.ok { color: var(--state-confirmed); } .pc.warn { color: var(--sev-medium); } .pc.bad { color: var(--sev-critical); }
+.aud-group { margin-top: 18px; }
+.aud-gh { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); display: flex; align-items: center; gap: 8px; }
+.aud-gh span { font-size: 11px; background: var(--surface-2); color: var(--fg-faint); border-radius: 999px; padding: 0 7px; }
+.aud-gh.bad { color: var(--sev-critical); } .aud-gh.warn { color: var(--sev-medium); } .aud-gh.ok { color: var(--state-confirmed); }
+.aud-items { display: flex; flex-direction: column; gap: 8px; }
+.aud-item { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 13px; }
+.aud-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: 0 0 auto; }
+.aud-dot.bad { background: var(--sev-critical); } .aud-dot.warn { background: var(--sev-medium); } .aud-dot.ok { background: var(--state-confirmed); }
+
 /* Rapport */
+.rep-head { border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+.rep-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-faint); font-weight: 600; }
+.rep-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 5px 0; }
+.rep-risk { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.risk.big { font-family: var(--font-display); font-size: 22px; font-weight: 600; text-transform: capitalize; }
+.rep-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.rep-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.rep-stats .stat { flex: 1 1 120px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.rep-stats .stat b { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+.rep-stats .stat span { font-size: 12px; color: var(--fg-muted); }
+.sev-dist { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.sev-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-muted); }
+.owasp-cov { display: flex; gap: 6px; flex-wrap: wrap; }
+.rep-foot { margin-top: 8px; font-style: italic; }
+
+/* (ancien bloc rapport, conservé pour compat) */
 .report { display: flex; flex-direction: column; gap: 18px; }
 .cards { display: flex; gap: 12px; }
 .card { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
