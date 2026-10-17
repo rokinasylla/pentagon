@@ -31,7 +31,14 @@ button.primary {
   color: var(--accent-fg);
   border-color: transparent;
 }
-button.primary:hover { filter: brightness(1.05); }
+button.primary:hover { filter: brightness(1.08); }
+/* Action OFFENSIVE (exploitation) — sienne, par convention de la charte. */
+button.offensive {
+  background: var(--accent-offensive);
+  color: var(--accent-offensive-fg);
+  border-color: transparent;
+}
+button.offensive:hover { filter: brightness(1.06); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 input, textarea {
@@ -143,12 +150,8 @@ input:focus, textarea:focus {
 /* Fil : tons de message + défilement */
 .thread { display: flex; flex-direction: column; }
 .msg .body { white-space: pre-wrap; }
-.msg.warn .body { background: #fdeceb; color: var(--sev-critical); }
-.msg.good .body { background: #e8f4ed; color: var(--state-confirmed); }
-:root[data-theme="dark"] .msg.warn .body,
-:root:not([data-theme="light"]) .msg.warn .body { background: #3a1f1f; color: #f3b7b3; }
-:root[data-theme="dark"] .msg.good .body,
-:root:not([data-theme="light"]) .msg.good .body { background: #16301f; color: #7fd3a1; }
+.msg.warn .body { background: var(--tone-warn-bg); color: var(--tone-warn-fg); border: 1px solid var(--tone-warn-border); }
+.msg.good .body { background: var(--tone-good-bg); color: var(--tone-good-fg); border: 1px solid var(--tone-good-border); }
 
 /* Barre de commandes + autocomplétion */
 .cmdbar-wrap { position: relative; border-top: 1px solid var(--border); }

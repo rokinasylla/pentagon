@@ -34,7 +34,7 @@ export default function FindingCard({ finding, index, busy, onOpen, onConfirm })
           Détail
         </button>
         <button
-          className="primary sm"
+          className="offensive sm"
           onClick={() => onConfirm(finding)}
           disabled={busy || confirmed}
           title={confirmed ? "Déjà confirmée" : "Démontrer l'impact réel (non destructif)"}

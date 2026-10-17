@@ -77,7 +77,7 @@ export default function FindingDrawer({ finding, busy, onProve, onConfirm, onClo
             Re-prouver
           </button>
           <button
-            className="primary"
+            className="offensive"
             onClick={() => onConfirm(finding)}
             disabled={busy || confirmed}
             title={confirmed ? "Déjà confirmée" : "Démontrer l'impact réel (non destructif)"}

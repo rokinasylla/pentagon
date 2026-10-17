@@ -1,90 +1,120 @@
 /*
-  PENTAGON — jetons de design (base NEUTRE et SOBRE).
+  PENTAGON — jetons de design.
 
-  ┌─────────────────────────────────────────────────────────────────────────┐
-  │ IDENTITÉ VISUELLE — À REMPLACER PAR VOTRE CHARTE                          │
-  │ Ce fichier est volontairement neutre : une échelle de gris froids + un   │
-  │ unique accent sobre, une pile de polices système. Les ÉCRANS sont        │
-  │ structurellement fidèles à la maquette ; l'habillage (logo, palette,     │
-  │ typographie) se fait ICI, en redéfinissant ces variables — sans toucher  │
-  │ aux composants. Remplacez les valeurs ci-dessous par vos tokens.         │
-  └─────────────────────────────────────────────────────────────────────────┘
+  Palette REPRISE de la charte « Identité visuelle » des maquettes :
+    Papier #F4F3EE · Encre #141418 · Indigo‑ardoise #2E3A59 (autorité)
+    Sienne #B0541E (RÉSERVÉE à l'offensif : exploitation, état Confirmé)
+    Texte second. #595D67 · labels #6B6F79
+  Sévérités : Critique #6E1F2E · Élevée #B0541E · Moyenne #8A6A12 ·
+              Faible #3C6686 · Info #55596A
+
+  L'habillage se fait ICI : changez ces variables, pas les composants.
 */
 
 :root {
-  /* Neutres (gris légèrement froids, choisis délibérément) */
-  --bg: #f7f8fa;
+  /* Surfaces & neutres (clair — « Papier ») */
+  --bg: #f4f3ee;          /* Papier */
   --surface: #ffffff;
-  --surface-2: #f0f2f5;
-  --border: #dfe3e8;
-  --fg: #1a1d21;
-  --fg-muted: #5b6470;
-  --fg-faint: #8b94a0;
+  --surface-2: #faf9f5;
+  --border: #e4e2da;
+  --fg: #141418;          /* Encre */
+  --fg-muted: #595d67;    /* Texte secondaire */
+  --fg-faint: #6b6f79;    /* Labels / tertiaire */
 
-  /* Accent unique (sobre) — à remplacer par la couleur de marque */
-  --accent: #2f6f7e;
+  /* Accent d'autorité (primaire) — Indigo‑ardoise */
+  --accent: #2e3a59;
   --accent-fg: #ffffff;
-  --accent-weak: #e7f0f2;
+  --accent-weak: #eef3f7; /* teinte « Conforme » */
 
-  /* Sévérités (sémantique, réglables) */
-  --sev-critical: #9b2226;
-  --sev-high: #bb3e03;
-  --sev-medium: #ca6702;
-  --sev-low: #577590;
-  --sev-info: #6b7280;
+  /* Accent OFFENSIF — Sienne (exploitation, confirmation) */
+  --accent-offensive: #b0541e;
+  --accent-offensive-fg: #ffffff;
+  --accent-offensive-weak: #fbf0e8;
 
-  /* États de preuve */
-  --state-detected: #8b94a0;
-  --state-proven: #2f6f7e;
-  --state-confirmed: #2a7d4f;
+  /* Sévérités (teintes bleu ↔ orange de la charte) */
+  --sev-critical: #6e1f2e;
+  --sev-high: #b0541e;
+  --sev-medium: #8a6a12;
+  --sev-low: #3c6686;
+  --sev-info: #55596a;
 
-  /* Typographie — pile système (remplaçable par une police de marque) */
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas,
+  /* États de preuve : grise → indigo (autorité) → sienne (offensif) */
+  --state-detected: #6b6f79;
+  --state-proven: #2e3a59;
+  --state-confirmed: #b0541e;
+
+  /* Tons de message */
+  --tone-warn-bg: #f7eaec;  --tone-warn-fg: #6e1f2e;  --tone-warn-border: #e7c9ce;
+  --tone-good-bg: #fbf0e8;  --tone-good-fg: #b0541e;  --tone-good-border: #ecd9c9;
+
+  /* Typographie — pile système (la charte prévoit IBM Plex ; repli système ici) */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas,
     "Liberation Mono", monospace;
 
-  /* Rythme & formes */
-  --radius: 10px;
-  --radius-sm: 6px;
+  /* Rythme & formes (coins généreux comme la maquette) */
+  --radius: 14px;
+  --radius-sm: 9px;
   --gap: 16px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 2px 8px rgba(16, 24, 40, 0.04);
+  --shadow: 0 1px 2px rgba(20, 20, 24, 0.05), 0 6px 20px rgba(20, 20, 24, 0.05);
 
   color-scheme: light;
 }
 
+/* Adaptation sombre (même identité : encre profonde, indigo/sienne éclaircis) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1216;
-    --surface: #161a20;
-    --surface-2: #1d222a;
-    --border: #2a313b;
-    --fg: #e8ebef;
-    --fg-muted: #9aa4b1;
-    --fg-faint: #6b7480;
-    --accent: #5aa6b5;
-    --accent-fg: #0f1216;
-    --accent-weak: #16303540;
-    --state-detected: #6b7480;
-    --state-proven: #5aa6b5;
-    --state-confirmed: #4fb07a;
+    --bg: #141418;
+    --surface: #1c1f26;
+    --surface-2: #23262f;
+    --border: #2e333d;
+    --fg: #f4f3ee;
+    --fg-muted: #aeb0b6;
+    --fg-faint: #8d909a;
+    --accent: #8097c4;          /* indigo‑ardoise éclairci */
+    --accent-fg: #141418;
+    --accent-weak: #22304a;
+    --accent-offensive: #d2763c; /* sienne éclaircie */
+    --accent-offensive-fg: #141418;
+    --accent-offensive-weak: #3a2317;
+    --sev-critical: #d16a78;
+    --sev-high: #d2763c;
+    --sev-medium: #c6a24a;
+    --sev-low: #7fa6c6;
+    --sev-info: #9aa0ad;
+    --state-detected: #8d909a;
+    --state-proven: #8097c4;
+    --state-confirmed: #d2763c;
+    --tone-warn-bg: #3a1f23;  --tone-warn-fg: #e9b8bf;  --tone-warn-border: #51313a;
+    --tone-good-bg: #3a2317;  --tone-good-fg: #e6b48c;  --tone-good-border: #513726;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0f1216;
-  --surface: #161a20;
-  --surface-2: #1d222a;
-  --border: #2a313b;
-  --fg: #e8ebef;
-  --fg-muted: #9aa4b1;
-  --fg-faint: #6b7480;
-  --accent: #5aa6b5;
-  --accent-fg: #0f1216;
-  --accent-weak: #16303540;
-  --state-detected: #6b7480;
-  --state-proven: #5aa6b5;
-  --state-confirmed: #4fb07a;
+  --bg: #141418;
+  --surface: #1c1f26;
+  --surface-2: #23262f;
+  --border: #2e333d;
+  --fg: #f4f3ee;
+  --fg-muted: #aeb0b6;
+  --fg-faint: #8d909a;
+  --accent: #8097c4;
+  --accent-fg: #141418;
+  --accent-weak: #22304a;
+  --accent-offensive: #d2763c;
+  --accent-offensive-fg: #141418;
+  --accent-offensive-weak: #3a2317;
+  --sev-critical: #d16a78;
+  --sev-high: #d2763c;
+  --sev-medium: #c6a24a;
+  --sev-low: #7fa6c6;
+  --sev-info: #9aa0ad;
+  --state-detected: #8d909a;
+  --state-proven: #8097c4;
+  --state-confirmed: #d2763c;
+  --tone-warn-bg: #3a1f23;  --tone-warn-fg: #e9b8bf;  --tone-warn-border: #51313a;
+  --tone-good-bg: #3a2317;  --tone-good-fg: #e6b48c;  --tone-good-border: #513726;
   color-scheme: dark;
 }
