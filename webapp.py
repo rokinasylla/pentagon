@@ -1112,6 +1112,33 @@ def api_v1_findings(job_id: str):
     })
 
 
+@app.route("/api/v1/sessions/<job_id>/audit")
+def api_v1_audit(job_id: str):
+    """
+    Posture de durcissement du serveur (onglet Audit) : extraite de l'analyse
+    des en-têtes de sécurité de la campagne. Lecture seule, aucune action.
+    """
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    state = job.get("state") or {}
+    sh = (((state.get("web_app_result") or {}).get("raw_data") or {})
+          .get("security_headers") or {})
+    summary = job.get("summary") or {}
+    return jsonify({
+        "session_id": job_id,
+        "target": summary.get("target") or state.get("target", ""),
+        "overall_risk": summary.get("overall_risk", "unknown"),
+        "available": bool(sh),
+        "security_score": sh.get("security_score"),
+        "http_status": sh.get("http_status"),
+        "missing_headers": sh.get("missing_security_headers") or [],
+        "present_headers": sh.get("present_security_headers") or [],
+        "info_disclosure": sh.get("info_disclosure_headers") or [],
+        "cookie_issues": sh.get("cookie_issues") or [],
+    })
+
+
 @app.route("/api/v1/sessions/<job_id>/findings/<finding_id>/exploit",
            methods=["POST"])
 def api_v1_exploit(job_id: str, finding_id: str):

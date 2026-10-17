@@ -36,6 +36,8 @@ export const logout = () => request("/api/v1/logout", { method: "POST" });
 export const listSessions = () => request("/api/jobs");
 export const getFindings = (sessionId) =>
   request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/findings`);
+export const getAudit = (sessionId) =>
+  request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/audit`);
 
 // ─── Lot UI-2 (préparé, câblé plus tard dans l'UI) ───
 export const sendCommand = (sessionId, command) =>

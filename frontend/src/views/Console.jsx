@@ -5,6 +5,7 @@ import FindingCard from "../components/FindingCard.jsx";
 import FindingDrawer from "../components/FindingDrawer.jsx";
 import CommandBar from "../components/CommandBar.jsx";
 import Thread from "../components/Thread.jsx";
+import AuditView from "../components/AuditView.jsx";
 
 const PREPROMPTS = [
   "/exploit 1",
@@ -21,6 +22,7 @@ export default function Console({ user, onLogout }) {
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(null); // faille ouverte dans le drawer
+  const [tab, setTab] = useState("findings"); // onglet du canevas
 
   const pushMsg = (role, text, tone = "") =>
     setMessages((m) => [...m, { role, text, tone }]);
@@ -170,29 +172,53 @@ export default function Console({ user, onLogout }) {
           <CommandBar onSubmit={runCommand} busy={busy || !activeId} />
         </section>
 
-        {/* ─── CANEVAS ─── */}
+        {/* ─── CANEVAS (onglets) ─── */}
         <section className="pane canevas">
-          <div className="pane-head">
-            Findings {findings.length > 0 && `(${findings.length})`}
+          <div className="pane-head tabs" role="tablist">
+            <button
+              className={`tab ${tab === "findings" ? "on" : ""}`}
+              role="tab"
+              aria-selected={tab === "findings"}
+              onClick={() => setTab("findings")}
+            >
+              Findings {findings.length > 0 && <span className="tab-n">{findings.length}</span>}
+            </button>
+            <button
+              className={`tab ${tab === "audit" ? "on" : ""}`}
+              role="tab"
+              aria-selected={tab === "audit"}
+              onClick={() => setTab("audit")}
+            >
+              Audit
+            </button>
+            <button className="tab" role="tab" disabled title="À venir (UI-3)">
+              Rapport
+            </button>
           </div>
+
           <div className="pane-body">
-            {error && <div className="err">{error}</div>}
-            {loadingF && <div className="loading">Chargement des findings…</div>}
-            {!loadingF && !error && findings.length === 0 && (
-              <div className="empty">Aucune faille à afficher pour cette session.</div>
+            {tab === "findings" && (
+              <>
+                {error && <div className="err">{error}</div>}
+                {loadingF && <div className="loading">Chargement des findings…</div>}
+                {!loadingF && !error && findings.length === 0 && (
+                  <div className="empty">Aucune faille à afficher pour cette session.</div>
+                )}
+                <div className="findings">
+                  {findings.map((f, i) => (
+                    <FindingCard
+                      key={f.id}
+                      finding={f}
+                      index={i + 1}
+                      busy={busy}
+                      onOpen={setSelected}
+                      onConfirm={(fd) => exploit(fd, "confirm")}
+                    />
+                  ))}
+                </div>
+              </>
             )}
-            <div className="findings">
-              {findings.map((f, i) => (
-                <FindingCard
-                  key={f.id}
-                  finding={f}
-                  index={i + 1}
-                  busy={busy}
-                  onOpen={setSelected}
-                  onConfirm={(fd) => exploit(fd, "confirm")}
-                />
-              ))}
-            </div>
+            {tab === "audit" && <AuditView sessionId={activeId} />}
           </div>
         </section>
       </div>
