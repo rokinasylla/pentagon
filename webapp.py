@@ -962,6 +962,45 @@ def _session_findings(job: dict):
     return get_or_init_findings(RESULTS_DIR, job_id, job.get("summary"))
 
 
+def _bearer_fetch(url: str, token: str | None) -> dict:
+    """GET non destructif avec le token en Authorization (I/O de confirmation)."""
+    import requests
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    r = requests.get(url, headers=headers, timeout=15, allow_redirects=False)
+    return {"status": r.status_code, "body": (r.text or "")[:4000]}
+
+
+def _session_exploit_actions(job: dict, finding):
+    """
+    Registre d'actions pour l'exploitation à la demande : testeurs standard +
+    confirmations PAR CATÉGORIE (JWT forgé → lecture réelle, IDOR → lecture de
+    la ressource d'autrui), bâties depuis les données brutes de la campagne.
+    """
+    from pentagon.agents.exploitation_agent import ExploitationAgent
+    from pentagon.core.confirmation import (
+        build_confirmation_actions, merge_actions,
+    )
+    base = ExploitationAgent()._default_exploit_actions()
+
+    state = job.get("state") or {}
+    exp_raw = (state.get("exploitation_result") or {}).get("raw_data") or {}
+    token = ((exp_raw.get("auth_test") or {}).get("token")) or None
+    jwta = exp_raw.get("jwt_analysis") or {}
+
+    ctx: dict = {"fetch": _bearer_fetch}
+    if token and jwta.get("is_forgeable") and finding.affected_endpoint:
+        ctx["jwt"] = {
+            "token": token,
+            "protected_url": finding.affected_endpoint,
+            "secret": jwta.get("cracked_secret"),
+            "elevate": {"role": "admin"},
+        }
+    if finding.category == "idor" and finding.affected_endpoint:
+        ctx["idor"] = {"token": token, "victim_url": finding.affected_endpoint}
+
+    return merge_actions(base, build_confirmation_actions(ctx))
+
+
 def _exploit_on_session(job: dict, job_id: str, finding, mode: str) -> dict:
     """
     Exécute l'exploitation à la demande sur UN Finding de la session, persiste
@@ -973,7 +1012,8 @@ def _exploit_on_session(job: dict, job_id: str, finding, mode: str) -> dict:
     )
     agent = ExploitationAgent()  # client LLM paresseux : exploit() n'en a pas besoin
     roe_check = _roe_check_for_target(job.get("target", ""))
-    result = agent.exploit(finding, mode=mode, roe_check=roe_check)
+    actions = _session_exploit_actions(job, finding)
+    result = agent.exploit(finding, mode=mode, roe_check=roe_check, actions=actions)
 
     # Persiste l'état mis à jour du Finding (survit aux redémarrages).
     current = load_findings(RESULTS_DIR, job_id) or _session_findings(job)

