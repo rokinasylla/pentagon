@@ -47,11 +47,14 @@
   --tone-warn-bg: #f7eaec;  --tone-warn-fg: #6e1f2e;  --tone-warn-border: #e7c9ce;
   --tone-good-bg: #fbf0e8;  --tone-good-fg: #b0541e;  --tone-good-border: #ecd9c9;
 
-  /* Typographie — pile système (la charte prévoit IBM Plex ; repli système ici) */
+  /* Typographie de la charte — IBM Plex (chargée via Google Fonts) :
+     Sans = interface/corps, Mono = preuves/commandes/traces,
+     Serif = titres à gravité éditoriale. Repli système à chaque fois. */
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas,
     "Liberation Mono", monospace;
+  --font-display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
 
   /* Rythme & formes (coins généreux comme la maquette) */
   --radius: 14px;
