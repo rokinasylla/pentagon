@@ -1388,6 +1388,57 @@ def api_v1_exploit(job_id: str, finding_id: str):
     return jsonify(result), code
 
 
+@app.route("/api/v1/sessions/<job_id>/findings/<finding_id>/retest",
+           methods=["POST"])
+def api_v1_retest(job_id: str, finding_id: str):
+    """
+    Re-teste une faille (Lot UI-4) : rejoue la démonstration NON DESTRUCTIVE du
+    testeur pour vérifier si elle est TOUJOURS présente (ex. après correction).
+    Ajoute une évidence « retest » et renvoie still_vulnerable.
+    """
+    job = lookup_job(job_id)
+    if job is None:
+        abort(404)
+    job["_id"] = job_id
+    from pentagon.core.finding_store import (
+        find_by_id, load_findings, save_findings, replace_finding,
+    )
+    from pentagon.core.finding import roe_action_for
+
+    finding = find_by_id(_session_findings(job), finding_id)
+    if finding is None:
+        return jsonify({"error": "Faille introuvable dans cette session."}), 404
+
+    # Garde RoE (re-test = acte offensif borné), puis action standard du testeur.
+    roe_check = _roe_check_for_target(job.get("target", ""))
+    decision = roe_check(roe_action_for(finding.category),
+                         finding.affected_endpoint)
+    if not decision.get("allowed"):
+        return jsonify({"status": "denied", "finding": finding.to_dict(),
+                        "reason": decision.get("reason", "Action hors périmètre (RoE).")}), 403
+
+    actions = _session_exploit_actions(job, finding)
+    action = actions.get(finding.category)
+    if action is None:
+        return jsonify({"status": "unsupported", "finding": finding.to_dict(),
+                        "reason": f"Re-test non pris en charge pour la catégorie "
+                                  f"'{finding.category}'."})
+
+    outcome = action(finding, "prove", None) or {}
+    still = bool(outcome.get("proven"))
+    finding.add_evidence(
+        "retest", str(outcome.get("tool") or finding.category),
+        "Toujours vulnérable" if still else "Non reproduit (corrigé ?)")
+
+    current = load_findings(RESULTS_DIR, job_id) or _session_findings(job)
+    save_findings(RESULTS_DIR, job_id, replace_finding(current, finding))
+
+    return jsonify({"status": "ok", "still_vulnerable": still,
+                    "finding": finding.to_dict(),
+                    "reason": ("Faille toujours présente." if still
+                               else "Faille non reproduite — peut-être corrigée.")})
+
+
 # Réponses des actions de flux/gouvernance : reconnues par le dispatcher, mais
 # exécutées par d'autres surfaces (formulaire de mission, demande admin, annulation).
 def _directive(kind: str, message: str) -> dict:

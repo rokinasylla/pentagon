@@ -26,6 +26,7 @@ export default function Console({ user, onLogout }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(null); // faille ouverte dans le drawer
   const [tab, setTab] = useState("findings"); // onglet du canevas
+  const [busyFinding, setBusyFinding] = useState(""); // id de la faille en cours d'action
 
   const pushMsg = (role, text, tone = "") =>
     setMessages((m) => [...m, { role, text, tone }]);
@@ -104,7 +105,7 @@ export default function Console({ user, onLogout }) {
 
   // Exploitation à la demande d'une faille (prove|confirm) → POST /exploit.
   const exploit = async (finding, mode) => {
-    setBusy(true);
+    setBusyFinding(finding.id);
     pushMsg("user", `${mode === "confirm" ? "/confirm" : "/exploit"} ${finding.title}`);
     try {
       const res = await api.exploitFinding(activeId, finding.id, mode);
@@ -115,7 +116,23 @@ export default function Console({ user, onLogout }) {
       // 403 (hors RoE) ou autre : message propre.
       pushMsg("system", err.message || "Exploitation refusée.", "warn");
     } finally {
-      setBusy(false);
+      setBusyFinding("");
+    }
+  };
+
+  // Re-test ciblé d'une faille (UI-4) → POST /retest.
+  const retest = async (finding) => {
+    setBusyFinding(finding.id);
+    pushMsg("user", `/retest ${finding.title}`);
+    try {
+      const res = await api.retestFinding(activeId, finding.id);
+      if (res.finding) mergeFinding(res.finding);
+      pushMsg("assistant", res.reason || "Re-test effectué.",
+        res.still_vulnerable === false ? "good" : "");
+    } catch (err) {
+      pushMsg("system", err.message || "Re-test refusé.", "warn");
+    } finally {
+      setBusyFinding("");
     }
   };
 
@@ -137,11 +154,16 @@ export default function Console({ user, onLogout }) {
           </label>
           <select id="sess" value={activeId} onChange={(e) => setActiveId(e.target.value)}>
             {sessions.length === 0 && <option value="">Aucune campagne</option>}
-            {sessions.map((s) => (
-              <option key={s.job_id} value={s.job_id}>
-                {s.target || s.job_id} — {s.overall_risk}
-              </option>
-            ))}
+            {sessions.map((s) => {
+              const d = s.started_at ? s.started_at.slice(0, 10) : "";
+              return (
+                <option key={s.job_id} value={s.job_id}>
+                  {s.target || s.job_id} — {s.overall_risk}
+                  {` · ${s.proven_count ?? 0}P/${s.detected_count ?? 0}D`}
+                  {d && ` · ${d}`}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div className="who">
@@ -226,9 +248,10 @@ export default function Console({ user, onLogout }) {
                       key={f.id}
                       finding={f}
                       index={i + 1}
-                      busy={busy}
+                      acting={busyFinding === f.id}
                       onOpen={setSelected}
                       onConfirm={(fd) => exploit(fd, "confirm")}
+                      onRetest={retest}
                     />
                   ))}
                 </div>
@@ -242,9 +265,10 @@ export default function Console({ user, onLogout }) {
 
       <FindingDrawer
         finding={selected}
-        busy={busy}
+        busy={!!busyFinding}
         onProve={(f) => exploit(f, "prove")}
         onConfirm={(f) => exploit(f, "confirm")}
+        onRetest={retest}
         onClose={() => setSelected(null)}
       />
     </div>

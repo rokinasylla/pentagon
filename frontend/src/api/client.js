@@ -69,3 +69,10 @@ export const exploitFinding = (sessionId, findingId, mode) =>
     )}/exploit`,
     { method: "POST", body: { mode } }
   );
+export const retestFinding = (sessionId, findingId) =>
+  request(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/findings/${encodeURIComponent(
+      findingId
+    )}/retest`,
+    { method: "POST" }
+  );

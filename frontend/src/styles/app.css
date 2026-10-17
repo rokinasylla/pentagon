@@ -271,7 +271,19 @@ button.sm { padding: 6px 10px; font-size: 12.5px; }
   all: unset; cursor: pointer; display: block; flex: 1; min-width: 0;
 }
 .fc-title-btn:hover .fc-title { color: var(--accent); }
-.fc-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.fc-trackline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.retest-badge {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid transparent;
+}
+.retest-badge.ok { background: var(--tone-good-bg); color: var(--tone-good-fg); border-color: var(--tone-good-border); }
+.retest-badge.warn { background: var(--tone-warn-bg); color: var(--tone-warn-fg); border-color: var(--tone-warn-border); }
+.finding-card.acting { opacity: 0.75; }
+.fc-wait { font-size: 12px; color: var(--fg-faint); margin-right: auto; align-self: center; }
+button.ghost { background: transparent; border-color: var(--border); color: var(--fg-muted); }
+button.ghost:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
+
+.fc-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 button.link {
   all: unset; cursor: pointer; color: var(--fg-muted); font-size: 12.5px; padding: 6px 4px;
 }

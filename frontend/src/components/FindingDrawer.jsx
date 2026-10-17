@@ -5,7 +5,7 @@ const STAGE_LABEL = { detect: "Détection", prove: "Preuve", confirm: "Confirmat
 
 // Drawer de détail d'une faille : preuve technique + explication vulgarisée +
 // confiance + catégorie + historique d'évidence, et actions d'exploitation.
-export default function FindingDrawer({ finding, busy, onProve, onConfirm, onClose }) {
+export default function FindingDrawer({ finding, busy, onProve, onConfirm, onRetest, onClose }) {
   if (!finding) return null;
   const confirmed = finding.proof_state === "confirmed";
   const explain = CATEGORY_EXPLAIN[finding.category];
@@ -73,6 +73,9 @@ export default function FindingDrawer({ finding, busy, onProve, onConfirm, onClo
         </div>
 
         <div className="drawer-actions">
+          <button onClick={() => onRetest(finding)} disabled={busy}>
+            Re-tester
+          </button>
           <button onClick={() => onProve(finding)} disabled={busy}>
             Re-prouver
           </button>
