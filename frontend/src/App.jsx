@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import * as api from "./api/client.js";
 import Login from "./views/Login.jsx";
 import Console from "./views/Console.jsx";
+import Admin from "./views/Admin.jsx";
 
 // Racine : vérifie l'état de session (api/v1/me) puis route vers la connexion
 // ou la console. L'auth repose sur le cookie de session Flask.
@@ -15,7 +16,7 @@ export default function App() {
       setAuth({
         loading: false,
         user: data.authenticated
-          ? { operator: data.operator, role: data.role }
+          ? { operator: data.operator, role: data.role, sites: data.sites || [] }
           : null,
       });
     } catch {
@@ -50,6 +51,18 @@ export default function App() {
             <Console user={auth.user} onLogout={refresh} />
           ) : (
             <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          !auth.user ? (
+            <Navigate to="/login" replace />
+          ) : auth.user.role === "admin" ? (
+            <Admin user={auth.user} onLogout={refresh} />
+          ) : (
+            <Navigate to="/" replace />
           )
         }
       />

@@ -331,6 +331,38 @@ def check_admin_authorization(target: str) -> dict:
     }
 
 
+# ───────────── ACL : sites autorisés PAR OPÉRATEUR (Lot UI-5) ───────────────
+# En plus de la liste blanche GLOBALE de l'admin (roe_policy.json), chaque
+# opérateur simple peut être restreint à un SOUS-ENSEMBLE de sites. L'admin
+# reste non restreint. Les sites d'un opérateur vivent dans users.json
+# (champ "sites"). Deny-by-default : un opérateur sans site assigné ne peut
+# cibler aucune cible.
+
+def _target_host(target: str) -> str:
+    """Hôte nu d'une cible (sans schéma ni chemin), en minuscules."""
+    from urllib.parse import urlparse
+    t = (target or "").strip()
+    p = urlparse(t if "//" in t else f"//{t}", scheme="https")
+    return (p.netloc or p.path).split("/")[0].lower()
+
+
+def user_sites(username: str) -> list[str]:
+    """Sites autorisés d'un opérateur (liste de domaines), [] si aucun/absent."""
+    u = load_users().get(username) or {}
+    return [s for s in (u.get("sites") or []) if isinstance(s, str)]
+
+
+def operator_can_target(operator: str, role: str, target: str) -> bool:
+    """
+    Un admin cible librement (dans la limite de la liste blanche globale). Un
+    opérateur simple n'est autorisé que sur SES sites (deny-by-default).
+    """
+    if role == "admin":
+        return True
+    host = _target_host(target)
+    return any(_target_host(s) == host for s in user_sites(operator))
+
+
 def gate_request(target: str, actions: list[str]):
     """
     Applique la gouvernance admin à une requête (plan ou start).
@@ -343,6 +375,14 @@ def gate_request(target: str, actions: list[str]):
     admin = check_admin_authorization(target)
     if not admin["allowed"]:
         return None, (ADMIN_DENIED_MSG.format(t=target), 403)
+
+    # ACL par opérateur : un simple utilisateur est borné à ses sites autorisés.
+    operator = session.get("operator")
+    role = session.get("role", "user")
+    if not operator_can_target(operator, role, target):
+        return None, (
+            "⛔ Cette cible n'est pas dans vos sites autorisés. Demandez à un "
+            "administrateur de vous l'attribuer.", 403)
 
     # L'admin borne aussi le niveau : on garde l'intersection des catégories
     # choisies par l'utilisateur et de celles permises par l'admin.
@@ -704,7 +744,12 @@ def api_admin_users():
     if (username in users and users[username].get("role") == "admin"
             and role != "admin" and _admin_count(users) <= 1):
         return jsonify({"error": "Impossible de rétrograder le dernier admin."}), 400
-    users[username] = {"password_hash": generate_password_hash(password), "role": role}
+    users[username] = {
+        "password_hash": generate_password_hash(password),
+        "role": role,
+        # Préserve l'ACL de sites en cas de réinitialisation d'un compte existant.
+        "sites": (users.get(username) or {}).get("sites", []),
+    }
     save_users(users)
     return jsonify({"ok": True, "username": username, "role": role})
 
@@ -993,10 +1038,68 @@ def api_v1_login():
 def api_v1_me():
     """État de session courant (pour que le SPA sache s'il doit afficher le login)."""
     if session.get("operator"):
-        return jsonify({"authenticated": True,
-                        "operator": session.get("operator"),
-                        "role": session.get("role")})
+        op = session.get("operator")
+        role = session.get("role")
+        return jsonify({"authenticated": True, "operator": op, "role": role,
+                        # Sites autorisés de l'opérateur (vide pour un admin,
+                        # qui n'est pas restreint).
+                        "sites": [] if role == "admin" else user_sites(op)})
     return jsonify({"authenticated": False})
+
+
+@app.route("/api/v1/admin/users")
+def api_v1_admin_users():
+    """Liste des comptes avec rôle + sites autorisés, et la liste blanche globale."""
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    users = load_users()
+    whitelist = []
+    try:
+        from pentagon.core.roe_enforcer import RoEEnforcer
+        whitelist = RoEEnforcer().policy.get("authorized_targets", []) or []
+    except Exception:
+        whitelist = []
+    return jsonify({
+        "users": [
+            {"username": u, "role": users[u].get("role", "user"),
+             "sites": users[u].get("sites", []) or []}
+            for u in sorted(users)
+        ],
+        "whitelist": whitelist,
+    })
+
+
+@app.route("/api/v1/admin/users/<username>/sites", methods=["PUT"])
+def api_v1_admin_user_sites(username: str):
+    """Définit les sites autorisés d'un opérateur (sous-ensemble de la liste blanche)."""
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    users = load_users()
+    if username not in users:
+        return jsonify({"error": "Compte introuvable."}), 404
+    data = request.get_json(force=True, silent=True) or {}
+    requested = data.get("sites")
+    if not isinstance(requested, list):
+        return jsonify({"error": "Le champ 'sites' doit être une liste."}), 400
+
+    # Borne les sites à la liste blanche globale (on n'accorde jamais un site
+    # que l'admin n'a pas lui-même autorisé dans roe_policy.json).
+    try:
+        from pentagon.core.roe_enforcer import RoEEnforcer
+        whitelist = RoEEnforcer().policy.get("authorized_targets", []) or []
+    except Exception:
+        whitelist = []
+    wl_hosts = {_target_host(s) for s in whitelist}
+    sites = []
+    for s in requested:
+        if isinstance(s, str) and _target_host(s) in wl_hosts and s not in sites:
+            sites.append(s)
+
+    users[username]["sites"] = sites
+    save_users(users)
+    return jsonify({"ok": True, "username": username, "sites": sites})
 
 
 @app.route("/api/v1/logout", methods=["POST"])

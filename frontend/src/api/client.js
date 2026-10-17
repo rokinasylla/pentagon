@@ -48,6 +48,14 @@ export const generatePdf = (sessionId) =>
 export const downloadUrl = (sessionId, kind) =>
   `/api/download/${encodeURIComponent(sessionId)}/${kind}`;
 
+// ─── Administration (Lot UI-5) — admin only ───
+export const adminListUsers = () => request("/api/v1/admin/users");
+export const adminSetUserSites = (username, sites) =>
+  request(`/api/v1/admin/users/${encodeURIComponent(username)}/sites`, {
+    method: "PUT",
+    body: { sites },
+  });
+
 // ─── Lot UI-2 (préparé, câblé plus tard dans l'UI) ───
 export const sendCommand = (sessionId, command) =>
   request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/command`, {

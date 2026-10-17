@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import * as api from "../api/client.js";
 import Brand from "../components/Brand.jsx";
 import FindingCard from "../components/FindingCard.jsx";
@@ -15,6 +16,7 @@ const PREPROMPTS = [
 ];
 
 export default function Console({ user, onLogout }) {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [findings, setFindings] = useState([]);
@@ -143,6 +145,14 @@ export default function Console({ user, onLogout }) {
           </select>
         </div>
         <div className="who">
+          {user.role !== "admin" && (
+            <span className="sites-chip" title="Vos sites autorisés">
+              {(user.sites || []).length} site{(user.sites || []).length > 1 ? "s" : ""} autorisé{(user.sites || []).length > 1 ? "s" : ""}
+            </span>
+          )}
+          {user.role === "admin" && (
+            <button onClick={() => navigate("/admin")}>Administration</button>
+          )}
           <span>
             {user.operator} ({user.role})
           </span>
