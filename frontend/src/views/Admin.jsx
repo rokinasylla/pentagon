@@ -6,24 +6,22 @@ const SECTIONS = [
   { id: "account", label: "Mon compte" },
   { id: "users", label: "Utilisateurs" },
   { id: "sites", label: "Sites autorisés" },
-  { id: "roles", label: "Rôles & accès" },
-  { id: "prefs", label: "Préférences" },
 ];
 
 export default function Admin({ user, onLogout }) {
   const [sec, setSec] = useState("users");
   const [users, setUsers] = useState([]);
-  const [whitelist, setWhitelist] = useState([]);
+  const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [savingFor, setSavingFor] = useState("");
-  const [nu, setNu] = useState({ username: "", password: "", role: "user", sites: [] });
+  const [nu, setNu] = useState({ username: "", password: "", role: "user" });
+  const [newSite, setNewSite] = useState("");
 
   const load = () => {
     setLoading(true);
-    api.adminListUsers()
-      .then((d) => { setUsers(d.users || []); setWhitelist(d.whitelist || []); })
+    Promise.all([api.adminListUsers(), api.adminListSites()])
+      .then(([u, s]) => { setUsers(u.users || []); setSites(s.sites || []); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -38,21 +36,15 @@ export default function Admin({ user, onLogout }) {
   const createUser = async (e) => {
     e.preventDefault();
     const u = nu.username.trim();
-    await act(async () => {
-      await api.adminCreateUser(u, nu.password, nu.role);
-      if (nu.role !== "admin" && nu.sites.length)
-        await api.adminSetUserSites(u, nu.sites);
-    }, `Compte « ${u} » créé.`);
-    setNu({ username: "", password: "", role: "user", sites: [] });
+    await act(() => api.adminCreateUser(u, nu.password, nu.role), `Compte « ${u} » créé.`);
+    setNu({ username: "", password: "", role: "user" });
   };
 
-  const toggleSite = async (usr, site) => {
-    const next = usr.sites.includes(site) ? usr.sites.filter((s) => s !== site) : [...usr.sites, site];
-    setSavingFor(usr.username); setError("");
-    try {
-      const r = await api.adminSetUserSites(usr.username, next);
-      setUsers((list) => list.map((x) => (x.username === usr.username ? { ...x, sites: r.sites } : x)));
-    } catch (e) { setError(e.message); } finally { setSavingFor(""); }
+  const addSite = async (e) => {
+    e.preventDefault();
+    const s = newSite.trim();
+    await act(() => api.adminAddSite(s), `Site « ${s} » autorisé.`);
+    setNewSite("");
   };
 
   const initials = (n) => (n || "?").slice(0, 2).toUpperCase();
@@ -63,7 +55,6 @@ export default function Admin({ user, onLogout }) {
 
       <main className="page-main">
         <div className="settings">
-          {/* Sous-nav réglages */}
           <aside className="set-nav">
             <div className="set-eyebrow">Réglages</div>
             {SECTIONS.map((s) => (
@@ -85,17 +76,18 @@ export default function Admin({ user, onLogout }) {
                   <span className="acct-avatar">{initials(user.operator)}</span>
                   <div>
                     <div className="acct-name">{user.operator}</div>
-                    <div className="fc-meta">{user.role === "admin" ? "Administrateur" : "Opérateur"}</div>
+                    <div className="fc-meta">Administrateur</div>
                   </div>
                 </div>
                 <p className="fc-meta" style={{ marginTop: 14 }}>
-                  Modèle d'accès : seul l'administrateur autorise les cibles et crée les
-                  comptes. Chaque opérateur ne voit que les sites qui lui sont attribués.
+                  Modèle d'accès : l'administrateur gère les comptes et la liste des
+                  sites autorisés, indépendamment l'un de l'autre. Un opérateur peut
+                  lancer une campagne sur tout site autorisé ; sinon, c'est bloqué.
                 </p>
               </section>
             )}
 
-            {/* ─── Utilisateurs ─── */}
+            {/* ─── Utilisateurs (comptes seulement) ─── */}
             {sec === "users" && (
               <>
                 <section className="fcard">
@@ -105,19 +97,14 @@ export default function Admin({ user, onLogout }) {
                   </div>
                   {loading && <div className="loading">Chargement…</div>}
                   <div className="utable">
-                    <div className="ut-head"><span>Utilisateur</span><span>Rôle</span><span>Sites attribués</span><span></span></div>
+                    <div className="ut-head"><span>Utilisateur</span><span>Rôle</span><span></span></div>
                     {users.map((u) => (
-                      <div key={u.username} className="ut-row">
+                      <div key={u.username} className="ut-row simple3">
                         <span className="ut-user">
                           <span className="ut-avatar">{initials(u.username)}</span>
                           <span>{u.username}{u.username === user.operator && <span className="fc-meta"> · vous</span>}</span>
                         </span>
                         <span><span className={`role-badge ${u.role}`}>{u.role}</span></span>
-                        <span className="ut-sites">
-                          {u.role === "admin" ? <span className="fc-meta">tous (non restreint)</span>
-                            : u.sites.length ? u.sites.map((s) => <span key={s} className="cat">{s}</span>)
-                            : <span className="fc-meta">aucun</span>}
-                        </span>
                         <span className="ut-ops">
                           <button className="ghost sm" onClick={() => act(() => api.adminSetUserRole(u.username, u.role === "admin" ? "user" : "admin"), "Rôle mis à jour.")}>
                             {u.role === "admin" ? "Rétrograder" : "Promouvoir"}
@@ -127,20 +114,6 @@ export default function Admin({ user, onLogout }) {
                             Supprimer
                           </button>
                         </span>
-                        {u.role !== "admin" && whitelist.length > 0 && (
-                          <div className="ut-acl">
-                            <span className="fc-meta">Sites autorisés :</span>
-                            <div className="site-checks">
-                              {whitelist.map((site) => (
-                                <label key={site} className="site-check">
-                                  <input type="checkbox" checked={u.sites.includes(site)}
-                                    disabled={savingFor === u.username} onChange={() => toggleSite(u, site)} />
-                                  <span>{site}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -148,7 +121,9 @@ export default function Admin({ user, onLogout }) {
 
                 <form className="fcard" onSubmit={createUser}>
                   <h2 className="set-h2">Nouvel utilisateur</h2>
-                  <p className="fc-meta" style={{ marginBottom: 14 }}>L'accès sera limité aux sites cochés.</p>
+                  <p className="fc-meta" style={{ marginBottom: 14 }}>
+                    Le compte pourra lancer des campagnes sur les sites autorisés.
+                  </p>
                   <div className="new-user">
                     <input placeholder="Identifiant" value={nu.username} onChange={(e) => setNu({ ...nu, username: e.target.value })} autoComplete="off" />
                     <input type="password" placeholder="Mot de passe (min. 6)" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} autoComplete="new-password" />
@@ -158,91 +133,51 @@ export default function Admin({ user, onLogout }) {
                     </select>
                     <button className="primary" type="submit" disabled={!nu.username.trim() || nu.password.length < 6}>Créer</button>
                   </div>
-                  {nu.role !== "admin" && whitelist.length > 0 && (
-                    <>
-                      <div className="fld-label" style={{ marginTop: 14 }}>Sites autorisés pour ce compte</div>
-                      <div className="site-checks">
-                        {whitelist.map((site) => (
-                          <label key={site} className="site-check">
-                            <input type="checkbox" checked={nu.sites.includes(site)}
-                              onChange={() => setNu((n) => ({ ...n, sites: n.sites.includes(site) ? n.sites.filter((x) => x !== site) : [...n.sites, site] }))} />
-                            <span>{site}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </>
-                  )}
                 </form>
               </>
             )}
 
-            {/* ─── Sites autorisés ─── */}
+            {/* ─── Sites autorisés (liste globale) ─── */}
             {sec === "sites" && (
-              <section className="fcard">
-                <div className="set-h-row">
-                  <h2 className="set-h2">Sites autorisés</h2>
-                  <span className="fc-meta">{whitelist.length} autorisé{whitelist.length > 1 ? "s" : ""}</span>
-                </div>
-                <p className="fc-meta" style={{ marginBottom: 14 }}>
-                  Liste blanche globale (roe_policy.json). Un opérateur ne peut tester
-                  qu'un site qui y figure ET qui lui est attribué.
-                </p>
-                <div className="utable">
-                  <div className="ut-head"><span>Domaine</span><span>Opérateurs assignés</span></div>
-                  {whitelist.length === 0 && <div className="fc-meta" style={{ padding: 12 }}>Aucun site dans la liste blanche.</div>}
-                  {whitelist.map((site) => {
-                    const ops = users.filter((u) => u.role !== "admin" && u.sites.includes(site)).map((u) => u.username);
-                    return (
-                      <div key={site} className="ut-row simple">
-                        <span className="mono">{site}</span>
-                        <span className="ut-sites">
-                          {ops.length ? ops.map((o) => <span key={o} className="cat">{o}</span>) : <span className="fc-meta">aucun</span>}
+              <>
+                <section className="fcard">
+                  <div className="set-h-row">
+                    <h2 className="set-h2">Sites autorisés</h2>
+                    <span className="fc-meta">{sites.length} autorisé{sites.length > 1 ? "s" : ""}</span>
+                  </div>
+                  <p className="fc-meta" style={{ marginBottom: 14 }}>
+                    Liste blanche globale. Tout opérateur peut lancer une campagne sur
+                    un site qui y figure ; tout autre site est bloqué.
+                  </p>
+                  {loading && <div className="loading">Chargement…</div>}
+                  <div className="utable">
+                    {sites.length === 0 && <div className="fc-meta" style={{ padding: 12 }}>Aucun site autorisé pour l'instant.</div>}
+                    {sites.map((s) => (
+                      <div key={s} className="ut-row simple">
+                        <span className="mono">{s}</span>
+                        <span className="ut-ops">
+                          <button className="ghost sm danger"
+                            onClick={() => { if (confirm(`Retirer « ${s} » des sites autorisés ?`)) act(() => api.adminRemoveSite(s), "Site retiré."); }}>
+                            Retirer
+                          </button>
                         </span>
                       </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+                    ))}
+                  </div>
+                </section>
 
-            {/* ─── Rôles & accès (informatif) ─── */}
-            {sec === "roles" && (
-              <section className="fcard">
-                <h2 className="set-h2">Rôles & accès</h2>
-                <p className="fc-meta" style={{ marginBottom: 14 }}>
-                  Séparation stricte des privilèges. Deux rôles : l'administrateur
-                  gouverne, l'opérateur mène les campagnes dans les limites fixées.
-                </p>
-                <div className="utable">
-                  <div className="ut-head"><span>Capacité</span><span>Administrateur</span><span>Opérateur</span></div>
-                  {[
-                    ["Créer / supprimer des comptes", "✓", "—"],
-                    ["Autoriser des sites (liste blanche)", "✓", "—"],
-                    ["Attribuer des sites à un opérateur", "✓", "—"],
-                    ["Lancer des campagnes", "✓", "sur ses sites"],
-                    ["Exploiter / confirmer à la demande", "✓", "sur ses sites"],
-                  ].map((r) => (
-                    <div key={r[0]} className="ut-row simple three">
-                      <span>{r[0]}</span><span className="fc-meta">{r[1]}</span><span className="fc-meta">{r[2]}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* ─── Préférences (informatif) ─── */}
-            {sec === "prefs" && (
-              <section className="fcard">
-                <h2 className="set-h2">Préférences</h2>
-                <ul className="pref-list">
-                  <li><strong>Expiration par inactivité</strong><span className="fc-meta"> · déconnexion automatique (30 min par défaut).</span></li>
-                  <li><strong>Un seul travail offensif actif par session</strong><span className="fc-meta"> · évite les actions concurrentes.</span></li>
-                  <li><strong>Périmètre fermé par défaut</strong><span className="fc-meta"> · l'exploitation reste décochée au départ d'une mission.</span></li>
-                  <li><strong>Vulgarisation</strong><span className="fc-meta"> · chaque faille est accompagnée d'une explication en clair.</span></li>
-                  <li><strong>Rétention</strong><span className="fc-meta"> · les campagnes sont persistées sur disque et rechargées au démarrage.</span></li>
-                </ul>
-                <p className="fc-meta">Ces réglages reflètent la politique en vigueur côté serveur.</p>
-              </section>
+                <form className="fcard" onSubmit={addSite}>
+                  <h2 className="set-h2">Autoriser un site</h2>
+                  <p className="fc-meta" style={{ marginBottom: 14 }}>
+                    En autorisant, vous attestez disposer du droit légal de faire tester cette cible.
+                  </p>
+                  <div className="add-site">
+                    <input placeholder="domaine ou URL (ex. exemple.com)" value={newSite}
+                      onChange={(e) => setNewSite(e.target.value)} autoComplete="off" />
+                    <button className="primary" type="submit" disabled={!newSite.trim()}>Autoriser le site</button>
+                  </div>
+                </form>
+              </>
             )}
           </div>
         </div>

@@ -71,6 +71,12 @@ export const adminSetUserRole = (username, role) =>
   request("/api/admin/users", { method: "PATCH", body: { username, role } });
 export const adminDeleteUser = (username) =>
   request("/api/admin/users", { method: "DELETE", body: { username } });
+// Sites autorisés (liste globale, découplée des comptes).
+export const adminListSites = () => request("/api/v1/admin/sites");
+export const adminAddSite = (site) =>
+  request("/api/v1/admin/sites", { method: "POST", body: { site } });
+export const adminRemoveSite = (site) =>
+  request("/api/v1/admin/sites", { method: "DELETE", body: { site } });
 
 // ─── Lot UI-2 (préparé, câblé plus tard dans l'UI) ───
 export const sendCommand = (sessionId, command) =>

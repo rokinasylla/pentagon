@@ -498,6 +498,24 @@ button.danger:hover:not(:disabled) { border-color: var(--sev-critical); }
 .tracker .sep { flex: 0 0 18px; height: 1px; background: var(--border); }
 
 .empty { color: var(--fg-muted); text-align: center; padding: 40px 16px; }
+
+/* État d'accueil (console vide) */
+.welcome { text-align: center; padding: 48px 20px; max-width: 420px; margin: 0 auto; }
+.welcome-mark { font-size: 30px; color: var(--accent); opacity: 0.55; }
+.welcome h3 { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 10px 0 6px; }
+.welcome p { color: var(--fg-muted); font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+.welcome-hint { font-size: 12.5px; color: var(--fg-faint); margin-top: 14px; }
+
+/* Retour d'action sur la carte de faille */
+.fc-result { margin-top: 10px; font-size: 12.5px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--fg-muted); border: 1px solid var(--border); }
+.fc-result.good { background: var(--tone-good-bg); color: var(--tone-good-fg); border-color: var(--tone-good-border); }
+.fc-result.warn { background: var(--tone-warn-bg); color: var(--tone-warn-fg); border-color: var(--tone-warn-border); }
+
+/* Admin : autoriser un site, table comptes */
+.add-site { display: flex; gap: 10px; flex-wrap: wrap; }
+.add-site input { flex: 1; min-width: 180px; }
+.ut-row.simple3 { grid-template-columns: 1.6fr 0.9fr auto; }
+@media (max-width: 760px) { .ut-row.simple3 { grid-template-columns: 1fr; } }
 .loading { color: var(--fg-muted); padding: 16px; }
 
 .cat { font-size: 11px; color: var(--accent); background: var(--accent-weak); padding: 2px 7px; border-radius: 999px; }

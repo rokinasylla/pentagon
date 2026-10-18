@@ -28,6 +28,7 @@ export default function Console({ user, onLogout }) {
   const [selected, setSelected] = useState(null); // faille ouverte dans le drawer
   const [tab, setTab] = useState("findings"); // onglet du canevas
   const [busyFinding, setBusyFinding] = useState(""); // id de la faille en cours d'action
+  const [cardMsg, setCardMsg] = useState({}); // retour par carte {id: {text, tone}}
 
   const pushMsg = (role, text, tone = "") =>
     setMessages((m) => [...m, { role, text, tone }]);
@@ -37,10 +38,9 @@ export default function Console({ user, onLogout }) {
     (async () => {
       try {
         const data = await api.listSessions();
-        const jobs = data.jobs || [];
-        setSessions(jobs);
-        const first = jobs.find((j) => j.has_summary) || jobs[0];
-        if (first) setActiveId(first.job_id);
+        // On NE sélectionne AUCUNE campagne d'office : un nouvel utilisateur
+        // (ou sans campagne) voit une console vide, pas les failles d'autrui.
+        setSessions(data.jobs || []);
       } catch (err) {
         setError(err.message);
       }
@@ -116,17 +116,25 @@ export default function Console({ user, onLogout }) {
   };
 
   // Exploitation à la demande d'une faille (prove|confirm) → POST /exploit.
+  const setMsgFor = (id, text, tone = "") =>
+    setCardMsg((m) => ({ ...m, [id]: { text, tone } }));
+
   const exploit = async (finding, mode) => {
     setBusyFinding(finding.id);
+    setMsgFor(finding.id, "Exploitation en cours…", "");
     pushMsg("user", `${mode === "confirm" ? "/confirm" : "/exploit"} ${finding.title}`);
     try {
       const res = await api.exploitFinding(activeId, finding.id, mode);
       if (res.finding) mergeFinding(res.finding);
-      pushMsg("assistant", res.reason || `Faille ${res.status}.`,
-        res.status === "confirmed" ? "good" : "");
+      const good = res.status === "confirmed" || res.status === "proven";
+      pushMsg("assistant", res.reason || `Faille ${res.status}.`, good ? "good" : "warn");
+      setMsgFor(finding.id, res.reason || `Résultat : ${res.status}.`, good ? "good" : "warn");
     } catch (err) {
-      // 403 (hors RoE) ou autre : message propre.
-      pushMsg("system", err.message || "Exploitation refusée.", "warn");
+      const text = err.status === 403
+        ? "Bloqué : ce site n'est pas autorisé (hors périmètre RoE)."
+        : (err.message || "Exploitation refusée.");
+      pushMsg("system", text, "warn");
+      setMsgFor(finding.id, text, "warn");
     } finally {
       setBusyFinding("");
     }
@@ -135,14 +143,20 @@ export default function Console({ user, onLogout }) {
   // Re-test ciblé d'une faille (UI-4) → POST /retest.
   const retest = async (finding) => {
     setBusyFinding(finding.id);
+    setMsgFor(finding.id, "Re-test en cours…", "");
     pushMsg("user", `/retest ${finding.title}`);
     try {
       const res = await api.retestFinding(activeId, finding.id);
       if (res.finding) mergeFinding(res.finding);
-      pushMsg("assistant", res.reason || "Re-test effectué.",
-        res.still_vulnerable === false ? "good" : "");
+      const tone = res.still_vulnerable === false ? "good" : "warn";
+      pushMsg("assistant", res.reason || "Re-test effectué.", tone);
+      setMsgFor(finding.id, res.reason || "Re-test effectué.", tone);
     } catch (err) {
-      pushMsg("system", err.message || "Re-test refusé.", "warn");
+      const text = err.status === 403
+        ? "Bloqué : ce site n'est pas autorisé (hors périmètre RoE)."
+        : (err.message || "Re-test refusé.");
+      pushMsg("system", text, "warn");
+      setMsgFor(finding.id, text, "warn");
     } finally {
       setBusyFinding("");
     }
@@ -176,7 +190,9 @@ export default function Console({ user, onLogout }) {
                   onChange={(e) => setActiveId(e.target.value)}
                   aria-label="Changer de session"
                 >
-                  {sessions.length === 0 && <option value="">Aucune campagne</option>}
+                  <option value="">
+                    {sessions.length === 0 ? "Aucune campagne" : "— choisir une campagne —"}
+                  </option>
                   {sessions.map((s) => {
                     const d = s.started_at ? s.started_at.slice(0, 10) : "";
                     return (
@@ -258,8 +274,26 @@ export default function Console({ user, onLogout }) {
             {tab === "findings" && (
               <>
                 {error && <div className="err">{error}</div>}
+                {!activeId && !loadingF && (
+                  <div className="welcome">
+                    <div className="welcome-mark">◆</div>
+                    <h3>Aucune campagne ouverte</h3>
+                    <p>
+                      Lancez une mission pour découvrir les vulnérabilités de votre
+                      site. Les failles trouvées s'afficheront ici.
+                    </p>
+                    <button className="primary" onClick={() => navigate("/mission")}>
+                      + Nouvelle mission
+                    </button>
+                    {sessions.length > 0 && (
+                      <p className="welcome-hint">
+                        …ou choisissez une campagne passée dans le sélecteur ci-dessus.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {loadingF && <div className="loading">Chargement des findings…</div>}
-                {!loadingF && !error && findings.length === 0 && (
+                {activeId && !loadingF && !error && findings.length === 0 && (
                   <div className="empty">Aucune faille à afficher pour cette session.</div>
                 )}
                 <div className="findings">
@@ -269,6 +303,7 @@ export default function Console({ user, onLogout }) {
                       finding={f}
                       index={i + 1}
                       acting={busyFinding === f.id}
+                      msg={cardMsg[f.id]}
                       onOpen={setSelected}
                       onProve={(fd) => exploit(fd, "prove")}
                       onConfirm={(fd) => exploit(fd, "confirm")}

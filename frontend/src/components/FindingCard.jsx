@@ -23,7 +23,7 @@ function traceResponse(finding) {
 
 // Carte de faille fidèle à la maquette : trace requête→réponse, tracker et
 // actions qui changent selon l'état (Détecté / Prouvé / Confirmé).
-export default function FindingCard({ finding, index, acting, onOpen, onProve, onConfirm, onDismiss }) {
+export default function FindingCard({ finding, index, acting, msg, onOpen, onProve, onConfirm, onDismiss }) {
   const sev = SEV.includes(finding.severity) ? finding.severity : "info";
   const state = finding.proof_state;
   const rt = lastRetest(finding);
@@ -104,6 +104,8 @@ export default function FindingCard({ finding, index, acting, onOpen, onProve, o
       {state === "proven" && (
         <div className="fc-note">action offensive · non destructive · bornée à la preuve</div>
       )}
+
+      {msg && <div className={`fc-result ${msg.tone}`}>{msg.text}</div>}
     </article>
   );
 }

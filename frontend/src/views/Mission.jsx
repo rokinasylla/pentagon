@@ -30,7 +30,8 @@ export default function Mission({ user, onLogout }) {
   useEffect(() => {
     api.getCatalog().then((c) => {
       setCatalog(c);
-      if (c.targets?.length) setTarget(c.targets[0]);
+      // Cible en SAISIE LIBRE : on ne préremplit pas, les sites autorisés sont
+      // de simples suggestions d'autocomplétion.
       setCats((c.categories || []).map((x) => x.id));
       if (c.engines?.length) setEngine(c.engines.includes("seq") ? "seq" : c.engines[0]);
     }).catch((e) => setError(e.message));
@@ -59,10 +60,14 @@ export default function Mission({ user, onLogout }) {
         } catch { /* keepalive */ }
       };
       es.onerror = () => { es.close(); setStatus((s) => (s === "running" ? "error" : s)); };
-    } catch (e) { setStatus(""); setError(e.message); }
+    } catch (e) {
+      setStatus("");
+      setError(e.status === 403
+        ? `⛔ Le site « ${target} » n'est pas autorisé. Demandez à un administrateur de l'ajouter aux sites autorisés.`
+        : e.message);
+    }
   };
 
-  const noTargets = catalog && (catalog.targets || []).length === 0;
   const running = status === "running";
 
   return (
@@ -80,26 +85,28 @@ export default function Mission({ user, onLogout }) {
 
           {error && <div className="err">{error}</div>}
 
-          {noTargets ? (
-            <div className="empty">
-              Aucun site ne vous est autorisé. Demandez à un administrateur de vous
-              attribuer un site dans l'espace d'administration.
-            </div>
-          ) : catalog ? (
+          {catalog ? (
             <div className="mform">
-              {/* 1 · Cible */}
+              {/* 1 · Cible (saisie libre) */}
               <section className="fcard">
                 <div className="fcard-h"><span className="step-n">1</span><h2>Cible</h2></div>
-                <label className="fld-label">URL ou domaine à tester</label>
+                <label className="fld-label" htmlFor="mtarget">URL ou domaine à tester</label>
                 <div className="fld mono">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
                     <path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" stroke="currentColor" strokeWidth="1.6" />
                   </svg>
-                  <select value={target} onChange={(e) => setTarget(e.target.value)} disabled={running}>
-                    {catalog.targets.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  <input id="mtarget" list="site-suggest" value={target}
+                    onChange={(e) => setTarget(e.target.value)} disabled={running}
+                    placeholder="exemple.com" autoComplete="off" />
+                  <datalist id="site-suggest">
+                    {(catalog.suggestions || []).map((t) => <option key={t} value={t} />)}
+                  </datalist>
                 </div>
+                <p className="fc-meta" style={{ marginTop: 8 }}>
+                  Saisissez n'importe quel site. Si le site n'est pas autorisé, la
+                  campagne sera bloquée — demandez son autorisation à l'administrateur.
+                </p>
               </section>
 
               {/* 2 · RoE */}

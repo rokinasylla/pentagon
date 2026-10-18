@@ -372,17 +372,13 @@ def gate_request(target: str, actions: list[str]):
         (message, code_http) à renvoyer tel quel ; sinon effective_actions est
         la liste des catégories effectivement permises (bornée par l'admin).
     """
+    # Modèle « sites globaux » : la cible doit figurer dans la liste blanche
+    # GLOBALE autorisée par l'administrateur (comptes et sites découplés). Tout
+    # utilisateur authentifié peut lancer une campagne sur un site autorisé ;
+    # sinon l'action est bloquée (« site non autorisé »).
     admin = check_admin_authorization(target)
     if not admin["allowed"]:
         return None, (ADMIN_DENIED_MSG.format(t=target), 403)
-
-    # ACL par opérateur : un simple utilisateur est borné à ses sites autorisés.
-    operator = session.get("operator")
-    role = session.get("role", "user")
-    if not operator_can_target(operator, role, target):
-        return None, (
-            "⛔ Cette cible n'est pas dans vos sites autorisés. Demandez à un "
-            "administrateur de vous l'attribuer.", 403)
 
     # L'admin borne aussi le niveau : on garde l'intersection des catégories
     # choisies par l'utilisateur et de celles permises par l'admin.
@@ -892,9 +888,15 @@ def api_jobs():
     campagne. Trié du plus récent au plus ancien.
     """
     sync_persisted_jobs()  # intègre les campagnes terminées trouvées sur disque
+    # Chaque opérateur ne voit QUE ses propres campagnes ; l'admin voit tout.
+    # Un nouvel utilisateur (aucune campagne) a donc une console VIDE.
+    me = session.get("operator")
+    is_admin = session.get("role") == "admin"
     with _JOBS_LOCK:
         items = []
         for jid, j in JOBS.items():
+            if not is_admin and (j.get("operator") or "") != me:
+                continue
             s = j.get("summary") or {}
             items.append({
                 "job_id": jid,
@@ -1070,6 +1072,41 @@ def api_v1_admin_users():
     })
 
 
+@app.route("/api/v1/admin/sites", methods=["GET", "POST", "DELETE"])
+def api_v1_admin_sites():
+    """
+    Liste blanche GLOBALE des sites autorisés (découplée des comptes) :
+    GET liste, POST autorise un site, DELETE le retire. Admin only.
+    """
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    try:
+        p = load_policy()
+    except Exception as e:
+        return jsonify({"error": f"Politique illisible : {e}"}), 500
+    sites = p.setdefault("authorized_targets", [])
+
+    if request.method == "GET":
+        return jsonify({"sites": sites})
+
+    data = request.get_json(force=True, silent=True) or {}
+    site = (data.get("site") or data.get("target") or "").strip()
+    if not site:
+        return jsonify({"error": "Domaine requis."}), 400
+
+    if request.method == "POST":
+        if site not in sites:
+            sites.append(site)
+    else:  # DELETE
+        p["authorized_targets"] = [s for s in sites if s != site]
+    try:
+        save_policy(p)
+    except Exception as e:
+        return jsonify({"error": f"Écriture impossible : {e}"}), 500
+    return jsonify({"sites": p.get("authorized_targets", [])})
+
+
 @app.route("/api/v1/admin/users/<username>/sites", methods=["PUT"])
 def api_v1_admin_user_sites(username: str):
     """Définit les sites autorisés d'un opérateur (sous-ensemble de la liste blanche)."""
@@ -1225,7 +1262,6 @@ def api_v1_catalog():
     - catégories RoE proposables (bornées par celles que l'admin autorise) ;
     - moteurs d'orchestration disponibles.
     """
-    operator = session.get("operator")
     role = session.get("role", "user")
     whitelist, admin_cats = [], []
     try:
@@ -1235,12 +1271,14 @@ def api_v1_catalog():
         admin_cats = pol.get("authorized_action_categories", []) or []
     except Exception:
         pass
-    targets = whitelist if role == "admin" else user_sites(operator)
     cats = [{"id": c, "label": CATEGORY_LABELS.get(c, c)}
             for c in SELECTABLE_CATEGORIES if c in admin_cats]
+    # `suggestions` = sites autorisés (liste globale), proposés en autocomplétion ;
+    # la cible reste en SAISIE LIBRE et le garde-fou bloque à l'exécution si le
+    # site n'est pas autorisé.
     return jsonify({
         "role": role,
-        "targets": targets,
+        "suggestions": whitelist,
         "categories": cats,
         "engines": sorted(SELECTABLE_ENGINES),
     })
