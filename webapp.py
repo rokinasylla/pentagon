@@ -1204,6 +1204,59 @@ def _session_exploit_actions(job: dict, finding):
     token = ((exp_raw.get("auth_test") or {}).get("token")) or None
     jwta = exp_raw.get("jwt_analysis") or {}
 
+    # --- Preuve à la demande pour TOUTES les catégories courantes : on rejoue
+    # le VRAI testeur sur l'endpoint de la faille (démonstration concrète, non
+    # destructive). Normalise les clés de résultat propres à chaque testeur.
+    def _list_action(run_fn, key, tool_name):
+        def action(finding_, mode, tok):
+            ep = finding_.affected_endpoint
+            if not ep:
+                return {"tool": tool_name, "proven": False, "confirmed": False,
+                        "reason": "Aucun endpoint à cibler sur cette faille."}
+            try:
+                result = run_fn(ep, tok) or {}
+            except Exception as e:
+                return {"tool": tool_name, "proven": False, "confirmed": False,
+                        "reason": f"{tool_name} : erreur ({type(e).__name__})."}
+            items = result.get(key) or []
+            proven = bool(items)
+            snippet = ""
+            if proven:
+                it = items[0] if isinstance(items[0], dict) else {}
+                snippet = str(it.get("evidence") or it.get("proof")
+                              or it.get("payload") or it)[:240] \
+                    if it else f"{tool_name} : faille démontrée"
+            return {"tool": tool_name, "proven": proven,
+                    "confirmed": proven and mode == "confirm",
+                    "snippet": snippet,
+                    "reason": "" if proven else
+                    f"{tool_name} : rien de reproductible sur {ep}."}
+        return action
+
+    def _build_extra():
+        from pentagon.tools.sqli_tester_tool import run_sqli_test
+        from pentagon.tools.xss_tester_tool import run_xss_test
+        from pentagon.tools.idor_tester_tool import run_idor_test
+        from pentagon.tools.auth_tester_tool import AuthTesterTool
+        return {
+            "sqli": _list_action(
+                lambda ep, tok: run_sqli_test(injectable_endpoints=[ep],
+                                              search_endpoints=[ep], token=tok),
+                "sqli_findings", "sqli_tester"),
+            "xss": _list_action(
+                lambda ep, tok: run_xss_test(reflected_urls=[ep], token=tok),
+                "xss_findings", "xss_tester"),
+            "idor": _list_action(
+                lambda ep, tok: run_idor_test(base_url="", endpoints=[ep], token=tok),
+                "idor_findings", "idor_tester"),
+            "auth": _list_action(
+                lambda ep, tok: AuthTesterTool().run(login_url=ep),
+                "weak_credentials_found", "auth_tester"),
+        }
+
+    extra = _build_extra()
+
+    # JWT : confirmation par forge de token + lecture réelle d'une ressource.
     ctx: dict = {"fetch": _bearer_fetch}
     if token and jwta.get("is_forgeable") and finding.affected_endpoint:
         ctx["jwt"] = {
@@ -1212,10 +1265,9 @@ def _session_exploit_actions(job: dict, finding):
             "secret": jwta.get("cracked_secret"),
             "elevate": {"role": "admin"},
         }
-    if finding.category == "idor" and finding.affected_endpoint:
-        ctx["idor"] = {"token": token, "victim_url": finding.affected_endpoint}
 
-    return merge_actions(base, build_confirmation_actions(ctx))
+    # Ordre : testeurs standard < testeurs par catégorie < confirmation JWT.
+    return merge_actions(merge_actions(base, extra), build_confirmation_actions(ctx))
 
 
 def _exploit_on_session(job: dict, job_id: str, finding, mode: str) -> dict:
