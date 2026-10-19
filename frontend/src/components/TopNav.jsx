@@ -10,12 +10,16 @@ export default function TopNav({ active, user, onLogout }) {
     try { await api.logout(); } finally { onLogout && (await onLogout()); }
   };
   const initials = (user.operator || "?").slice(0, 2).toUpperCase();
-  const links = [
+  const links = [];
+  // L'opérateur a un accueil dédié (ses sites attribués) ; l'admin a Réglages.
+  if (user.role !== "admin")
+    links.push({ key: "accueil", label: "Accueil", go: () => navigate("/accueil") });
+  links.push(
     { key: "missions", label: "Missions", go: () => navigate("/mission") },
     { key: "sessions", label: "Sessions", go: () => navigate("/") },
     { key: "audits", label: "Audits", go: () => navigate("/overview", { state: { view: "audits" } }) },
     { key: "rapports", label: "Rapports", go: () => navigate("/overview", { state: { view: "reports" } }) },
-  ];
+  );
   if (user.role === "admin")
     links.push({ key: "reglages", label: "Réglages", go: () => navigate("/admin") });
 

@@ -10,7 +10,7 @@ export default function ProofTracker({ state }) {
       {ORDER.map((s, i) => (
         <div key={s} style={{ display: "contents" }}>
           {i > 0 && <span className="sep" />}
-          <span className={`step ${s} ${i <= current ? "on" : ""}`}>
+          <span className={`step ${s} ${i <= current ? "on" : "future"}`}>
             <span className="dot" />
             {LABEL[s]}
           </span>

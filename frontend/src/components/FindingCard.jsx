@@ -5,6 +5,8 @@ const SEV = ["critical", "high", "medium", "low", "info"];
 const SEV_LABEL = {
   critical: "Critique", high: "Élevée", medium: "Moyenne", low: "Faible", info: "Info",
 };
+// Nombre de segments remplis par niveau (rail lisible sans la couleur).
+const SEV_SEG = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
 
 function confidenceLabel(c) {
   if (c == null) return "";
@@ -41,7 +43,14 @@ export default function FindingCard({ finding, index, acting, msg, onOpen, onPro
             {conf && <span> · {conf}</span>}
           </div>
         </button>
-        <span className={`sev ${sev}`}>{SEV_LABEL[sev]}</span>
+        <div className="fc-sev">
+          <span className={`sev ${sev}`}>{SEV_LABEL[sev]}</span>
+          <span className={`sev-rail ${sev}`} role="img" aria-label={`sévérité ${SEV_SEG[sev]} sur 5`}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <i key={i} className={i < SEV_SEG[sev] ? "on" : ""} />
+            ))}
+          </span>
+        </div>
       </div>
 
       {/* Trace requête → réponse */}

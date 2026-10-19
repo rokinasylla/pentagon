@@ -1,61 +1,47 @@
 import { useEffect, useState } from "react";
 import * as api from "../api/client.js";
+import AuditPanel from "./AuditPanel.jsx";
 
-function postureLabel(score) {
-  if (score == null) return { label: "—", cls: "info" };
-  if (score >= 80) return { label: "Solide", cls: "low" };
-  if (score >= 50) return { label: "Correcte", cls: "medium" };
-  if (score >= 25) return { label: "À renforcer", cls: "high" };
-  return { label: "Critique", cls: "critical" };
-}
+// Verdict d'un contrôle d'en-tête manquant selon sa sévérité.
+const headerVerdict = (sev) => (sev === "high" || sev === "critical" ? "expose" : "corriger");
+// Verdict d'une CVE selon sa sévérité.
+const cveVerdict = (sev) => (sev === "high" || sev === "critical" ? "expose" : "corriger");
 
-// Répartit les contrôles en trois seaux : exposés / à corriger / conformes.
-function buckets(audit) {
-  const high = (s) => s === "high" || s === "critical";
-  const exposes = [
-    ...(audit.missing_headers || []).filter((h) => high(h.severity)).map((h) => ({
-      name: h.header, detail: h.description, reco: h.owasp,
+// Transforme la charge utile de /audit (en-têtes, divulgation, cookies, CVE)
+// en groupes par domaine attendus par AuditPanel. Les domaines non fournis par
+// le back (transport, méthodes, ports, DNS) n'apparaissent simplement pas —
+// ils seront remontés quand l'audit back sera enrichi (cf. ui-refonte §4).
+function toGroups(audit) {
+  const groups = [];
+
+  const headers = [
+    ...(audit.present_headers || []).map((h) => ({
+      name: h.header, target: "en-tête", detail: h.value, reco: "conforme", v: "bon",
     })),
-    ...(audit.info_disclosure || []).map((h) => ({
-      name: h.header, detail: `expose « ${h.value} »`, reco: h.description,
+    ...(audit.missing_headers || []).map((h) => ({
+      name: h.header, target: "en-tête", detail: h.description, reco: h.owasp, v: headerVerdict(h.severity),
     })),
   ];
-  const corriger = [
-    ...(audit.missing_headers || []).filter((h) => !high(h.severity)).map((h) => ({
-      name: h.header, detail: h.description, reco: h.owasp,
-    })),
-    ...(audit.cookie_issues || []).map((c) => ({
-      name: c.name || c.cookie || "cookie", detail: c.issue || c.description || "", reco: "",
-    })),
-  ];
-  const conformes = (audit.present_headers || []).map((h) => ({
-    name: h.header, detail: h.value, reco: "",
+  if (headers.length) groups.push({ title: "En-têtes HTTP de sécurité", lines: headers });
+
+  const disclosure = (audit.info_disclosure || []).map((h) => ({
+    name: h.header, target: "en-tête", detail: `expose « ${h.value} »`, reco: h.description, v: "expose",
   }));
-  return { exposes, corriger, conformes };
-}
+  if (disclosure.length) groups.push({ title: "Divulgation d’information", lines: disclosure });
 
-function Group({ title, cls, items }) {
-  if (!items.length) return null;
-  return (
-    <section className="aud-group">
-      <h4 className={`aud-gh ${cls}`}>{title} <span>{items.length}</span></h4>
-      <div className="aud-items">
-        {items.map((it, i) => (
-          <div key={i} className="aud-item">
-            <span className={`aud-dot ${cls}`} aria-hidden="true" />
-            <div>
-              <code className="mono">{it.name}</code>
-              {(it.detail || it.reco) && (
-                <div className="fc-meta">
-                  {it.detail}{it.reco && ` — ${it.reco}`}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+  const cookies = (audit.cookie_issues || []).map((c) => ({
+    name: c.name || c.cookie || "cookie", target: "cookie", detail: c.issue || c.description || "", reco: "", v: "corriger",
+  }));
+  if (cookies.length) groups.push({ title: "Cookies", lines: cookies });
+
+  const cves = (audit.cve || audit.cves || []).map((c) => ({
+    name: c.product || c.component || c.cve, target: c.cve || "bannière",
+    detail: c.summary || c.description || "", reco: c.recommendation || "mettre à jour",
+    v: cveVerdict(c.severity),
+  }));
+  if (cves.length) groups.push({ title: "Corrélation CVE des composants", lines: cves });
+
+  return groups;
 }
 
 export default function AuditView({ sessionId }) {
@@ -76,29 +62,5 @@ export default function AuditView({ sessionId }) {
     return <div className="empty">Aucune donnée de durcissement pour cette session.</div>;
   }
 
-  const p = postureLabel(audit.security_score);
-  const b = buckets(audit);
-
-  return (
-    <div className="audit">
-      <div className="aud-title">Hôte &amp; domaine</div>
-
-      <div className="posture">
-        <div className="posture-eyebrow">Posture globale de durcissement</div>
-        <div className="posture-row">
-          <span className={`posture-label ${p.cls}`}>{p.label}</span>
-          <span className="posture-score">{audit.security_score ?? "—"}<span className="s-max">/100</span></span>
-        </div>
-        <div className="posture-counts">
-          <span className="pc ok">{b.conformes.length} conformes</span>
-          <span className="pc warn">{b.corriger.length} à corriger</span>
-          <span className="pc bad">{b.exposes.length} exposés</span>
-        </div>
-      </div>
-
-      <Group title="Exposés" cls="bad" items={b.exposes} />
-      <Group title="À corriger" cls="warn" items={b.corriger} />
-      <Group title="Conformes" cls="ok" items={b.conformes} />
-    </div>
-  );
+  return <AuditPanel score={audit.security_score} groups={toGroups(audit)} />;
 }
