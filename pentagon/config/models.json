@@ -1,0 +1,92 @@
+{
+  "policy_name": "Routage de modele par role - PENTAGON",
+  "version": "1.1",
+  "description": "Associe a chaque role d'agent un fournisseur et un modele LLM (Lot L1 de la spec agent-autonome, SS15.1). Le fichier est relu par le ModelRouter ; aucun redemarrage n'est necessaire. Une cible explicite passee a LLMClient(model=...) ou la variable DEEPSEEK_MODEL priment toujours sur ce routage.",
+  "default_provider": "deepseek",
+  "default_model": "deepseek-chat",
+  "default_params": {
+    "temperature": 0.3,
+    "max_tokens": 2000
+  },
+  "providers": {
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "note": "Fournisseur par defaut. API compatible SDK OpenAI."
+    },
+    "anthropic": {
+      "base_url": "https://api.anthropic.com/v1/",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "note": "Endpoint compatible SDK OpenAI d'Anthropic. Permet d'utiliser claude-opus-5-5 sans changer de code client. Necessite ANTHROPIC_API_KEY et un budget dedie (modele premium)."
+    }
+  },
+  "roles": {
+    "orchestrator": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "temperature": 0.3,
+      "max_tokens": 2000,
+      "note": "Coordination des agents et dialogue console ; raisonnement leger, latence privilegiee."
+    },
+    "planner": {
+      "provider": "deepseek",
+      "model": "deepseek-reasoner",
+      "temperature": 0.2,
+      "max_tokens": 4000,
+      "note": "Boucle planner/executor de l'agent autonome (L4) : raisonnement multi-etapes. Candidat prioritaire pour une bascule vers claude-opus-5-5."
+    },
+    "osint": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "temperature": 0.3,
+      "max_tokens": 2000
+    },
+    "scanning": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "temperature": 0.2,
+      "max_tokens": 2000
+    },
+    "web_app": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "temperature": 0.2,
+      "max_tokens": 2500
+    },
+    "exploitation": {
+      "provider": "deepseek",
+      "model": "deepseek-reasoner",
+      "temperature": 0.2,
+      "max_tokens": 4000,
+      "note": "Analyse offensive et correlation CVE : raisonnement renforce. Candidat prioritaire pour une bascule vers claude-opus-5-5."
+    },
+    "reporting": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "temperature": 0.4,
+      "max_tokens": 3000,
+      "note": "Redaction du rapport : un peu plus de souplesse stylistique."
+    },
+    "assistant": {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "temperature": 0.3,
+      "max_tokens": 2000,
+      "note": "Assistant conversationnel de la console web."
+    }
+  },
+  "budget": {
+    "per_campaign_max_tokens": 2000000,
+    "warn_ratio": 0.8,
+    "note": "Plafond de jetons par campagne (SS15.1). 0 ou absent = pas de plafond. warn_ratio declenche un avertissement passe ce pourcentage du plafond. A baisser fortement si des roles basculent sur un modele premium."
+  },
+  "candidates": {
+    "note": "Profils prets a activer en changeant 'provider'/'model' d'un role. Exemple : pointer planner et exploitation sur le profil ci-dessous pour un raisonnement offensif renforce.",
+    "opus_reasoning": {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "temperature": 0.2,
+      "max_tokens": 4000
+    }
+  }
+}
