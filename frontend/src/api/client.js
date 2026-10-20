@@ -71,12 +71,41 @@ export const adminSetUserRole = (username, role) =>
   request("/api/admin/users", { method: "PATCH", body: { username, role } });
 export const adminDeleteUser = (username) =>
   request("/api/admin/users", { method: "DELETE", body: { username } });
-// Sites autorisés (liste globale, découplée des comptes).
+// Sites autorisés PER-OPERATOR (domaine · opérateur · périmètre max · statut).
 export const adminListSites = () => request("/api/v1/admin/sites");
-export const adminAddSite = (site) =>
-  request("/api/v1/admin/sites", { method: "POST", body: { site } });
-export const adminRemoveSite = (site) =>
+// Autorise / attribue un site : { operator, max_categories:[...], proof }.
+export const adminAuthorizeSite = (site, { operator, maxCategories, proof } = {}) =>
+  request("/api/v1/admin/sites", {
+    method: "POST",
+    body: { site, operator, max_categories: maxCategories, proof },
+  });
+export const adminRevokeSite = (site) =>
   request("/api/v1/admin/sites", { method: "DELETE", body: { site } });
+// Rétro-compat : autoriser un site sans attribution (ancien appel).
+export const adminAddSite = (site) => adminAuthorizeSite(site);
+export const adminRemoveSite = (site) => adminRevokeSite(site);
+
+// Demandes d'accès (admin : lister / décider).
+export const adminListAccessRequests = () =>
+  request("/api/v1/admin/access-requests");
+export const adminDecideAccessRequest = (domain, decision, opts = {}) =>
+  request("/api/v1/admin/access-requests", {
+    method: "POST",
+    body: {
+      domain,
+      decision,
+      operator: opts.operator,
+      max_categories: opts.maxCategories,
+      proof: opts.proof,
+    },
+  });
+
+// ─── Espace opérateur (per-operator) ───
+// Sites attribués à l'opérateur courant + ses demandes en attente.
+export const getMySites = () => request("/api/v1/me/sites");
+// L'opérateur demande l'accès à un site (l'admin validera).
+export const requestAccess = (domain) =>
+  request("/api/v1/access-requests", { method: "POST", body: { domain } });
 
 // ─── Lot UI-2 (préparé, câblé plus tard dans l'UI) ───
 export const sendCommand = (sessionId, command) =>

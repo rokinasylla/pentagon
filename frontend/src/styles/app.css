@@ -1031,6 +1031,12 @@ button.icon:hover { color: var(--fg); }
 .av-eng-tag { font-size: 11px; color: var(--fg-faint); }
 .av-eng-d { display: block; font-size: 12px; color: var(--fg-muted); margin-top: 2px; line-height: 1.5; }
 
+.av-site-status { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.av-site-ops { display: flex; gap: 6px; flex-wrap: wrap; }
+.av-mini { all: unset; cursor: pointer; font-size: 11px; font-weight: 600; color: #2e3a59; background: #edeff4; border: 1px solid #d7dcea; border-radius: 7px; padding: 3px 8px; }
+.av-mini:hover { filter: brightness(0.97); }
+.av-mini.danger { color: #6e1f2e; background: #f7eaec; border-color: #e7c9ce; }
+
 @media (max-width: 760px) {
   .adminv { flex-direction: column; }
   .av-rail { max-width: none; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 12px; }

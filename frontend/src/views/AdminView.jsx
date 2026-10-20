@@ -6,6 +6,28 @@
 
 import { useState } from "react";
 
+// Matrice de droits par défaut (modèle per-operator) — utilisée si le conteneur
+// n'en fournit pas.
+const _yes = { yes: true }, _no = { no: true };
+const _note = (t, tone) => ({ note: true, noteTxt: t, tone });
+const DEFAULT_CAPS = [
+  { label: "Autoriser / révoquer des sites", admin: _yes, op: _no },
+  { label: "Créer et gérer les comptes", admin: _yes, op: _no },
+  { label: "Définir les rôles & droits", admin: _yes, op: _no },
+  { label: "Voir tous les sites & campagnes", admin: _yes, op: _note("ses sites", "warn") },
+  { label: "Reconnaissance & scan", admin: _yes, op: _note("ses sites", "warn") },
+  { label: "Exploitation à la demande", admin: _yes, op: _note("si RoE", "warn") },
+  { label: "Générer & exporter un rapport", admin: _yes, op: _yes },
+  { label: "Étendre le périmètre (RoE)", admin: _yes, op: _note("sur demande", "warn") },
+];
+
+// Catégories RoE proposables (périmètre max d'un site).
+const PERIMETER = [
+  { key: "passive", label: "Reconnaissance passive" },
+  { key: "active_scan", label: "Scan actif" },
+  { key: "exploitation", label: "Exploitation", dashed: true },
+];
+
 const RAIL = [
   { id: "account", label: "Mon compte", icon: (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.8" /><path d="M5 20c1.2-3.6 4-5 7-5s5.8 1.4 7 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -75,10 +97,20 @@ function Account({ user }) {
   );
 }
 
-function Users({ users, siteOptions, onCreateUser }) {
+function Users({ users, siteOptions, onCreateUser, busy }) {
+  const [form, setForm] = useState({ username: "", password: "", role: "user", sites: [] });
+  const toggleSite = (s) =>
+    setForm((f) => ({ ...f, sites: f.sites.includes(s) ? f.sites.filter((x) => x !== s) : [...f.sites, s] }));
+  const valid = form.username.trim() && form.password.length >= 6;
+  const submit = (e) => {
+    e.preventDefault();
+    if (!valid || !onCreateUser) return;
+    onCreateUser({ ...form, username: form.username.trim() });
+    setForm({ username: "", password: "", role: "user", sites: [] });
+  };
   return (
     <>
-      <div className="av-h-row"><h1 className="av-h1">Utilisateurs</h1><span className="av-count">{users.length} comptes</span></div>
+      <div className="av-h-row"><h1 className="av-h1">Utilisateurs</h1><span className="av-count">{users.length} compte{users.length > 1 ? "s" : ""}</span></div>
       <div className="av-cols">
         <section className="av-card flush av-grow">
           <div className="av-thead" style={{ gridTemplateColumns: "2fr 1.1fr 1.6fr 1fr" }}>
@@ -90,7 +122,7 @@ function Users({ users, siteOptions, onCreateUser }) {
               <div key={i} className="av-trow" style={{ gridTemplateColumns: "2fr 1.1fr 1.6fr 1fr" }}>
                 <span className="av-u">
                   <span className="av-u-av" style={{ background: u.role === "admin" ? "#2E3A59" : "#16181D" }}>{u.initials}</span>
-                  <span className="av-u-id"><span className="av-u-name">{u.name}</span><span className="av-u-mail mono">{u.email}</span></span>
+                  <span className="av-u-id"><span className="av-u-name">{u.name}</span>{u.email && <span className="av-u-mail mono">{u.email}</span>}</span>
                 </span>
                 <span><span className="av-role-badge" style={{ color: ROLE_BADGE[u.role].color, background: ROLE_BADGE[u.role].bg, border: `1px solid ${ROLE_BADGE[u.role].border}` }}>{u.role === "admin" ? "Administrateur" : "Opérateur"}</span></span>
                 <span className="av-u-sites">{u.sites}</span>
@@ -106,26 +138,28 @@ function Users({ users, siteOptions, onCreateUser }) {
             Nouvel utilisateur
           </h2>
           <p className="av-card-sub">L'accès sera limité aux sites cochés.</p>
-          <form className="av-form" onSubmit={(e) => { e.preventDefault(); onCreateUser && onCreateUser(); }}>
-            <label className="av-field-wrap"><span className="av-label">Nom complet</span><span className="av-field"><input placeholder="Prénom Nom" /></span></label>
-            <label className="av-field-wrap"><span className="av-label">E-mail</span><span className="av-field"><input type="email" className="mono" placeholder="nom@organisation.fr" /></span></label>
+          <form className="av-form" onSubmit={submit}>
+            <label className="av-field-wrap"><span className="av-label">Identifiant</span><span className="av-field"><input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="n.sylla" autoComplete="off" /></span></label>
+            <label className="av-field-wrap"><span className="av-label">Mot de passe (min. 6)</span><span className="av-field"><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" /></span></label>
             <div>
               <span className="av-label">Rôle</span>
               <div className="av-radios">
-                <label className="av-radio on"><input type="radio" name="role" defaultChecked />Opérateur</label>
-                <label className="av-radio"><input type="radio" name="role" />Admin</label>
+                <label className={`av-radio ${form.role === "user" ? "on" : ""}`}><input type="radio" name="role" checked={form.role === "user"} onChange={() => setForm({ ...form, role: "user" })} />Opérateur</label>
+                <label className={`av-radio ${form.role === "admin" ? "on" : ""}`}><input type="radio" name="role" checked={form.role === "admin"} onChange={() => setForm({ ...form, role: "admin" })} />Admin</label>
               </div>
             </div>
-            <div>
-              <span className="av-label">Sites autorisés pour ce compte</span>
-              <div className="av-checks">
-                {siteOptions.map((s, i) => (
-                  <label key={s} className="av-check"><input type="checkbox" defaultChecked={i === 0} /><span className="mono">{s}</span></label>
-                ))}
+            {form.role === "user" && (
+              <div>
+                <span className="av-label">Sites autorisés pour ce compte</span>
+                <div className="av-checks">
+                  {siteOptions.length === 0 && <p className="av-fine">Aucun site autorisé à attribuer pour l'instant.</p>}
+                  {siteOptions.map((s) => (
+                    <label key={s} className="av-check"><input type="checkbox" checked={form.sites.includes(s)} onChange={() => toggleSite(s)} /><span className="mono">{s}</span></label>
+                  ))}
+                </div>
               </div>
-            </div>
-            <button type="submit" className="av-btn primary block">Créer et inviter</button>
-            <p className="av-fine">Un e-mail d'invitation permet à l'utilisateur de définir son mot de passe.</p>
+            )}
+            <button type="submit" className="av-btn primary block" disabled={!valid || busy}>{busy ? "Création…" : "Créer le compte"}</button>
           </form>
         </section>
       </div>
@@ -133,23 +167,42 @@ function Users({ users, siteOptions, onCreateUser }) {
   );
 }
 
-function Sites({ sites, operators, onAuthorizeSite }) {
+function Sites({ sites, operators, onAuthorizeSite, onRevokeSite, onApprove, onReject, busy }) {
+  const [form, setForm] = useState({ domain: "", proof: "Mandat signé", maxCategories: ["passive", "active_scan"], operator: "" });
+  const toggleCat = (k) =>
+    setForm((f) => ({ ...f, maxCategories: f.maxCategories.includes(k) ? f.maxCategories.filter((x) => x !== k) : [...f.maxCategories, k] }));
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.domain.trim() || !onAuthorizeSite) return;
+    onAuthorizeSite({ ...form, domain: form.domain.trim(), operator: form.operator || null });
+    setForm({ domain: "", proof: "Mandat signé", maxCategories: ["passive", "active_scan"], operator: "" });
+  };
+  const nOk = sites.filter((s) => s.status === "autorise").length;
+  const nWait = sites.filter((s) => s.status === "attente").length;
   return (
     <>
-      <div className="av-h-row"><h1 className="av-h1">Sites autorisés</h1><span className="av-count">{sites.filter((s) => s.status === "autorise").length} autorisés · {sites.filter((s) => s.status === "attente").length} en attente</span></div>
+      <div className="av-h-row"><h1 className="av-h1">Sites autorisés</h1><span className="av-count">{nOk} autorisé{nOk > 1 ? "s" : ""}{nWait ? ` · ${nWait} en attente` : ""}</span></div>
       <div className="av-cols">
         <section className="av-card flush av-grow">
-          <div className="av-thead" style={{ gridTemplateColumns: "1.9fr 1.3fr 1.5fr 1fr" }}>
+          <div className="av-thead" style={{ gridTemplateColumns: "1.9fr 1.3fr 1.5fr 1.1fr" }}>
             <span>Domaine</span><span>Opérateur</span><span>Périmètre max</span><span>Statut</span>
           </div>
+          {sites.length === 0 && <div className="av-trow" style={{ gridTemplateColumns: "1fr" }}><span className="av-u-sites">Aucun site pour l'instant.</span></div>}
           {sites.map((s, i) => {
             const st = SITE_STATUS[s.status] || SITE_STATUS.autorise;
             return (
-              <div key={i} className="av-trow" style={{ gridTemplateColumns: "1.9fr 1.3fr 1.5fr 1fr" }}>
-                <span className="av-u-id"><span className="av-u-name mono">{s.domain}</span><span className="av-site-by">autorisé par {s.by} · {s.date}</span></span>
-                <span className="av-u-sites">{s.operator}</span>
+              <div key={i} className="av-trow" style={{ gridTemplateColumns: "1.9fr 1.3fr 1.5fr 1.1fr" }}>
+                <span className="av-u-id"><span className="av-u-name mono">{s.domain}</span><span className="av-site-by">{s.by}{s.date ? ` · ${s.date}` : ""}</span></span>
+                <span className="av-u-sites">{s.operator || "—"}</span>
                 <span className="av-scope mono">{s.scope}</span>
-                <span className="av-status" style={{ color: st.color }}><i className="dot" style={{ background: st.dot }} />{s.statusLabel}</span>
+                <span className="av-site-status">
+                  <span className="av-status" style={{ color: st.color }}><i className="dot" style={{ background: st.dot }} />{s.statusLabel}</span>
+                  <span className="av-site-ops">
+                    {s.status === "autorise" && onRevokeSite && <button type="button" className="av-mini danger" onClick={() => onRevokeSite(s.domain)}>Révoquer</button>}
+                    {s.status === "attente" && onApprove && <button type="button" className="av-mini" onClick={() => onApprove(s.domain, s.operator)}>Valider</button>}
+                    {s.status === "attente" && onReject && <button type="button" className="av-mini danger" onClick={() => onReject(s.domain)}>Refuser</button>}
+                  </span>
+                </span>
               </div>
             );
           })}
@@ -161,19 +214,19 @@ function Sites({ sites, operators, onAuthorizeSite }) {
             Autoriser un site
           </h2>
           <p className="av-card-sub">Le site devient testable, dans la limite du périmètre que vous fixez.</p>
-          <form className="av-form" onSubmit={(e) => { e.preventDefault(); onAuthorizeSite && onAuthorizeSite(); }}>
-            <label className="av-field-wrap"><span className="av-label">Domaine / URL</span><span className="av-field"><input className="mono" placeholder="exemple.com" /></span></label>
-            <label className="av-field-wrap"><span className="av-label">Preuve d'autorisation</span><span className="av-field"><select><option>Mandat signé</option><option>Propriétaire vérifié</option><option>Périmètre bug bounty</option></select></span></label>
+          <form className="av-form" onSubmit={submit}>
+            <label className="av-field-wrap"><span className="av-label">Domaine / URL</span><span className="av-field"><input className="mono" value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="exemple.com" autoComplete="off" /></span></label>
+            <label className="av-field-wrap"><span className="av-label">Preuve d'autorisation</span><span className="av-field"><select value={form.proof} onChange={(e) => setForm({ ...form, proof: e.target.value })}><option>Mandat signé</option><option>Propriétaire vérifié</option><option>Périmètre bug bounty</option></select></span></label>
             <div>
               <span className="av-label">Périmètre maximal autorisé</span>
               <div className="av-checks">
-                <label className="av-check"><input type="checkbox" defaultChecked />Reconnaissance passive</label>
-                <label className="av-check"><input type="checkbox" defaultChecked />Scan actif</label>
-                <label className="av-check dashed"><input type="checkbox" />Exploitation</label>
+                {PERIMETER.map((c) => (
+                  <label key={c.key} className={`av-check ${c.dashed ? "dashed" : ""}`}><input type="checkbox" checked={form.maxCategories.includes(c.key)} onChange={() => toggleCat(c.key)} />{c.label}</label>
+                ))}
               </div>
             </div>
-            <label className="av-field-wrap"><span className="av-label">Opérateur assigné</span><span className="av-field"><select>{operators.map((o) => <option key={o}>{o}</option>)}</select></span></label>
-            <button type="submit" className="av-btn primary block">Autoriser le site</button>
+            <label className="av-field-wrap"><span className="av-label">Opérateur assigné</span><span className="av-field"><select value={form.operator} onChange={(e) => setForm({ ...form, operator: e.target.value })}><option value="">— (non attribué)</option>{operators.map((o) => <option key={o} value={o}>{o}</option>)}</select></span></label>
+            <button type="submit" className="av-btn primary block" disabled={!form.domain.trim() || busy}>{busy ? "…" : "Autoriser le site"}</button>
             <div className="av-warn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ color: "#B0541E", flexShrink: 0, marginTop: 1 }}><path d="M12 3l9 16H3l9-16z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" /><path d="M12 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="16.4" r="1" fill="currentColor" /></svg>
               <p>En autorisant, vous attestez disposer du droit légal de faire tester cette cible.</p>
@@ -265,6 +318,10 @@ export default function AdminView({
   caps = [],
   onCreateUser,
   onAuthorizeSite,
+  onRevokeSite,
+  onApprove,
+  onReject,
+  busy = false,
 }) {
   const [sec, setSec] = useState(initialSection);
   return (
@@ -285,9 +342,9 @@ export default function AdminView({
           </div>
 
           {sec === "account" && <Account user={user} />}
-          {sec === "users" && <Users users={users} siteOptions={siteOptions} onCreateUser={onCreateUser} />}
-          {sec === "sites" && <Sites sites={sites} operators={operators} onAuthorizeSite={onAuthorizeSite} />}
-          {sec === "roles" && <Roles caps={caps} />}
+          {sec === "users" && <Users users={users} siteOptions={siteOptions} onCreateUser={onCreateUser} busy={busy} />}
+          {sec === "sites" && <Sites sites={sites} operators={operators} onAuthorizeSite={onAuthorizeSite} onRevokeSite={onRevokeSite} onApprove={onApprove} onReject={onReject} busy={busy} />}
+          {sec === "roles" && <Roles caps={caps && caps.length ? caps : DEFAULT_CAPS} />}
           {sec === "prefs" && <Prefs />}
         </div>
       </div>

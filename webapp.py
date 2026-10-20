@@ -352,15 +352,77 @@ def user_sites(username: str) -> list[str]:
     return [s for s in (u.get("sites") or []) if isinstance(s, str)]
 
 
+# Message de refus quand la cible est autorisée globalement mais PAS attribuée
+# à l'opérateur courant (modèle per-operator).
+NOT_ATTRIBUTED_MSG = (
+    "Le site « {t} » ne vous est pas attribué. Demandez l'accès à "
+    "l'administrateur depuis votre espace, il l'examinera."
+)
+
+
+def site_store():
+    """
+    Store des sites per-operator (`pentagon/config/sites.json`), relu à chaud.
+
+    Amorçage doux : si le store est vide, il est reconstruit depuis l'existant
+    (liste blanche globale `roe_policy.json` + sites attribués dans `users.json`)
+    pour préserver le comportement courant lors de la bascule per-operator.
+    """
+    from pentagon.core.site_store import SiteStore
+    store = SiteStore()
+    if not store.sites:
+        try:
+            pol = load_policy()
+            if store.seed_if_empty(
+                pol.get("authorized_targets", []) or [],
+                pol.get("authorized_action_categories", []) or [],
+                load_users(),
+            ):
+                _sync_from_store(store)
+        except Exception:
+            pass
+    return store
+
+
+def _sync_from_store(store) -> None:
+    """
+    Reflète le store per-operator vers les stockages hérités, pour que le reste
+    du code (RoEEnforcer global, `user_sites`, `/api/v1/me`) reste cohérent :
+      - `roe_policy.authorized_targets` <- domaines de statut `autorise` ;
+      - `users.json[*].sites` <- sites `autorise` attribués à chaque opérateur.
+    """
+    try:
+        pol = load_policy()
+        pol["authorized_targets"] = store.authorized_domains()
+        save_policy(pol)
+    except Exception:
+        pass
+    try:
+        users = load_users()
+        by_op: dict[str, list[str]] = {}
+        for s in store.sites:
+            if s.get("status") == "autorise" and s.get("operator"):
+                by_op.setdefault(s["operator"], []).append(s["domain"])
+        changed = False
+        for uname, u in users.items():
+            if u.get("role") == "admin":
+                continue
+            new_sites = by_op.get(uname, [])
+            if (u.get("sites") or []) != new_sites:
+                u["sites"] = new_sites
+                changed = True
+        if changed:
+            save_users(users)
+    except Exception:
+        pass
+
+
 def operator_can_target(operator: str, role: str, target: str) -> bool:
     """
-    Un admin cible librement (dans la limite de la liste blanche globale). Un
-    opérateur simple n'est autorisé que sur SES sites (deny-by-default).
+    Un admin cible tout site autorisé ; un opérateur simple n'est autorisé que
+    sur SES sites attribués (deny-by-default), via le store per-operator.
     """
-    if role == "admin":
-        return True
-    host = _target_host(target)
-    return any(_target_host(s) == host for s in user_sites(operator))
+    return site_store().max_categories(target, operator, role) is not None
 
 
 def gate_request(target: str, actions: list[str]):
@@ -372,22 +434,33 @@ def gate_request(target: str, actions: list[str]):
         (message, code_http) à renvoyer tel quel ; sinon effective_actions est
         la liste des catégories effectivement permises (bornée par l'admin).
     """
-    # Modèle « sites globaux » : la cible doit figurer dans la liste blanche
-    # GLOBALE autorisée par l'administrateur (comptes et sites découplés). Tout
-    # utilisateur authentifié peut lancer une campagne sur un site autorisé ;
-    # sinon l'action est bloquée (« site non autorisé »).
+    # 1) Liste blanche GLOBALE de l'admin : la cible doit y figurer (sinon
+    #    « site non autorisé »). C'est le plafond de catégories de l'admin.
     admin = check_admin_authorization(target)
     if not admin["allowed"]:
         return None, (ADMIN_DENIED_MSG.format(t=target), 403)
 
-    # L'admin borne aussi le niveau : on garde l'intersection des catégories
-    # choisies par l'utilisateur et de celles permises par l'admin.
-    effective = [a for a in actions if a in admin["categories"]]
+    # 2) Modèle PER-OPERATOR : un opérateur simple n'agit que sur SES sites
+    #    attribués, et le périmètre est borné par le périmètre MAX du site fixé
+    #    par l'admin. Un admin n'est pas restreint (plafond global).
+    operator = session.get("operator") or ""
+    role = session.get("role") or "user"
+    site_cats = site_store().max_categories(target, operator, role)
+    if site_cats is None:
+        if role == "admin":
+            site_cats = admin["categories"]
+        else:
+            return None, (NOT_ATTRIBUTED_MSG.format(t=target), 403)
+
+    # 3) Intersection : catégories choisies ∩ plafond global admin ∩ périmètre
+    #    max du site. Deny-by-default si l'intersection est vide.
+    ceiling = set(admin["categories"]) & set(site_cats)
+    effective = [a for a in actions if a in ceiling]
     if not effective:
-        allowed = ", ".join(admin["categories"]) or "(aucune)"
+        allowed = ", ".join(sorted(ceiling)) or "(aucune)"
         return None, (
-            "L'administrateur n'autorise aucune des catégories choisies pour "
-            f"cette cible. Catégories autorisées par l'admin : {allowed}.", 403)
+            "Aucune des catégories choisies n'est permise pour cette cible. "
+            f"Catégories autorisées ici : {allowed}.", 403)
     return effective, None
 
 
@@ -1075,36 +1148,97 @@ def api_v1_admin_users():
 @app.route("/api/v1/admin/sites", methods=["GET", "POST", "DELETE"])
 def api_v1_admin_sites():
     """
-    Liste blanche GLOBALE des sites autorisés (découplée des comptes) :
-    GET liste, POST autorise un site, DELETE le retire. Admin only.
+    Sites autorisés PER-OPERATOR (source : sites.json). Admin only.
+      GET    : liste enrichie (domaine, opérateur, périmètre max, preuve, statut).
+      POST   : autorise/attribue un site {site, operator, max_categories, proof}.
+      DELETE : révoque un site {site}.
+    La liste blanche globale (roe_policy) et users.json sont resynchronisés.
     """
     guard = require_admin()
     if guard is not None:
         return guard
-    try:
-        p = load_policy()
-    except Exception as e:
-        return jsonify({"error": f"Politique illisible : {e}"}), 500
-    sites = p.setdefault("authorized_targets", [])
+    store = site_store()
 
     if request.method == "GET":
-        return jsonify({"sites": sites})
+        return jsonify({"sites": store.to_public()})
 
     data = request.get_json(force=True, silent=True) or {}
-    site = (data.get("site") or data.get("target") or "").strip()
+    site = (data.get("site") or data.get("target") or data.get("domain") or "").strip()
     if not site:
         return jsonify({"error": "Domaine requis."}), 400
 
     if request.method == "POST":
-        if site not in sites:
-            sites.append(site)
+        operator = (data.get("operator") or "").strip() or None
+        cats = [c for c in (data.get("max_categories") or []) if c in SELECTABLE_CATEGORIES]
+        proof = (data.get("proof") or "").strip()
+        if operator and operator not in load_users():
+            return jsonify({"error": "Opérateur inconnu."}), 400
+        store.authorize(site, operator, cats, proof, session.get("operator") or "admin")
     else:  # DELETE
-        p["authorized_targets"] = [s for s in sites if s != site]
-    try:
-        save_policy(p)
-    except Exception as e:
-        return jsonify({"error": f"Écriture impossible : {e}"}), 500
-    return jsonify({"sites": p.get("authorized_targets", [])})
+        store.revoke(site)
+    _sync_from_store(store)
+    return jsonify({"sites": store.to_public()})
+
+
+@app.route("/api/v1/admin/access-requests", methods=["GET", "POST"])
+def api_v1_admin_access_requests():
+    """
+    Demandes d'accès des opérateurs (sites de statut `attente`). Admin only.
+      GET  : liste des demandes en attente.
+      POST : décision {domain, decision: "approve"|"reject", operator?,
+             max_categories?, proof?}.
+    """
+    guard = require_admin()
+    if guard is not None:
+        return guard
+    store = site_store()
+
+    if request.method == "GET":
+        return jsonify({"requests": [s for s in store.to_public() if s["status"] == "attente"]})
+
+    data = request.get_json(force=True, silent=True) or {}
+    domain = (data.get("domain") or data.get("site") or "").strip()
+    decision = (data.get("decision") or "").strip()
+    if not domain or decision not in ("approve", "reject"):
+        return jsonify({"error": "Champs 'domain' et 'decision' (approve|reject) requis."}), 400
+
+    if decision == "approve":
+        cats = [c for c in (data.get("max_categories") or []) if c in SELECTABLE_CATEGORIES]
+        proof = (data.get("proof") or "").strip()
+        operator = (data.get("operator") or "").strip() or None
+        store.approve(domain, cats, proof, session.get("operator") or "admin", operator=operator)
+    else:
+        store.reject(domain)
+    _sync_from_store(store)
+    return jsonify({"requests": [s for s in store.to_public() if s["status"] == "attente"],
+                    "sites": store.to_public()})
+
+
+@app.route("/api/v1/me/sites")
+def api_v1_me_sites():
+    """Sites attribués à l'opérateur courant + ses demandes en attente."""
+    op = session.get("operator") or ""
+    role = session.get("role") or "user"
+    store = site_store()
+    if role == "admin":
+        mine = [s for s in store.to_public() if s["status"] == "autorise"]
+    else:
+        mine = [s for s in store.to_public() if s["status"] == "autorise" and s["operator"] == op]
+    pending = [s for s in store.to_public() if s["status"] == "attente" and s["operator"] == op]
+    return jsonify({"sites": mine, "pending": pending})
+
+
+@app.route("/api/v1/access-requests", methods=["POST"])
+def api_v1_access_requests():
+    """Un opérateur demande l'accès à un site (statut `attente`)."""
+    op = session.get("operator") or ""
+    data = request.get_json(force=True, silent=True) or {}
+    domain = (data.get("domain") or data.get("site") or "").strip()
+    if not domain:
+        return jsonify({"error": "Domaine requis."}), 400
+    store = site_store()
+    rec = store.request_access(domain, op)
+    return jsonify({"ok": True, "status": rec.get("status")})
 
 
 @app.route("/api/v1/admin/users/<username>/sites", methods=["PUT"])
