@@ -15,7 +15,7 @@ question : « cet hôte est-il dans le périmètre de la campagne ? »
   - OU explicitement autorisé par le RoE (scope_check fourni) → autorisé ;
   - sinon                                                     → REFUSÉ.
 
-Un sous-domaine du même domaine racine (p. ex. dev.nafar.tech pour nafar.tech)
+Un sous-domaine du même domaine racine (p. ex. dev.exemple.com pour exemple.com)
 n'est PAS autorisé d'office : c'est un AUTRE hôte, qui doit passer par une
 autorisation explicite du RoE (élargissement supervisé du périmètre). La garde
 ne relâche donc jamais la gouvernance ; `same_site`/`registrable_domain` servent
@@ -48,7 +48,7 @@ def registrable_domain(host: str) -> str:
     """
     Domaine enregistrable approximatif (eTLD+1), sans dépendance externe.
 
-    "dev.nafar.tech" -> "nafar.tech" ; "a.b.co.uk" -> "b.co.uk".
+    "dev.exemple.com" -> "exemple.com" ; "a.b.co.uk" -> "b.co.uk".
     Heuristique conservatrice : en cas de doute, ne fusionne pas deux domaines.
     """
     host = (host or "").strip(".").lower()

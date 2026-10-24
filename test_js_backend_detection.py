@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pentagon.tools.js_analyzer_tool import _extract_backend_urls
 
-TARGET = "https://nafar.tech/"
+TARGET = "https://exemple.com/"
 
 
 def test_framework_doc_url_is_not_a_backend():
@@ -25,35 +25,35 @@ def test_framework_doc_url_is_not_a_backend():
 
 
 def test_same_site_api_subdomain_is_detected():
-    content = 'fetch("https://api.nafar.tech/v1/users");'
+    content = 'fetch("https://api.exemple.com/v1/users");'
     out = _extract_backend_urls(content, TARGET)
-    assert "https://api.nafar.tech/v1/users" in out
+    assert "https://api.exemple.com/v1/users" in out
 
 
 def test_same_site_dev_subdomain_is_detected():
-    # dev.nafar.tech = asset lié à surfacer (sous-domaine dédié).
-    content = 'const base="https://dev.nafar.tech/api/health";'
+    # dev.exemple.com = asset lié à surfacer (sous-domaine dédié).
+    content = 'const base="https://dev.exemple.com/api/health";'
     out = _extract_backend_urls(content, TARGET)
-    assert "https://dev.nafar.tech/api/health" in out
+    assert "https://dev.exemple.com/api/health" in out
 
 
 def test_third_party_api_paths_excluded():
     # Même avec un vrai /api/, un domaine racine DIFFÉRENT est exclu.
     content = ('"https://github.com/org/api/v2" '
                '"https://react.dev/learn" '
-               '"https://www.instagram.com/nafar"')
+               '"https://www.instagram.com/compte"')
     assert _extract_backend_urls(content, TARGET) == []
 
 
 def test_target_host_itself_excluded():
     # Une URL same-host est gérée par l'extraction de chemins /api, pas ici.
-    content = '"https://nafar.tech/api/public"'
+    content = '"https://exemple.com/api/public"'
     assert _extract_backend_urls(content, TARGET) == []
 
 
 def test_api_reference_substring_not_matched():
     # Garantit qu'on matche un SEGMENT /api, pas la sous-chaîne.
-    content = '"https://docs.nafar.tech/api-reference/intro"'  # même site mais pas d'API réelle
+    content = '"https://docs.exemple.com/api-reference/intro"'  # même site mais pas d'API réelle
     # "api-reference" n'est pas un segment /api ; "docs" n'est pas un sous-domaine backend.
     assert _extract_backend_urls(content, TARGET) == []
 
@@ -63,11 +63,11 @@ def test_mixed_bundle_keeps_only_real_same_site_backend():
         '"https://nextjs.org/docs/app/api-reference/functions/cookies" '
         '"https://react.dev/" '
         '"https://www.w3.org/2000/svg" '
-        '"https://api.nafar.tech/api/login" '
+        '"https://api.exemple.com/api/login" '
         '"https://github.com/x/api"'
     )
     out = _extract_backend_urls(content, TARGET)
-    assert out == ["https://api.nafar.tech/api/login"]
+    assert out == ["https://api.exemple.com/api/login"]
 
 
 def main():
