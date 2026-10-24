@@ -25,6 +25,8 @@ from pentagon.tools.whatweb_tool import run_whatweb_scan
 from pentagon.tools.tls_analyzer_tool import run_tls_analysis
 from pentagon.tools.network_exposure_tool import analyze_network_exposure
 from pentagon.tools.cve_lookup_tool import run_cve_analysis
+from pentagon.tools.waf_detector_tool import run_waf_detection
+from pentagon.tools.origin_discovery_tool import verify_origin_exposure
 
 SCANNING_SYSTEM_PROMPT = """Tu es l'Agent Scanning & Enumeration de PENTAGON, un système \
 multi-agent de test d'intrusion automatisé.
@@ -131,26 +133,32 @@ class ScanningAgent:
         target: str,
         scan_profile: str = "web_focused",
         osint_context: dict[str, Any] | None = None,
+        origin_candidates: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Exécute l'agent Scanning sur une cible.
-        
+
         Args:
             target: cible à scanner (domaine ou IP).
             scan_profile: profil Nmap ("quick", "standard", "web_focused", "full").
-        
+            osint_context: contexte transmis par l'agent OSINT.
+            origin_candidates: IP d'origine (hors-Cloudflare) déjà AUTORISÉES par
+                le RoE, à vérifier activement pour confirmer une exposition
+                d'origine. L'orchestrateur ne transmet ici que des IP validées ;
+                l'agent ne décide pas du périmètre.
+
         Returns:
             Dictionnaire structuré avec les résultats de l'agent.
         """
         started_at = datetime.now(timezone.utc)
-        
+
         print(f"[{self.name}] Démarrage du scan sur '{target}' (profil: {scan_profile})")
         print(f"[{self.name}] ⚠️  Trafic actif émis vers la cible")
-        
+
         # 1. Exécution du scan Nmap (ports/services)
         print(f"[{self.name}] Invocation de Nmap...")
         nmap_data = run_nmap_scan(target=target, profile=scan_profile)
-        
+
         if nmap_data["status"] == "error":
             print(f"[{self.name}] ❌ Scan Nmap échoué : {nmap_data['error']}")
             return {
@@ -159,13 +167,13 @@ class ScanningAgent:
                 "target": target,
                 "error": nmap_data["error"],
             }
-        
+
         # 2. Exécution du scan WhatWeb (technologies web)
         # WhatWeb a besoin d'une URL complète (avec https://)
         whatweb_url = target if target.startswith("http") else f"https://{target}"
         print(f"[{self.name}] Invocation de WhatWeb...")
         whatweb_data = run_whatweb_scan(target_url=whatweb_url, aggression="polite")
-        
+
         if whatweb_data["status"] == "error":
             print(f"[{self.name}] ⚠️  WhatWeb échoué (on continue avec Nmap seul) : {whatweb_data['error']}")
 
@@ -189,16 +197,25 @@ class ScanningAgent:
         cve_data = run_cve_analysis(whatweb_data, nmap_data)
         print(f"[{self.name}]   → {len(cve_data.get('findings', []))} composant(s) à CVE connues")
 
+        # 2quinquies. Détection de WAF/CDN (identification des couches de défense)
+        print(f"[{self.name}] Détection WAF/CDN...")
+        waf_data = run_waf_detection(whatweb_url)
+        if waf_data.get("is_cloudflare"):
+            print(f"[{self.name}] 🛡️  Cloudflare détecté devant la cible")
+
+        # 2sexies. Vérification d'exposition d'origine (seulement sur IP RoE-autorisées)
+        origin_verification = self._verify_origins(target, origin_candidates)
+
         # 3. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des résultats du scan...")
         analysis = self._analyze_with_llm(
             target, nmap_data, whatweb_data, tls_data, net_data, cve_data,
-            osint_context)
-        
-        # 3. Construction du résultat final
+            osint_context, waf_data, origin_verification)
+
+        # 4. Construction du résultat final
         ended_at = datetime.now(timezone.utc)
         duration_seconds = (ended_at - started_at).total_seconds()
-        
+
         result = {
             "agent": self.name,
             "version": self.version,
@@ -210,13 +227,16 @@ class ScanningAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["nmap", "whatweb", "tls", "network_exposure", "cve_lookup"],
+            "tools_used": ["nmap", "whatweb", "tls", "network_exposure", "cve_lookup",
+                           "waf_detection", "origin_verification"],
             "raw_data": {
                 "nmap": nmap_data,
                 "whatweb": whatweb_data,
                 "tls": tls_data,
                 "network_exposure": net_data,
                 "cve_lookup": cve_data,
+                "waf_detection": waf_data,
+                "origin_verification": origin_verification,
             },
             "analysis": analysis,
         }
@@ -228,6 +248,40 @@ class ScanningAgent:
         print(f"[{self.name}] Terminé en {duration_seconds:.2f}s")
         return result
     
+    def _verify_origins(
+        self,
+        target: str,
+        origin_candidates: list[str] | None,
+    ) -> dict[str, Any]:
+        """
+        Vérifie activement l'exposition des IP d'origine déjà autorisées.
+
+        Ne fait rien si aucune IP n'est fournie (cas nominal : l'opérateur n'a
+        pas élargi le périmètre aux origines découvertes). Chaque vérification
+        émet du trafic vers l'IP concernée — d'où l'exigence d'une autorisation
+        RoE en amont, garantie par l'orchestrateur.
+        """
+        summary: dict[str, Any] = {
+            "checked": [],
+            "exposed_origins": [],
+            "findings": [],
+        }
+        if not origin_candidates:
+            return summary
+
+        target_host = target.replace("https://", "").replace("http://", "").split("/")[0]
+
+        for ip in origin_candidates:
+            print(f"[{self.name}] Vérification d'exposition d'origine sur {ip}...")
+            verdict = verify_origin_exposure(ip, target_host)
+            summary["checked"].append(ip)
+            if verdict.get("exposed"):
+                print(f"[{self.name}] 🚨 Origine exposée confirmée : {ip}")
+                summary["exposed_origins"].append(ip)
+                if verdict.get("finding"):
+                    summary["findings"].append(verdict["finding"])
+        return summary
+
     def _analyze_with_llm(
         self,
         target: str,
@@ -237,12 +291,37 @@ class ScanningAgent:
         net_data: dict[str, Any] | None = None,
         cve_data: dict[str, Any] | None = None,
         osint_context: dict[str, Any] | None = None,
+        waf_data: dict[str, Any] | None = None,
+        origin_verification: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Analyse LLM corrélée : Nmap, WhatWeb, TLS, exposition réseau et CVE.
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        
+
+        # Section WAF/origine (couches de défense et exposition éventuelle)
+        defense_section = ""
+        if waf_data or origin_verification:
+            waf_json = json.dumps(waf_data or {}, indent=2, ensure_ascii=False, default=str)
+            origin_json = json.dumps(
+                origin_verification or {}, indent=2, ensure_ascii=False, default=str
+            )
+            defense_section = f"""=== DÉTECTION WAF/CDN ===
+```json
+{waf_json}
+```
+
+=== VÉRIFICATION D'EXPOSITION D'ORIGINE ===
+```json
+{origin_json}
+```
+
+Si une origine est marquée `exposed`, c'est un finding de sévérité HIGH \
+(contournement du WAF Cloudflare par accès direct à l'IP) : intègre-le à \
+`key_findings` et à `defense_layers`.
+
+"""
+
         # Prépare la section contexte OSINT si disponible
         osint_section = ""
         if osint_context:
@@ -300,7 +379,7 @@ dans tes 'key_findings' avec le type 'vulnerable_component', la sévérité four
 les identifiants CVE cités dans la preuve. C'est l'OWASP A06:2021 (composants \
 vulnérables/obsolètes).
 
-Produis une analyse de scanning structurée selon le format JSON défini dans tes instructions.
+{defense_section}Produis une analyse de scanning structurée selon le format JSON défini dans tes instructions.
 
 Sois particulièrement attentif à :
 - La CORRÉLATION entre Nmap et WhatWeb (ex: Nmap voit Cloudflare sur les ports, WhatWeb confirme via headers)

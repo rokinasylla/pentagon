@@ -7,11 +7,13 @@ passivement des informations publiques sur la cible, conformément à :
 - OWASP WSTG Section INFO
 - MITRE ATT&CK Tactic TA0043 (Reconnaissance)
 
-Outils mobilisés (v1.1) :
+Outils mobilisés (v1.2) :
 - WHOIS : informations d'enregistrement du domaine
 - DNS Lookup : enregistrements DNS (A, MX, NS, TXT, CNAME)
+- Origin Discovery : recherche passive d'IP d'origine derrière Cloudflare
+  (crt.sh + DNS), avec classification Cloudflare / hors-Cloudflare
 
-Niveau de risque : passif (aucune interaction active avec la cible)
+Niveau de risque : passif (aucune interaction active avec le serveur web cible)
 """
 
 import json
@@ -22,6 +24,7 @@ from pentagon.core.llm_client import LLMClient
 from pentagon.tools.whois_tool import run_whois
 from pentagon.tools.dns_tool import run_dns_lookup
 from pentagon.tools.email_dns_security_tool import run_email_dns_security
+from pentagon.tools.origin_discovery_tool import run_origin_discovery
 
 
 OSINT_SYSTEM_PROMPT = """Tu es l'Agent OSINT (Open-Source Intelligence) de PENTAGON, un système \
@@ -114,7 +117,7 @@ class OSINTAgent:
         """
         self.llm = llm or LLMClient()
         self.name = "OSINT_Agent"
-        self.version = "1.1"
+        self.version = "1.2"
         self.ptes_phase = 2
         self.attack_tactic = "TA0043"
     
@@ -147,15 +150,24 @@ class OSINTAgent:
             n_ed = len(email_dns_data.get("findings", []))
             print(f"[{self.name}]   → {n_ed} finding(s) DNS/e-mail")
 
-        # 3. Analyse corrélée par le LLM
+        # 3. Découverte passive d'IP d'origine (derrière Cloudflare)
+        print(f"[{self.name}] Recherche passive d'IP d'origine (crt.sh + DNS)...")
+        origin_data = run_origin_discovery(target_domain)
+
+        # 4. Analyse corrélée par le LLM
         print(f"[{self.name}] Analyse LLM des données collectées...")
         analysis = self._analyze_with_llm(
-            target_domain, whois_data, dns_data, email_dns_data)
-        
-        # 4. Construction du résultat final structuré
+            target_domain, whois_data, dns_data, email_dns_data, origin_data)
+
+        # Les IP d'origine hors-Cloudflare découvertes sont injectées de façon
+        # DÉTERMINISTE dans l'infrastructure (indépendamment du LLM), afin
+        # d'alimenter le flux d'élargissement de périmètre (interactive-scope).
+        self._merge_origin_candidates(analysis, origin_data)
+
+        # 5. Construction du résultat final structuré
         ended_at = datetime.now(timezone.utc)
         duration_seconds = (ended_at - started_at).total_seconds()
-        
+
         result = {
             "agent": self.name,
             "version": self.version,
@@ -165,11 +177,12 @@ class OSINTAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration_seconds,
-            "tools_used": ["whois", "dns_lookup", "email_dns_security"],
+            "tools_used": ["whois", "dns_lookup", "email_dns_security", "origin_discovery"],
             "raw_data": {
                 "whois": whois_data,
                 "dns": dns_data,
                 "email_dns_security": email_dns_data,
+                "origin_discovery": origin_data,
             },
             "analysis": analysis,
         }
@@ -187,13 +200,29 @@ class OSINTAgent:
         whois_data: dict[str, Any],
         dns_data: dict[str, Any],
         email_dns_data: dict[str, Any] | None = None,
+        origin_data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Demande au LLM d'analyser les données collectées (WHOIS + DNS + e-mail).
+        Demande au LLM d'analyser les données collectées (WHOIS + DNS + e-mail + origine).
         """
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         email_dns_block = json.dumps(email_dns_data or {}, indent=2,
                                      ensure_ascii=False, default=str)
+
+        origin_section = ""
+        if origin_data:
+            origin_section = f"""=== DÉCOUVERTE D'IP D'ORIGINE (crt.sh + DNS, classification Cloudflare) ===
+```json
+{json.dumps(origin_data, indent=2, default=str)}
+```
+
+Interprète ces données : les IP listées dans `classification.non_cloudflare` \
+(et `likely_origins`) sont des candidates d'IP d'origine potentiellement \
+exposées derrière Cloudflare. Une origine directement joignable est une \
+misconfiguration à fort impact (contournement complet du WAF). Signale-la \
+comme un finding et recommande sa vérification active à l'agent Scanning.
+
+"""
 
         user_prompt = f"""Date actuelle : {current_date}
 
@@ -218,19 +247,62 @@ DOIT apparaître dans tes 'key_findings' avec la sévérité fournie. Ces faille
 permettent l'usurpation d'e-mails (phishing) ou la fuite de la cartographie DNS \
 — signale-les explicitement.
 
-Produis une analyse OSINT corrélée et structurée selon le format JSON défini dans tes instructions.
+{origin_section}Produis une analyse OSINT corrélée et structurée selon le format JSON défini dans tes instructions.
 Identifie les éléments utiles pour les phases suivantes du pentest (Scanning, Web App Testing, \
 Vulnerability Analysis). Sois particulièrement attentif aux corrélations entre WHOIS et DNS \
-(ex: hébergeur identifié via CNAME mais privacy service activé sur WHOIS)."""
-        
+(ex: hébergeur identifié via CNAME mais privacy service activé sur WHOIS) et à toute IP \
+d'origine hors-Cloudflare."""
+
         response_text = self.llm.chat(
             system_prompt=OSINT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0.2,
             max_tokens=2000,
         )
-        
+
         return self._parse_llm_response(response_text)
+
+    def _merge_origin_candidates(
+        self,
+        analysis: dict[str, Any],
+        origin_data: dict[str, Any],
+    ) -> None:
+        """
+        Injecte les IP d'origine hors-Cloudflare dans l'infrastructure de façon
+        déterministe (sans dépendre de la sortie du LLM).
+
+        Ces IP alimentent `infrastructure_summary.ip_addresses`, que
+        l'orchestrateur extrait ensuite comme assets candidats pour
+        l'élargissement de périmètre supervisé (interactive-scope). On les
+        marque aussi via un finding dédié pour la traçabilité.
+        """
+        if not isinstance(analysis, dict) or origin_data.get("status") != "success":
+            return
+
+        candidates = [c["ip"] for c in origin_data.get("likely_origins", [])]
+        if not candidates:
+            return
+
+        infra = analysis.setdefault("infrastructure_summary", {})
+        existing = infra.get("ip_addresses") or []
+        if not isinstance(existing, list):
+            existing = [existing]
+        merged = list(dict.fromkeys([*existing, *candidates]))
+        infra["ip_addresses"] = merged
+
+        findings = analysis.setdefault("key_findings", [])
+        if isinstance(findings, list):
+            findings.append({
+                "type": "potential_origin_ip",
+                "value": ", ".join(candidates),
+                "significance": (
+                    "IP hors plages Cloudflare trouvée(s) dans les certificats/DNS "
+                    "de la cible : origine potentiellement joignable en direct "
+                    "(contournement du WAF si confirmé). À vérifier en phase active."
+                ),
+                "attack_mapping": "T1590.005",
+                "source_tool": "origin_discovery",
+            })
     
     def _parse_llm_response(self, response_text: str) -> dict[str, Any]:
         """
