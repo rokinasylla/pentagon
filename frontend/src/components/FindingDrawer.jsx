@@ -38,6 +38,8 @@ export default function FindingDrawer({ finding, busy, onProve, onConfirm, onRet
   if (!finding) return null;
   const confirmed = finding.proof_state === "confirmed";
   const detected = finding.proof_state === "detected";
+  // Observation (divulgation, en-têtes, TLS…) : établie par constat, pas d'exploitation.
+  const exploitable = finding.exploitable !== false;
   const explain = CATEGORY_EXPLAIN[finding.category];
   const catLabel = CATEGORY_LABEL[finding.category] || finding.category;
   const sev = finding.severity || "info";
@@ -114,14 +116,22 @@ export default function FindingDrawer({ finding, busy, onProve, onConfirm, onRet
           <button onClick={() => onRetest(finding)} disabled={busy}>
             Re-tester
           </button>
-          {detected && (
-            <button className="primary" onClick={() => onProve(finding)} disabled={busy}>
-              Prouver
-            </button>
+          {exploitable ? (
+            <>
+              {detected && (
+                <button className="primary" onClick={() => onProve(finding)} disabled={busy}>
+                  Prouver
+                </button>
+              )}
+              <button className="offensive" onClick={() => onConfirm(finding)} disabled={busy}>
+                {confirmed ? "Rejouer la preuve" : busy ? "Exploitation…" : "Confirmer par exploitation"}
+              </button>
+            </>
+          ) : (
+            <span className="muted">
+              Faille d'observation — établie par constat direct, pas d'exploitation.
+            </span>
           )}
-          <button className="offensive" onClick={() => onConfirm(finding)} disabled={busy}>
-            {confirmed ? "Rejouer la preuve" : busy ? "Exploitation…" : "Confirmer par exploitation"}
-          </button>
         </div>
       </aside>
     </>

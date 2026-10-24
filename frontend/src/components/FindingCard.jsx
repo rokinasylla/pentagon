@@ -28,6 +28,9 @@ function traceResponse(finding) {
 export default function FindingCard({ finding, index, acting, msg, onOpen, onProve, onConfirm, onDismiss }) {
   const sev = SEV.includes(finding.severity) ? finding.severity : "info";
   const state = finding.proof_state;
+  // Faille d'observation (divulgation, en-têtes, TLS…) : déjà établie par
+  // constat, rien à exploiter. Le backend expose `exploitable: false`.
+  const exploitable = finding.exploitable !== false;
   const rt = lastRetest(finding);
   const resp = traceResponse(finding);
   const conf = confidenceLabel(finding.confidence);
@@ -76,11 +79,22 @@ export default function FindingCard({ finding, index, acting, msg, onOpen, onPro
       <div className="fc-actions">
         {acting && <span className="fc-wait">en cours…</span>}
 
-        {state === "detected" && (
+        {state === "detected" && exploitable && (
           <>
             <button className="primary sm" onClick={() => onProve(finding)} disabled={acting}>
               Prouver automatiquement
             </button>
+            <button className="ghost sm" onClick={() => onDismiss(finding)} disabled={acting}>
+              Écarter
+            </button>
+          </>
+        )}
+
+        {state === "detected" && !exploitable && (
+          <>
+            <span className="fc-note" title="Faille établie par constat direct">
+              Observation — déjà établie, rien à exploiter
+            </span>
             <button className="ghost sm" onClick={() => onDismiss(finding)} disabled={acting}>
               Écarter
             </button>

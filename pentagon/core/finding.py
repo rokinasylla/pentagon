@@ -54,6 +54,20 @@ def _now_iso() -> str:
 # (deny-by-default : l'orchestrateur ne lance l'agent que si la politique
 # autorise explicitement cette catégorie). Le mapping est centralisé ici
 # pour que la commande d'exploitation sache quoi faire re-vérifier au RoE.
+# Classes PROUVABLES PAR EXPLOITATION (une attaque réelle les démontre).
+EXPLOITABLE_CATEGORIES: frozenset[str] = frozenset({
+    "auth", "jwt", "idor", "sqli", "xss",
+    "lfi", "open_redirect", "ssti", "ssrf", "csrf",
+})
+
+# Classes d'OBSERVATION : établies par simple constat (divulgation, en-têtes,
+# TLS, CVE, mauvaise config…). Elles n'ont RIEN à « exploiter » — elles sont
+# déjà prouvées par la détection elle-même. L'exploitation à la demande ne
+# s'applique donc pas : l'UI doit l'indiquer au lieu d'échouer sèchement.
+OBSERVATION_CATEGORIES: frozenset[str] = frozenset({
+    "info_disclosure", "security_headers", "tls", "cve", "misconfig",
+})
+
 CATEGORY_TO_ROE_ACTION: dict[str, str] = {
     "auth": "exploitation",
     "jwt": "exploitation",
@@ -65,6 +79,12 @@ CATEGORY_TO_ROE_ACTION: dict[str, str] = {
     "ssti": "exploitation",
     "ssrf": "exploitation",
     "csrf": "exploitation",
+    # Observation : relève au plus du passif/scan, jamais d'un acte offensif.
+    "info_disclosure": "passive",
+    "security_headers": "passive",
+    "tls": "active_scan",
+    "cve": "active_scan",
+    "misconfig": "active_scan",
 }
 
 
@@ -75,6 +95,17 @@ def roe_action_for(category: str) -> str:
     jamais « passive » : on ne relâche pas la garde sur une catégorie inconnue.
     """
     return CATEGORY_TO_ROE_ACTION.get(category, "exploitation")
+
+
+def is_exploitable_category(category: str) -> bool:
+    """
+    True si la catégorie se PROUVE par exploitation (attaque réelle possible).
+
+    Les classes d'observation (divulgation, en-têtes, TLS, CVE, config) et une
+    catégorie vide/inconnue renvoient False : il n'y a rien à exploiter, la
+    faille est établie par constat direct.
+    """
+    return category in EXPLOITABLE_CATEGORIES
 
 
 # --- Inférence de catégorie depuis un finding affiché ---------------------
@@ -93,6 +124,11 @@ _CWE_TO_CATEGORY = {
     "918": "ssrf",
     "1336": "ssti", "94": "ssti",
     "347": "jwt", "345": "jwt",
+    # Observation (non exploitables) :
+    "200": "info_disclosure", "209": "info_disclosure", "548": "info_disclosure",
+    "693": "security_headers", "1021": "security_headers", "1004": "security_headers",
+    "295": "tls", "326": "tls", "327": "tls",
+    "16": "misconfig", "650": "misconfig",
 }
 
 _TITLE_KEYWORDS = [
@@ -111,6 +147,24 @@ _TITLE_KEYWORDS = [
               "accès horizontal", "acces horizontal")),
     ("auth", ("authentification", "identifiant", "mot de passe par défaut",
               "mot de passe par defaut", "credentials", "brute")),
+    # --- Classes d'OBSERVATION (non exploitables) ---
+    ("security_headers", ("en-tête de sécurité", "en-tete de securite",
+                          "security header", "csp", "hsts", "x-frame-options",
+                          "clickjacking", "en-têtes manquants", "headers manquants",
+                          "content-security-policy")),
+    ("tls", ("tls", "ssl", "certificat", "chiffrement faible", "cipher",
+             "protocole obsolète", "protocole obsolete", "handshake")),
+    ("cve", ("cve-", "vulnérabilité connue", "vulnerabilite connue",
+             "version vulnérable", "version vulnerable", "composant obsolète",
+             "composant obsolete")),
+    ("misconfig", ("méthode http", "methode http", "trace", "mauvaise configuration",
+                   "misconfiguration", "configuration par défaut",
+                   "configuration par defaut", "répertoire listé", "directory listing")),
+    ("info_disclosure", ("divulgation", "disclosure", "header server",
+                         "en-tête server", "en-tete server", "x-powered-by",
+                         "exposition d'information", "fuite d'information",
+                         "version du serveur", "bannière", "banner",
+                         "information exposure")),
 ]
 
 
@@ -214,8 +268,17 @@ class Finding:
         self.updated_at = entry["at"]
         return entry
 
+    @property
+    def exploitable(self) -> bool:
+        """True si la faille se prouve par exploitation (cf. is_exploitable_category)."""
+        return is_exploitable_category(self.category)
+
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        # Drapeau dérivé exposé à l'UI : distinguer « à prouver » (exploitable)
+        # de « déjà établi » (observation) — évite de proposer /exploit à tort.
+        d["exploitable"] = self.exploitable
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Finding":
