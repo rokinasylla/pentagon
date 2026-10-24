@@ -24,6 +24,7 @@ Niveau de risque : ACTIF (envoie des requêtes vers la cible)
 import json
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 from pentagon.core.llm_client import LLMClient
 from pentagon.tools.js_analyzer_tool import run_js_analysis
@@ -31,6 +32,7 @@ from pentagon.tools.api_prober_tool import run_api_probe
 from pentagon.tools.security_headers_tool import run_security_headers_scan
 from pentagon.tools.http_methods_tool import run_http_methods_scan
 from pentagon.tools.data_analyzer_tool import run_data_analysis
+from pentagon.tools.dynamic_crawler_tool import run_dynamic_crawl
 
 WEBAPP_SYSTEM_PROMPT = """Tu es l'Agent Web App de PENTAGON, un système multi-agent \
 de test d'intrusion automatisé.
@@ -173,9 +175,34 @@ class WebAppAgent:
         else:
             print(f"[{self.name}] Pas de backend séparé, test direct sur la cible")
         
-        # Endpoints à tester = routes découvertes
-        endpoints_to_test = js_data.get("app_routes", [])
-        
+        # === Outil 1bis : Crawl DYNAMIQUE (navigateur) — surface réelle ===
+        # Explore l'appli comme un utilisateur (JS exécuté) pour découvrir les
+        # routes, formulaires et appels d'API (XHR/fetch) que l'analyse statique
+        # rate. Borné au périmètre (deny-by-default) et tolérant si Playwright
+        # est absent (on continue avec la seule découverte statique).
+        print(f"[{self.name}] Crawl dynamique (navigateur)...")
+        crawl_data = run_dynamic_crawl(
+            target_url, scope_check=scope_check, max_pages=15, max_depth=2)
+        crawl_routes: list[str] = []
+        if crawl_data.get("status") == "success":
+            for pg in crawl_data.get("pages", []):
+                path = urlparse(pg.get("url", "")).path
+                if path and path != "/":
+                    crawl_routes.append(path)
+            for call in crawl_data.get("api_calls", []):
+                path = urlparse(call.get("url", "")).path
+                if path and path != "/":
+                    crawl_routes.append(path)
+            print(f"[{self.name}]   → {crawl_data.get('pages_visited', 0)} page(s), "
+                  f"{len(crawl_data.get('forms', []))} formulaire(s), "
+                  f"{len(crawl_data.get('api_calls', []))} appel(s) d'API dynamiques")
+        else:
+            print(f"[{self.name}]   → crawl dynamique indisponible : {crawl_data.get('error')}")
+
+        # Endpoints à tester = routes statiques (bundle JS) ∪ routes dynamiques (crawl)
+        endpoints_to_test = list(dict.fromkeys(
+            js_data.get("app_routes", []) + crawl_routes))
+
         # === Outil 2 : Sondage des endpoints ===
         print(f"[{self.name}] Sondage de {len(endpoints_to_test)} endpoints...")
         api_data = run_api_probe(base_url=api_base, endpoints=endpoints_to_test)
@@ -233,10 +260,11 @@ class WebAppAgent:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": duration,
-            "tools_used": ["js_analyzer", "api_prober", "security_headers",
-                           "http_methods", "data_analyzer"],
+            "tools_used": ["js_analyzer", "dynamic_crawler", "api_prober",
+                           "security_headers", "http_methods", "data_analyzer"],
             "raw_data": {
                 "js_analysis": js_data,
+                "dynamic_crawl": crawl_data,
                 "api_probe": api_data,
                 "security_headers": headers_data,
                 "http_methods": methods_data,
