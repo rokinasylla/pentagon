@@ -127,6 +127,7 @@ class GraphOrchestrator:
                 target=target,
                 osint_context=osint_context,
                 scanning_context=None,
+                scope_check=self._seq.roe.check_target,
             )
             n = len(res.get("analysis", {}).get("vulnerabilities", []))
             return {
@@ -157,6 +158,7 @@ class GraphOrchestrator:
                 web_app_context=web_app_context,
                 osint_context=osint_context,
                 scanning_context=scanning_context,
+                scope_check=self._seq.roe.check_target,
             )
             n = len(res.get("analysis", {}).get("exploited_vulnerabilities", []))
             return {

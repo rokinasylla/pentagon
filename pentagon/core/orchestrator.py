@@ -232,6 +232,7 @@ class Orchestrator:
                 target=target,
                 osint_context=osint_context,
                 scanning_context=scanning_context,
+                scope_check=self.roe.check_target,
             )
             state.web_app_result = web_app_result
             state.agents_executed.append("WebApp_Agent")
@@ -282,6 +283,7 @@ class Orchestrator:
                 web_app_context=web_app_context,
                 osint_context=osint_context,
                 scanning_context=scanning_context,
+                scope_check=self.roe.check_target,
             )
             state.exploitation_result = exploitation_result
             state.agents_executed.append("Exploitation_Agent")

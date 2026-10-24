@@ -126,15 +126,20 @@ class WebAppAgent:
         target: str,
         osint_context: dict[str, Any] | None = None,
         scanning_context: dict[str, Any] | None = None,
+        scope_check: Any = None,
     ) -> dict[str, Any]:
         """
         Exécute l'agent Web App sur une cible.
-        
+
         Args:
             target: URL ou domaine de la cible.
             osint_context: contexte des agents précédents (optionnel).
             scanning_context: contexte de l'agent scanning (optionnel).
-        
+            scope_check: callable optionnel (url) -> {"allowed": bool} (le RoE).
+                Injecté par l'orchestrateur ; borne le périmètre des requêtes
+                (deny-by-default) — un « backend » hors périmètre n'est jamais
+                sondé, on retombe sur la cible.
+
         Returns:
             Dictionnaire structuré avec les résultats.
         """
@@ -150,13 +155,22 @@ class WebAppAgent:
         print(f"[{self.name}] Analyse du bundle JavaScript...")
         js_data = run_js_analysis(target_url)
         
-        # Détermine où tester l'API : backend découplé ou cible directe
+        # Détermine où tester l'API : backend découplé ou cible directe.
+        # GARDE RoE (deny-by-default) : on n'adopte un « backend » découvert que
+        # s'il est DANS le périmètre autorisé — sinon on retombe sur la cible.
+        # Empêche qu'un lien tiers glissé dans le bundle devienne la base d'API.
+        from pentagon.core.scope_guard import host_in_scope
         backend_urls = js_data.get("backend_urls", [])
+        api_base = target_url
         if backend_urls:
-            api_base = backend_urls[0]
-            print(f"[{self.name}] Backend découplé détecté : {api_base}")
+            candidate = backend_urls[0]
+            if host_in_scope(candidate, target_url, scope_check):
+                api_base = candidate
+                print(f"[{self.name}] Backend découplé détecté : {api_base}")
+            else:
+                print(f"[{self.name}] ⚠️  Backend candidat HORS périmètre ignoré "
+                      f"({candidate}) → test direct sur la cible")
         else:
-            api_base = target_url
             print(f"[{self.name}] Pas de backend séparé, test direct sur la cible")
         
         # Endpoints à tester = routes découvertes

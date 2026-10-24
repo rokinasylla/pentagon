@@ -21,10 +21,14 @@ Niveau de risque : PASSIF (téléchargement de ressources publiques uniquement)
 """
 
 import re
-import requests
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 from typing import Any
+
+# Import DIFFÉRÉ de `requests` (voir run_js_analysis) : le module s'importe sans
+# la lib réseau, ce qui rend les fonctions PURES (extraction, filtrage)
+# testables hors-ligne — conforme à la convention PENTAGON.
+from pentagon.core.scope_guard import same_site, host_of
 
 
 DEFAULT_TIMEOUT = 30
@@ -58,8 +62,10 @@ def run_js_analysis(
         - potential_secrets: chaînes ressemblant à des secrets/tokens
         - error: message d'erreur le cas échéant
     """
+    import requests  # import différé : la lib réseau n'est chargée qu'à l'exécution
+
     started_at = datetime.now(timezone.utc)
-    
+
     result: dict[str, Any] = {
         "status": "success",
         "target_url": target_url,
@@ -222,39 +228,75 @@ def _extract_app_routes(content: str) -> list[str]:
     return sorted(routes)
 
 
+# Sous-domaines qui désignent typiquement un backend/une instance liée de la
+# MÊME organisation (api.cible, dev.cible, staging.cible…).
+_BACKEND_SUBDOMAIN_LABELS = frozenset({
+    "api", "backend", "back", "rest", "graphql", "gateway", "gw",
+    "dev", "staging", "stage", "preprod", "preprod", "test", "qa", "uat",
+    "app", "admin", "auth", "account", "accounts", "service", "services",
+})
+
+# Domaines tiers récurrents à ignorer même en cas d'homonymie partielle
+# (doc de frameworks, standards, CDN, réseaux sociaux…). Filet de sécurité :
+# le filtre PRINCIPAL est la contrainte de MÊME domaine racine ci-dessous.
+_IGNORE_DOMAINS = (
+    "w3.org", "schema.org", "localhost", "example.com", "example.org",
+    "reactjs.org", "react.dev", "nextjs.org", "vuejs.org", "angular.io",
+    "svelte.dev", "vercel.com", "vercel.app", "netlify.app", "github.com",
+    "githubusercontent.com", "gitlab.com", "npmjs.com", "nodejs.org",
+    "googleapis.com", "gstatic.com", "google.com", "cloudflare.com",
+    "cloudflareinsights.com", "jsdelivr.net", "unpkg.com", "cdnjs.com",
+    "jquery.com", "bootstrapcdn.com", "fontawesome.com", "sentry.io",
+    "instagram.com", "linkedin.com", "tiktok.com", "facebook.com",
+    "twitter.com", "x.com", "youtube.com", "mozilla.org",
+)
+
+# Un vrai segment d'API (pas une sous-chaîne : /api-reference ne compte pas).
+_API_PATH_RE = re.compile(r'/(?:api|rest|graphql)(?:/|$)|/v\d+(?:/|$)', re.IGNORECASE)
+
+
+def _looks_like_api(url: str, host: str) -> bool:
+    """Signal de backend/API RÉEL : segment /api|/rest|/graphql|/vN, ou sous-domaine dédié."""
+    path = urlparse(url).path or ""
+    if _API_PATH_RE.search(path):
+        return True
+    first_label = host.split(".", 1)[0]
+    return first_label in _BACKEND_SUBDOMAIN_LABELS
+
+
 def _extract_backend_urls(content: str, target_url: str) -> list[str]:
     """
-    Extrait les URLs de backend externes (architectures découplées).
-    
-    Cherche les URLs absolues http(s):// qui ne sont PAS la cible elle-même
-    ni des CDN/librairies connues. Détecte ainsi un backend séparé.
+    Repère un éventuel backend/instance liée de l'application testée.
+
+    Deux garde-fous, pour ne JAMAIS confondre un lien tiers (doc de framework,
+    CDN, réseau social) avec « le backend » — l'erreur qui a fait attaquer
+    nextjs.org au lieu de la vraie cible :
+
+      1. MÊME domaine racine que la cible (p. ex. api.cible / dev.cible pour
+         cible.tld), via scope_guard.same_site → exclut d'emblée nextjs.org,
+         react.dev, github, réseaux sociaux, CDN… (domaines différents) ;
+      2. Signal d'API RÉEL : un vrai segment /api|/rest|/graphql|/vN (pas la
+         sous-chaîne « /api-reference ») OU un sous-domaine dédié (api., dev.…).
+
+    Les URLs retournées restent des assets à SURFACER : leur éventuel test
+    reste soumis au RoE (un sous-domaine ≠ la cible n'est pas attaqué d'office).
     """
-    target_domain = urlparse(target_url).netloc
-    
-    # Tous les URLs absolus
-    all_urls = set(re.findall(r'https?://[a-zA-Z0-9.-]+(?:/[a-zA-Z0-9/_.-]*)?', content))
-    
-    # Domaines à ignorer (librairies, standards, CDN connus)
-    ignore_domains = [
-        "w3.org", "reactjs.org", "localhost", "github.com",
-        "googleapis.com", "gstatic.com", "cloudflare.com",
-        "jsdelivr.net", "unpkg.com", "cdnjs.com", "jquery.com",
-        "schema.org", "example.com",
-    ]
-    
+    target_host = host_of(target_url)
+
+    all_urls = set(re.findall(r'https?://[a-zA-Z0-9.-]+(?:/[a-zA-Z0-9/_.{}$-]*)?', content))
+
     backend_urls = set()
     for url in all_urls:
-        domain = urlparse(url).netloc
-        # Ignore la cible elle-même
-        if domain == target_domain:
-            continue
-        # Ignore les domaines connus non pertinents
-        if any(ignored in domain for ignored in ignore_domains):
-            continue
-        # Garde uniquement les URLs qui ressemblent à un backend/API
-        if "/api" in url or "backend" in domain or "api." in domain:
+        host = host_of(url)
+        if not host or host == target_host:
+            continue  # cible elle-même ou URL illisible
+        if not same_site(url, target_url):
+            continue  # domaine racine DIFFÉRENT → jamais « le backend »
+        if any(ig in host for ig in _IGNORE_DOMAINS):
+            continue  # filet de sécurité (homonymie improbable mais explicite)
+        if _looks_like_api(url, host):
             backend_urls.add(url)
-    
+
     return sorted(backend_urls)
 
 
