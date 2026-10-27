@@ -24,6 +24,7 @@ ce module s'importe sans la stack — seule une campagne réelle la charge.
 import glob
 import io
 import json
+import logging
 import os
 import secrets
 import threading
@@ -31,18 +32,28 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from logging.handlers import RotatingFileHandler
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from flask import (
     Flask, jsonify, render_template, request, Response, send_file, abort,
     session, redirect, url_for,
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 # Charge .env (clé DeepSeek, identifiants opérateur, secret de session).
 load_dotenv()
 
 app = Flask(__name__)
+
+# Derrière le reverse proxy nginx qui termine le TLS, Flask ne voit que du HTTP
+# sur 127.0.0.1. ProxyFix fait confiance aux en-têtes X-Forwarded-* posés par
+# nginx (UN seul proxy de confiance) pour rétablir le schéma réel (https) et
+# l'IP réelle du client — indispensable au cookie Secure, à request.is_secure
+# (HSTS) et à l'IP consignée dans le journal d'audit.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 # ──────────────────── Authentification multi-utilisateur + rôles ────────────
 # La console est une interface OFFENSIVE : elle ne doit JAMAIS être ouverte
@@ -60,14 +71,165 @@ app = Flask(__name__)
 # (Chrome restaure les cookies de session via « reprendre là où vous en étiez »).
 SESSION_IDLE_MINUTES = int(os.getenv("SESSION_IDLE_MINUTES", "30"))
 
-app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+# En production (COOKIE_SECURE=1), la clé de session DOIT être fournie et stable :
+# une clé aléatoire par processus invaliderait toutes les sessions à chaque
+# redémarrage et différerait entre workers gunicorn (déconnexions aléatoires).
+_PROD = os.getenv("COOKIE_SECURE", "0") == "1"
+_SECRET = os.getenv("FLASK_SECRET_KEY")
+if not _SECRET:
+    if _PROD:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY manquant : obligatoire en production (COOKIE_SECURE=1). "
+            "Générez-le une fois — python -c \"import secrets; print(secrets.token_hex(32))\" "
+            "— et placez-le dans l'environnement du service."
+        )
+    _SECRET = secrets.token_hex(32)  # dev local uniquement
+app.secret_key = _SECRET
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    # Passé à True en production derrière TLS (via COOKIE_SECURE=1).
-    SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "0") == "1",
+    # True en production derrière TLS (via COOKIE_SECURE=1) : le cookie n'est
+    # alors jamais émis en clair.
+    SESSION_COOKIE_SECURE=_PROD,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=SESSION_IDLE_MINUTES),
 )
+
+
+# ────────────────────────── Durcissement sécurité ───────────────────────────
+# La console est une interface OFFENSIVE exposée : on applique une défense en
+# profondeur AU-DESSUS de l'authentification et de la gouvernance RoE déjà en
+# place — en-têtes de sécurité navigateur, défense CSRF par origine, limitation
+# des tentatives de connexion (anti-brute-force) et journal d'audit.
+
+# Journal d'audit : trace horodatée des événements de sécurité (connexions,
+# déconnexions, décisions d'autorisation, lancements de campagne) avec IP et
+# opérateur — appuie la traçabilité du modèle per-operator.
+AUDIT_LOG_PATH = os.getenv("PENTAGON_AUDIT_LOG", os.path.join("logs", "audit.log"))
+_audit_dir = os.path.dirname(AUDIT_LOG_PATH)
+if _audit_dir:
+    os.makedirs(_audit_dir, exist_ok=True)
+_audit = logging.getLogger("pentagon.audit")
+if not _audit.handlers:
+    _audit.setLevel(logging.INFO)
+    _handler = RotatingFileHandler(AUDIT_LOG_PATH, maxBytes=1_000_000,
+                                   backupCount=5, encoding="utf-8")
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    _audit.addHandler(_handler)
+    _audit.propagate = False
+
+
+def _client_ip() -> str:
+    """IP réelle du client (rétablie par ProxyFix depuis X-Forwarded-For)."""
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return (fwd.split(",")[0].strip() or request.remote_addr or "?")
+
+
+def audit(event: str, **fields) -> None:
+    """Écrit une ligne d'audit : évènement + opérateur + IP + champs libres."""
+    op = session.get("operator") or "-"
+    parts = [f"event={event}", f"operator={op}", f"ip={_client_ip()}"]
+    parts += [f"{k}={v}" for k, v in fields.items() if v is not None]
+    _audit.info(" ".join(str(p) for p in parts))
+
+
+# Anti-brute-force : au-delà de LOGIN_FAIL_MAX échecs dans LOGIN_FAIL_WINDOW
+# secondes depuis une même IP, les connexions sont bloquées LOGIN_LOCK_SECONDS.
+# État en mémoire (par processus) : suffisant pour ce service ; un déploiement
+# multi-workers partagerait cet état (Redis). → gunicorn mono-worker recommandé.
+LOGIN_FAIL_MAX = int(os.getenv("LOGIN_FAIL_MAX", "5"))
+LOGIN_FAIL_WINDOW = int(os.getenv("LOGIN_FAIL_WINDOW", "300"))
+LOGIN_LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", "300"))
+_login_attempts: dict[str, dict] = {}
+_login_attempts_lock = threading.Lock()
+
+
+def login_lock_remaining(ip: str) -> int:
+    """Secondes de blocage restantes pour cette IP (0 si non bloquée)."""
+    now = time.time()
+    with _login_attempts_lock:
+        rec = _login_attempts.get(ip)
+        if rec and rec.get("locked_until", 0) > now:
+            return int(rec["locked_until"] - now) + 1
+    return 0
+
+
+def login_note_failure(ip: str) -> None:
+    """Enregistre un échec ; verrouille l'IP au seuil atteint."""
+    now = time.time()
+    with _login_attempts_lock:
+        rec = _login_attempts.setdefault(ip, {"fails": [], "locked_until": 0})
+        rec["fails"] = [t for t in rec["fails"] if now - t < LOGIN_FAIL_WINDOW]
+        rec["fails"].append(now)
+        if len(rec["fails"]) >= LOGIN_FAIL_MAX:
+            rec["locked_until"] = now + LOGIN_LOCK_SECONDS
+            rec["fails"] = []
+
+
+def login_note_success(ip: str) -> None:
+    """Réinitialise le compteur d'échecs après une connexion réussie."""
+    with _login_attempts_lock:
+        _login_attempts.pop(ip, None)
+
+
+# Pages HTML legacy (Jinja, scripts inline) : CSP assouplie ciblée. La SPA
+# (/console) et l'API n'ont aucun script inline → CSP stricte « script-src 'self' ».
+_LEGACY_HTML_PATHS = {"/", "/login", "/logout"}
+
+
+def _content_security_policy(relaxed: bool) -> str:
+    script_src = "script-src 'self' 'unsafe-inline'" if relaxed else "script-src 'self'"
+    return "; ".join([
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "img-src 'self' data:",
+        "font-src 'self' https://fonts.gstatic.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        script_src,
+        "connect-src 'self'",
+    ])
+
+
+@app.after_request
+def _security_headers(resp):
+    """Défense navigateur : clickjacking, sniffing MIME, fuite de référent, TLS."""
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    resp.headers["Content-Security-Policy"] = _content_security_policy(
+        request.path in _LEGACY_HTML_PATHS
+    )
+    # HSTS seulement en HTTPS : l'envoyer en dev HTTP forcerait le navigateur à
+    # refuser http://localhost pendant un an.
+    if request.is_secure:
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return resp
+
+
+@app.before_request
+def _csrf_origin_guard():
+    """Défense CSRF : toute requête MODIFIANTE doit venir de la même origine.
+
+    Complète SameSite=Lax. L'API et les formulaires étant servis en même
+    origine, le navigateur envoie toujours Origin sur ces requêtes ; une requête
+    forgée depuis un site tiers portera une Origin (ou, à défaut, un Referer)
+    d'une autre origine et sera refusée.
+    """
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    source = request.headers.get("Origin") or request.headers.get("Referer", "")
+    try:
+        ok = bool(source) and urlparse(source).netloc == request.host
+    except ValueError:
+        ok = False
+    if not ok:
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Origine refusée (protection CSRF)."}), 403
+        return ("Origine refusée (protection CSRF).", 403)
+    return None
 
 
 @app.before_request
@@ -656,22 +818,34 @@ def login():
                   "Exécutez « python set_password.py » sur le serveur."), 503
     error = None
     if request.method == "POST":
+        ip = _client_ip()
+        locked = login_lock_remaining(ip)
+        if locked:
+            audit("login_blocked", reason="rate_limit")
+            return render_template(
+                "login.html",
+                error=f"Trop de tentatives. Réessayez dans {locked} s."), 429
         user = (request.form.get("username") or "").strip()
         pwd = request.form.get("password") or ""
         role = authenticate(user, pwd)
         if role:
+            login_note_success(ip)
             session.clear()
             session.permanent = True
             session["operator"] = user
             session["role"] = role
             session["last_seen"] = datetime.now(timezone.utc).isoformat()
+            audit("login_success", role=role)
             return redirect(url_for("index"))
+        login_note_failure(ip)
+        audit("login_failure", username=user)
         error = "Identifiants invalides."
     return render_template("login.html", error=error)
 
 
 @app.route("/logout")
 def logout():
+    audit("logout")
     session.clear()
     return redirect(url_for("login"))
 
@@ -897,6 +1071,8 @@ def api_start():
         daemon=True,
     )
     thread.start()
+    audit("campaign_start", target=target, requested_for=operator or "-",
+          categories="|".join(actions), engine=engine, job=job_id)
     return jsonify({"job_id": job_id})
 
 
@@ -1095,17 +1271,26 @@ def api_v1_login():
     """Connexion JSON : pose la session opérateur, renvoie le rôle."""
     if not load_users():
         return jsonify({"error": "Aucun compte configuré sur le serveur."}), 503
+    ip = _client_ip()
+    locked = login_lock_remaining(ip)
+    if locked:
+        audit("login_blocked", reason="rate_limit")
+        return jsonify({"error": f"Trop de tentatives. Réessayez dans {locked} s."}), 429
     data = request.get_json(force=True, silent=True) or {}
     user = (data.get("username") or "").strip()
     pwd = data.get("password") or ""
     role = authenticate(user, pwd)
     if not role:
+        login_note_failure(ip)
+        audit("login_failure", username=user)
         return jsonify({"error": "Identifiants invalides."}), 401
+    login_note_success(ip)
     session.clear()
     session.permanent = True
     session["operator"] = user
     session["role"] = role
     session["last_seen"] = datetime.now(timezone.utc).isoformat()
+    audit("login_success", role=role)
     return jsonify({"ok": True, "operator": user, "role": role})
 
 
@@ -1174,8 +1359,11 @@ def api_v1_admin_sites():
         if operator and operator not in load_users():
             return jsonify({"error": "Opérateur inconnu."}), 400
         store.authorize(site, operator, cats, proof, session.get("operator") or "admin")
+        audit("site_authorize", site=site, assigned_to=operator or "-",
+              categories="|".join(cats))
     else:  # DELETE
         store.revoke(site)
+        audit("site_revoke", site=site)
     _sync_from_store(store)
     return jsonify({"sites": store.to_public()})
 
@@ -1207,8 +1395,11 @@ def api_v1_admin_access_requests():
         proof = (data.get("proof") or "").strip()
         operator = (data.get("operator") or "").strip() or None
         store.approve(domain, cats, proof, session.get("operator") or "admin", operator=operator)
+        audit("access_approve", site=domain, assigned_to=operator or "-",
+              categories="|".join(cats))
     else:
         store.reject(domain)
+        audit("access_reject", site=domain)
     _sync_from_store(store)
     return jsonify({"requests": [s for s in store.to_public() if s["status"] == "attente"],
                     "sites": store.to_public()})
@@ -1276,6 +1467,7 @@ def api_v1_admin_user_sites(username: str):
 @app.route("/api/v1/logout", methods=["POST"])
 def api_v1_logout():
     """Déconnexion JSON : vide la session."""
+    audit("logout")
     session.clear()
     return jsonify({"ok": True})
 
@@ -1904,5 +2096,10 @@ sync_persisted_jobs()
 
 
 if __name__ == "__main__":
-    print("PENTAGON — interface web sur http://127.0.0.1:5000")
+    # Serveur de DÉVELOPPEMENT uniquement (Werkzeug). En production, le module
+    # est servi par gunicorn derrière nginx (TLS) — voir deploy/README.md :
+    #   gunicorn -w 1 -b 127.0.0.1:5000 webapp:app
+    # L'écoute reste sur 127.0.0.1 : jamais exposée directement, toujours via
+    # le reverse proxy qui termine le HTTPS.
+    print("PENTAGON — interface web (DEV) sur http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, threaded=True, debug=False)

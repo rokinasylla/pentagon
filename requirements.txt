@@ -26,6 +26,9 @@ reportlab>=4.0.0
 
 # Interface web opérateur (webapp.py)
 flask>=3.0.0
+# Serveur WSGI de production (derrière nginx/TLS). Le serveur de dev Flask
+# n'est utilisé qu'en local. Déploiement : gunicorn -w 1 -b 127.0.0.1:5000 webapp:app
+gunicorn>=21.2.0
 
 # Moteur d'orchestration graphe optionnel (pentagon.py --engine langgraph)
 # Parallélisme, routage conditionnel, checkpointing. Non requis pour le moteur

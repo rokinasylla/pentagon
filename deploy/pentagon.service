@@ -1,0 +1,42 @@
+# PENTAGON — service systemd (serveur WSGI de production gunicorn).
+#
+# Remplace l'exécution du serveur de développement Flask (python webapp.py).
+# Installation :
+#   sudo cp deploy/pentagon.service /etc/systemd/system/pentagon.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now pentagon
+#   systemctl status pentagon
+#
+# Adaptez User= et les chemins à votre VM.
+
+[Unit]
+Description=PENTAGON - console web (gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=pentagon
+WorkingDirectory=/opt/pentagon
+
+# Secrets HORS du dépôt git : au minimum
+#   FLASK_SECRET_KEY=<64 hex>        (obligatoire, stable)
+#   COOKIE_SECURE=1                  (cookie de session jamais émis en clair)
+#   DEEPSEEK_API_KEY=...             (et autres clés LLM)
+EnvironmentFile=/opt/pentagon/.env
+
+# 1 worker : l'état anti-brute-force et le registre des campagnes vivent en
+# mémoire de processus. Les threads gèrent la concurrence des requêtes et les
+# flux SSE longue durée.
+ExecStart=/opt/pentagon/.venv/bin/gunicorn --workers 1 --threads 8 \
+          --timeout 3600 --bind 127.0.0.1:5000 webapp:app
+Restart=on-failure
+RestartSec=3
+
+# Durcissement systemd (réduit la surface en cas de compromission du process).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
