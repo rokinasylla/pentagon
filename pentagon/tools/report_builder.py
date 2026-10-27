@@ -67,6 +67,9 @@ class ReportModel:
     recon_scanning_findings: list[dict[str, Any]] = field(default_factory=list)
     exec_summaries: dict[str, str] = field(default_factory=dict)
     attempted_not_confirmed: list[str] = field(default_factory=list)
+    # Surfaces NON testées (hors périmètre, anti-bot) : empêche de lire
+    # « aucune faille retenue » comme « cible sûre ».
+    coverage_gaps: list[dict[str, Any]] = field(default_factory=list)
 
     # Gouvernance / audit
     errors: list[dict[str, Any]] = field(default_factory=list)
@@ -205,5 +208,41 @@ def build_report(campaign: dict[str, Any], operator: str = "") -> ReportModel:
     model.attempted_not_confirmed = list(
         (campaign.get("exploitation_result") or {}).get(
             "analysis", {}).get("attempted_but_not_confirmed", []) or [])
+
+    # --- Couverture : surfaces découvertes mais NON testées ---
+    # Collecte les lacunes signalées par les agents (hors périmètre), dédupliquées.
+    gaps: list[dict[str, Any]] = []
+    seen = set()
+    for agent_key in ("web_app_result", "exploitation_result"):
+        for g in (campaign.get(agent_key) or {}).get("coverage", []) or []:
+            key = (g.get("kind"), g.get("host"), g.get("area"))
+            if key in seen:
+                continue
+            seen.add(key)
+            gaps.append(g)
+
+    # Inférence anti-bot : un WAF/CDN devant la cible + une exploration dynamique
+    # quasi vide (0 formulaire, 0 appel d'API) trahit un blocage qui a pu masquer
+    # la surface réelle — à signaler comme limite de couverture.
+    waf = (campaign.get("scanning_result") or {}).get("raw_data", {}).get(
+        "waf_detection", {}) or {}
+    crawl = (campaign.get("web_app_result") or {}).get("raw_data", {}).get(
+        "dynamic_crawl", {}) or {}
+    if waf.get("waf_detected") and crawl.get("status") == "success":
+        forms = len(crawl.get("forms", []) or [])
+        apis = len(crawl.get("api_calls", []) or [])
+        if forms == 0 and apis == 0:
+            vendors = waf.get("vendors") or []
+            vendor = ", ".join(vendors) if vendors else "WAF/CDN"
+            gaps.append({
+                "area": "Couverture",
+                "kind": "anti_bot",
+                "host": model.target,
+                "detail": (f"{vendor} détecté devant la cible et exploration "
+                           f"dynamique quasi vide (0 formulaire, 0 appel d'API) : "
+                           f"un blocage anti-bot a pu masquer la surface réelle. "
+                           f"Résultats à interpréter avec prudence."),
+            })
+    model.coverage_gaps = gaps
 
     return model

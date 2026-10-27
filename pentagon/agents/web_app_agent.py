@@ -162,6 +162,8 @@ class WebAppAgent:
         # s'il est DANS le périmètre autorisé — sinon on retombe sur la cible.
         # Empêche qu'un lien tiers glissé dans le bundle devienne la base d'API.
         from pentagon.core.scope_guard import host_in_scope
+        # Couverture : surfaces découvertes mais NON testées (hors périmètre).
+        coverage: list[dict[str, Any]] = []
         backend_urls = js_data.get("backend_urls", [])
         api_base = target_url
         if backend_urls:
@@ -172,6 +174,15 @@ class WebAppAgent:
             else:
                 print(f"[{self.name}] ⚠️  Backend candidat HORS périmètre ignoré "
                       f"({candidate}) → test direct sur la cible")
+                coverage.append({
+                    "area": "Web App",
+                    "kind": "out_of_scope",
+                    "host": urlparse(candidate).netloc,
+                    "example": candidate,
+                    "detail": (f"Backend/API applicatif hors périmètre ({candidate}) : "
+                               f"NON testé. L'application réelle est probablement "
+                               f"là — autorisez cet hôte dans le RoE pour le couvrir."),
+                })
         else:
             print(f"[{self.name}] Pas de backend séparé, test direct sur la cible")
         
@@ -270,6 +281,7 @@ class WebAppAgent:
                 "http_methods": methods_data,
                 "data_analysis": data_analysis_results,
             },
+            "coverage": coverage,
             "analysis": analysis,
         }
         

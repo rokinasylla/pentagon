@@ -219,6 +219,18 @@ class ReportingAgent:
             for item in model.attempted_not_confirmed:
                 story.append(P(f"• {item}"))
 
+        # Couverture et limites : surfaces NON testées. Empêche de lire
+        # « aucune faille retenue » comme « cible sûre ».
+        if model.coverage_gaps:
+            story.append(Paragraph(
+                "Couverture et limites du test (surfaces NON testées)",
+                styles["PgH3"]))
+            story.append(P(
+                "⚠️ L'absence de faille retenue ne signifie PAS que la cible est "
+                "sûre : les éléments ci-dessous n'ont pas pu être testés."))
+            for g in model.coverage_gaps:
+                story.append(P(f"• [{g.get('area', '?')}] {g.get('detail', '')}"))
+
         story.append(PageBreak())
 
         # ---- Reconnaissance ----
