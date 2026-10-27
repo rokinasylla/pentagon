@@ -73,11 +73,12 @@ export const adminDeleteUser = (username) =>
   request("/api/admin/users", { method: "DELETE", body: { username } });
 // Sites autorisés PER-OPERATOR (domaine · opérateur · périmètre max · statut).
 export const adminListSites = () => request("/api/v1/admin/sites");
-// Autorise / attribue un site : { operator, max_categories:[...], proof }.
-export const adminAuthorizeSite = (site, { operator, maxCategories, proof } = {}) =>
+// Autorise / attribue un site : { operator, max_categories:[...], proof,
+// include_subdomains }. include_subdomains = couvrir les sous-domaines (opt-in).
+export const adminAuthorizeSite = (site, { operator, maxCategories, proof, includeSubdomains } = {}) =>
   request("/api/v1/admin/sites", {
     method: "POST",
-    body: { site, operator, max_categories: maxCategories, proof },
+    body: { site, operator, max_categories: maxCategories, proof, include_subdomains: !!includeSubdomains },
   });
 export const adminRevokeSite = (site) =>
   request("/api/v1/admin/sites", { method: "DELETE", body: { site } });

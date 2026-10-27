@@ -110,6 +110,23 @@ class TestSiteStore(unittest.TestCase):
         self.assertEqual(pub["a.example.com"]["scope"], "passive · active_scan")
         self.assertEqual(pub["b.example.com"]["scope"], "à définir")
 
+    def test_subdomain_scopes_opt_in(self):
+        # Sans opt-in : pas de couverture de sous-domaines.
+        self.s.authorize("shop.acme.io", "n.sylla", ["passive"], "", "a.diop")
+        self.assertEqual(self.s.subdomain_scopes(), [])
+        self.assertFalse(self.s.includes_subdomains("shop.acme.io"))
+        # Avec opt-in : le domaine racine (eTLD+1) est couvert.
+        self.s.authorize("nafar.tech", "n.sylla", ["passive", "active_scan"], "",
+                         "a.diop", include_subdomains=True)
+        self.assertIn("nafar.tech", self.s.subdomain_scopes())
+        self.assertTrue(self.s.includes_subdomains("nafar.tech"))
+        pub = {p["domain"]: p for p in self.s.to_public()}
+        self.assertTrue(pub["nafar.tech"]["include_subdomains"])
+        self.assertFalse(pub["shop.acme.io"]["include_subdomains"])
+        # Révoqué -> ne compte plus dans le périmètre sous-domaines.
+        self.s.revoke("nafar.tech")
+        self.assertEqual(self.s.subdomain_scopes(), [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

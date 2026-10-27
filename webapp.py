@@ -556,6 +556,9 @@ def _sync_from_store(store) -> None:
     try:
         pol = load_policy()
         pol["authorized_targets"] = store.authorized_domains()
+        # Sous-domaines couverts (opt-in) : reflété dans la politique globale
+        # pour les contrôles à la demande (exploit ciblé, dispatcher).
+        pol["subdomain_scopes"] = store.subdomain_scopes()
         save_policy(pol)
     except Exception:
         pass
@@ -769,11 +772,28 @@ def _run_campaign_job(job_id: str, target: str, actions: list[str],
 
     writer = _JobLogWriter(job, sys.stdout)
     try:
+        # Élargissement opt-in aux sous-domaines, SI l'admin l'a activé pour ce
+        # site : la campagne pourra alors suivre/tester un sous-domaine du même
+        # domaine racine (ex. l'app réelle sur dev.<domaine>), sans jamais sortir
+        # du domaine autorisé.
+        sub_scopes: list[str] = []
+        try:
+            if site_store().includes_subdomains(target):
+                from pentagon.core.scope_guard import registrable_domain, host_of
+                rd = registrable_domain(host_of(target))
+                if rd:
+                    sub_scopes = [rd]
+        except Exception:
+            sub_scopes = []
         roe = RoEEnforcer.from_user_input(
             authorized_targets=[target],
             authorized_actions=actions,
             operator_name=operator or "web",
+            subdomain_scopes=sub_scopes,
         )
+        if sub_scopes:
+            job["log"].append(
+                f"[web] Périmètre élargi aux sous-domaines de {sub_scopes[0]}")
         orchestrator = _make_orchestrator(engine, roe)
         label = "LangGraph (parallèle)" if engine == "langgraph" else "séquentiel"
         job["log"].append(f"[web] Moteur d'orchestration : {label}")
@@ -1356,11 +1376,13 @@ def api_v1_admin_sites():
         operator = (data.get("operator") or "").strip() or None
         cats = [c for c in (data.get("max_categories") or []) if c in SELECTABLE_CATEGORIES]
         proof = (data.get("proof") or "").strip()
+        include_sub = bool(data.get("include_subdomains"))
         if operator and operator not in load_users():
             return jsonify({"error": "Opérateur inconnu."}), 400
-        store.authorize(site, operator, cats, proof, session.get("operator") or "admin")
+        store.authorize(site, operator, cats, proof, session.get("operator") or "admin",
+                        include_subdomains=include_sub)
         audit("site_authorize", site=site, assigned_to=operator or "-",
-              categories="|".join(cats))
+              categories="|".join(cats), subdomains=include_sub)
     else:  # DELETE
         store.revoke(site)
         audit("site_revoke", site=site)
@@ -1394,9 +1416,11 @@ def api_v1_admin_access_requests():
         cats = [c for c in (data.get("max_categories") or []) if c in SELECTABLE_CATEGORIES]
         proof = (data.get("proof") or "").strip()
         operator = (data.get("operator") or "").strip() or None
-        store.approve(domain, cats, proof, session.get("operator") or "admin", operator=operator)
+        include_sub = bool(data.get("include_subdomains"))
+        store.approve(domain, cats, proof, session.get("operator") or "admin",
+                      operator=operator, include_subdomains=include_sub)
         audit("access_approve", site=domain, assigned_to=operator or "-",
-              categories="|".join(cats))
+              categories="|".join(cats), subdomains=include_sub)
     else:
         store.reject(domain)
         audit("access_reject", site=domain)

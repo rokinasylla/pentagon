@@ -74,8 +74,8 @@ export default function Admin({ user, onLogout }) {
       }
     });
 
-  const onAuthorizeSite = ({ domain, proof, maxCategories, operator }) =>
-    act(() => api.adminAuthorizeSite(domain, { operator, maxCategories, proof }));
+  const onAuthorizeSite = ({ domain, proof, maxCategories, operator, includeSubdomains }) =>
+    act(() => api.adminAuthorizeSite(domain, { operator, maxCategories, proof, includeSubdomains }));
   const onRevokeSite = (domain) => {
     if (confirm(`Révoquer l'autorisation de « ${domain} » ?`)) act(() => api.adminRevokeSite(domain));
   };

@@ -96,6 +96,20 @@ class RoEEnforcer:
                 matched = auth_target
                 break
 
+        # Élargissement OPT-IN aux sous-domaines : une cible autorisée peut
+        # couvrir ses sous-domaines (même domaine enregistrable) SI l'admin l'a
+        # explicitement activé (subdomain_scopes). Reste deny-by-default : rien
+        # n'est élargi sans ce drapeau.
+        if not is_allowed:
+            sub_scopes = self.policy.get("subdomain_scopes", []) or []
+            if sub_scopes and normalized:
+                from pentagon.core.scope_guard import registrable_domain, host_of
+                rd = registrable_domain(host_of(normalized))
+                allowed_rds = {registrable_domain(host_of(s)) for s in sub_scopes}
+                if rd and rd in allowed_rds:
+                    is_allowed = True
+                    matched = f"*.{rd} (sous-domaines autorisés)"
+
         if is_allowed:
             decision = {
                 "allowed": True,
@@ -233,6 +247,7 @@ class RoEEnforcer:
         authorized_targets: list[str],
         authorized_actions: list[str],
         operator_name: str = "anonyme",
+        subdomain_scopes: list[str] | None = None,
     ) -> "RoEEnforcer":
         """
         Cree un RoE Enforcer a partir d'une saisie utilisateur (interface).
@@ -255,6 +270,9 @@ class RoEEnforcer:
             "default_behavior": "deny",
             "authorized_targets": authorized_targets,
             "authorized_action_categories": authorized_actions,
+            # Domaines enregistrables dont les sous-domaines sont dans le
+            # périmètre (élargissement opt-in décidé par l'admin).
+            "subdomain_scopes": subdomain_scopes or [],
             "operator": operator_name,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "notes": "deny by default : toute cible/action non listee est refusee.",
