@@ -31,19 +31,27 @@ class Orchestrator:
     Pilote l'exécution de la chaîne d'agents et gère l'état partagé.
     """
     
-    def __init__(self, llm: LLMClient | None = None, roe_enforcer: RoEEnforcer | None = None):
+    def __init__(self, llm: LLMClient | None = None, roe_enforcer: RoEEnforcer | None = None,
+                 credentials: dict[str, Any] | None = None):
         """
         Initialise l'orchestrateur et les agents.
-        
+
         Args:
             llm: client LLM partagé entre tous les agents (économie de ressources).
             roe_enforcer: garde-fou RoE. Si None, en crée un avec la politique par défaut.
+            credentials: identifiants de test de l'opérateur (autorisés par le RoE)
+                transmis à l'agent Web App pour que le crawl se connecte et explore
+                la surface authentifiée. Peut aussi être fourni à run_campaign.
         """
         # Un seul client LLM partagé par tous les agents
         self.llm = llm or LLMClient()
         
         # Garde-fou RoE (gouvernance)
         self.roe = roe_enforcer or RoEEnforcer()
+
+        # Identifiants de test de l'opérateur (surface authentifiée) — jamais
+        # devinés, uniquement ceux fournis explicitement.
+        self.credentials = credentials
 
         # Instanciation des agents
         self.osint_agent = OSINTAgent(llm=self.llm)
@@ -77,6 +85,7 @@ class Orchestrator:
         target: str,
         scan_profile: str = "web_focused",
         scope_authorizer: Optional[Callable[[str, dict[str, Any]], bool]] = None,
+        credentials: dict[str, Any] | None = None,
     ) -> PentagonState:
         """
         Exécute une campagne complète de reconnaissance et scanning.
@@ -94,6 +103,10 @@ class Orchestrator:
         Returns:
             L'état PentagonState consolidé en fin de campagne.
         """
+        # Identifiants fournis à l'appel → priment sur ceux du constructeur.
+        if credentials is not None:
+            self.credentials = credentials
+
         # Initialise l'état partagé
         state = PentagonState(target=target)
 
@@ -241,6 +254,7 @@ class Orchestrator:
                 osint_context=osint_context,
                 scanning_context=scanning_context,
                 scope_check=self.roe.check_target,
+                credentials=self.credentials,
             )
             state.web_app_result = web_app_result
             state.agents_executed.append("WebApp_Agent")

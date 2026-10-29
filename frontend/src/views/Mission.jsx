@@ -27,6 +27,11 @@ export default function Mission({ user, onLogout }) {
   const [target, setTarget] = useState("");
   const [cats, setCats] = useState([]);
   const [engine, setEngine] = useState("seq");
+  // Identifiants de test (surface authentifiée) — optionnels, fournis par
+  // l'opérateur. Vides → aucune connexion (audit de la seule surface publique).
+  const [loginUser, setLoginUser] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [loginUrl, setLoginUrl] = useState("");
   const [error, setError] = useState("");
   const [jobId, setJobId] = useState(null);
   const [log, setLog] = useState([]);
@@ -102,7 +107,13 @@ export default function Mission({ user, onLogout }) {
   const launch = async () => {
     setError("");
     try {
-      const r = await api.startCampaign({ target, actions: cats, operator: user.operator, engine });
+      const payload = { target, actions: cats, operator: user.operator, engine };
+      // N'inclut les identifiants que si identifiant ET mot de passe sont saisis.
+      if (loginUser && loginPass) {
+        payload.credentials = { username: loginUser, password: loginPass };
+        if (loginUrl) payload.credentials.login_url = loginUrl;
+      }
+      const r = await api.startCampaign(payload);
       attach(r.job_id);
     } catch (e) {
       setStatus("");
@@ -251,6 +262,51 @@ export default function Mission({ user, onLogout }) {
                     );
                   })}
                 </div>
+              </section>
+
+              {/* 4 · Connexion (optionnel) — surface authentifiée */}
+              <section className="fcard">
+                <div className="fcard-h">
+                  <span className="step-n">4</span><h2>Connexion · surface authentifiée</h2>
+                  <span className="roe-pill">optionnel</span>
+                </div>
+                <p className="fcard-sub">
+                  Fournissez un compte de test <strong>autorisé</strong> : l'agent se
+                  connecte pour explorer les pages et endpoints réservés aux
+                  utilisateurs connectés. Laissez vide pour n'auditer que la surface
+                  publique.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label className="fld-label" htmlFor="mlogin-user">Identifiant</label>
+                    <div className="fld">
+                      <input id="mlogin-user" value={loginUser} autoComplete="off"
+                        onChange={(e) => setLoginUser(e.target.value)}
+                        placeholder="ex. operateur_test" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="fld-label" htmlFor="mlogin-pass">Mot de passe</label>
+                    <div className="fld">
+                      <input id="mlogin-pass" type="password" value={loginPass}
+                        autoComplete="new-password"
+                        onChange={(e) => setLoginPass(e.target.value)}
+                        placeholder="••••••••" />
+                    </div>
+                  </div>
+                </div>
+                <label className="fld-label" htmlFor="mlogin-url" style={{ marginTop: 10 }}>
+                  URL de connexion <span className="fc-meta">(optionnel — sinon détectée)</span>
+                </label>
+                <div className="fld mono">
+                  <input id="mlogin-url" value={loginUrl} autoComplete="off"
+                    onChange={(e) => setLoginUrl(e.target.value)}
+                    placeholder="https://exemple.com/login" />
+                </div>
+                <p className="fc-meta" style={{ marginTop: 8 }}>
+                  🔒 Le mot de passe n'est ni affiché dans le journal, ni stocké, ni
+                  enregistré dans le rapport.
+                </p>
               </section>
 
               <div className="legal">

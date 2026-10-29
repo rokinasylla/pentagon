@@ -49,6 +49,12 @@ def host_of(target: str) -> str:
     return (p.netloc or p.path).split("/")[0].lower()
 
 
+def _registrable(host: str) -> str:
+    """Domaine enregistrable (eTLD+1) via la garde de périmètre (sans doublonner)."""
+    from pentagon.core.scope_guard import registrable_domain
+    return registrable_domain(host)
+
+
 class SiteStore:
     """Lit/écrit `sites.json` et applique la logique per-operator."""
 
@@ -93,6 +99,27 @@ class SiteStore:
         """Domaines de statut `autorise` (pour synchroniser la liste blanche globale)."""
         return [s["domain"] for s in self.sites if s.get("status") == "autorise"]
 
+    def subdomain_scopes(self) -> list[str]:
+        """Domaines enregistrables dont les SOUS-DOMAINES sont dans le périmètre.
+
+        Un site `autorise` marqué `include_subdomains` couvre tout son domaine
+        racine (ex. `nafar.tech` → `*.nafar.tech`). Opt-in : rien n'est élargi
+        sans ce drapeau.
+        """
+        out: list[str] = []
+        for s in self.sites:
+            if s.get("status") == "autorise" and s.get("include_subdomains"):
+                rd = _registrable(host_of(s["domain"]))
+                if rd and rd not in out:
+                    out.append(rd)
+        return out
+
+    def includes_subdomains(self, domain: str) -> bool:
+        """True si ce site autorisé couvre ses sous-domaines (opt-in admin)."""
+        rec = self.find(domain)
+        return bool(rec and rec.get("status") == "autorise"
+                    and rec.get("include_subdomains"))
+
     def pending(self) -> list[dict]:
         """Demandes d'accès en attente."""
         return [s for s in self.sites if s.get("status") == "attente"]
@@ -126,7 +153,8 @@ class SiteStore:
         self.sites.append(rec)
         return rec
 
-    def authorize(self, domain, operator, max_categories, proof, by, date=None) -> dict:
+    def authorize(self, domain, operator, max_categories, proof, by, date=None,
+                  include_subdomains=False) -> dict:
         """Autorise (ou met à jour) un site attribué à un opérateur."""
         rec = self._upsert({
             "domain": domain.strip(),
@@ -134,6 +162,7 @@ class SiteStore:
             "max_categories": list(max_categories or []),
             "proof": proof or "",
             "status": "autorise",
+            "include_subdomains": bool(include_subdomains),
             "by": by,
             "date": date or self._today(),
         })
@@ -160,7 +189,8 @@ class SiteStore:
         self.save()
         return rec
 
-    def approve(self, domain, max_categories, proof, by, operator=None) -> Optional[dict]:
+    def approve(self, domain, max_categories, proof, by, operator=None,
+                include_subdomains=False) -> Optional[dict]:
         """Valide une demande d'accès : `attente` → `autorise`."""
         rec = self.find(domain)
         if not rec:
@@ -168,6 +198,7 @@ class SiteStore:
         rec["status"] = "autorise"
         rec["max_categories"] = list(max_categories or [])
         rec["proof"] = proof or rec.get("proof", "")
+        rec["include_subdomains"] = bool(include_subdomains)
         rec["by"] = by
         rec["date"] = self._today()
         if operator:
@@ -217,6 +248,7 @@ class SiteStore:
                 "scope": " · ".join(cats) if cats else ("à définir" if s.get("status") == "attente" else "—"),
                 "proof": s.get("proof", ""),
                 "status": s.get("status", "autorise"),
+                "include_subdomains": bool(s.get("include_subdomains")),
                 "by": s.get("by", ""),
                 "date": s.get("date", ""),
             })

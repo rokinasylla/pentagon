@@ -120,7 +120,51 @@ def test_campagne_vide_ne_plante_pas():
     assert m.findings == []
     assert m.overall_risk == "info"
     assert m.severity_counts["critical"] == 0
+    assert m.coverage_gaps == []
     print("✓ test_campagne_vide_ne_plante_pas")
+
+
+def test_couverture_hors_perimetre_et_dedup():
+    # Même hôte hors périmètre signalé par WebApp ET Exploitation → 1 seule
+    # entrée après déduplication.
+    campaign = {
+        "target": "https://nafar.tech/",
+        "web_app_result": {"coverage": [
+            {"area": "Web App", "kind": "out_of_scope",
+             "host": "dev.nafar.tech", "detail": "Backend hors périmètre."}]},
+        "exploitation_result": {"coverage": [
+            {"area": "Exploitation", "kind": "out_of_scope",
+             "host": "dev.nafar.tech", "detail": "Login hors périmètre."}]},
+    }
+    m = build_report(campaign)
+    oos = [g for g in m.coverage_gaps if g["kind"] == "out_of_scope"]
+    hosts = {g["host"] for g in oos}
+    assert "dev.nafar.tech" in hosts
+    # Les deux entrées ont une area différente → non dédupliquées entre elles,
+    # mais une même (kind, host, area) le serait. On vérifie au moins la présence.
+    assert len(oos) == 2
+    print("✓ test_couverture_hors_perimetre_et_dedup")
+
+
+def test_couverture_anti_bot_inferee():
+    # WAF détecté + crawl dynamique quasi vide → note anti-bot ajoutée.
+    campaign = {
+        "target": "https://nafar.tech/",
+        "scanning_result": {"raw_data": {"waf_detection": {
+            "waf_detected": True, "vendors": ["Cloudflare"]}}},
+        "web_app_result": {"raw_data": {"dynamic_crawl": {
+            "status": "success", "forms": [], "api_calls": []}}},
+    }
+    m = build_report(campaign)
+    anti = [g for g in m.coverage_gaps if g["kind"] == "anti_bot"]
+    assert len(anti) == 1
+    assert "Cloudflare" in anti[0]["detail"]
+
+    # Si le crawl a trouvé de la surface, PAS de note anti-bot (pas de faux signal).
+    campaign["web_app_result"]["raw_data"]["dynamic_crawl"]["forms"] = [{"action": "/x"}]
+    m2 = build_report(campaign)
+    assert [g for g in m2.coverage_gaps if g["kind"] == "anti_bot"] == []
+    print("✓ test_couverture_anti_bot_inferee")
 
 
 def main():
@@ -133,6 +177,8 @@ def main():
     test_risque_global_et_owasp()
     test_recon_et_audit()
     test_campagne_vide_ne_plante_pas()
+    test_couverture_hors_perimetre_et_dedup()
+    test_couverture_anti_bot_inferee()
     print("=" * 70)
     print("✓ Tous les tests passent")
     print("=" * 70)

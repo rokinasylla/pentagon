@@ -168,14 +168,14 @@ function Users({ users, siteOptions, onCreateUser, busy }) {
 }
 
 function Sites({ sites, operators, onAuthorizeSite, onRevokeSite, onApprove, onReject, busy }) {
-  const [form, setForm] = useState({ domain: "", proof: "Mandat signé", maxCategories: ["passive", "active_scan"], operator: "" });
+  const [form, setForm] = useState({ domain: "", proof: "Mandat signé", maxCategories: ["passive", "active_scan"], operator: "", includeSubdomains: false });
   const toggleCat = (k) =>
     setForm((f) => ({ ...f, maxCategories: f.maxCategories.includes(k) ? f.maxCategories.filter((x) => x !== k) : [...f.maxCategories, k] }));
   const submit = (e) => {
     e.preventDefault();
     if (!form.domain.trim() || !onAuthorizeSite) return;
     onAuthorizeSite({ ...form, domain: form.domain.trim(), operator: form.operator || null });
-    setForm({ domain: "", proof: "Mandat signé", maxCategories: ["passive", "active_scan"], operator: "" });
+    setForm({ domain: "", proof: "Mandat signé", maxCategories: ["passive", "active_scan"], operator: "", includeSubdomains: false });
   };
   const nOk = sites.filter((s) => s.status === "autorise").length;
   const nWait = sites.filter((s) => s.status === "attente").length;
@@ -194,7 +194,7 @@ function Sites({ sites, operators, onAuthorizeSite, onRevokeSite, onApprove, onR
               <div key={i} className="av-trow" style={{ gridTemplateColumns: "1.9fr 1.3fr 1.5fr 1.1fr" }}>
                 <span className="av-u-id"><span className="av-u-name mono">{s.domain}</span><span className="av-site-by">{s.by}{s.date ? ` · ${s.date}` : ""}</span></span>
                 <span className="av-u-sites">{s.operator || "—"}</span>
-                <span className="av-scope mono">{s.scope}</span>
+                <span className="av-scope mono">{s.scope}{s.include_subdomains ? " · +sous-domaines" : ""}</span>
                 <span className="av-site-status">
                   <span className="av-status" style={{ color: st.color }}><i className="dot" style={{ background: st.dot }} />{s.statusLabel}</span>
                   <span className="av-site-ops">
@@ -225,6 +225,7 @@ function Sites({ sites, operators, onAuthorizeSite, onRevokeSite, onApprove, onR
                 ))}
               </div>
             </div>
+            <label className="av-check"><input type="checkbox" checked={form.includeSubdomains} onChange={(e) => setForm({ ...form, includeSubdomains: e.target.checked })} />Inclure les sous-domaines (ex. dev.{form.domain.trim() || "exemple.com"})</label>
             <label className="av-field-wrap"><span className="av-label">Opérateur assigné</span><span className="av-field"><select value={form.operator} onChange={(e) => setForm({ ...form, operator: e.target.value })}><option value="">— (non attribué)</option>{operators.map((o) => <option key={o} value={o}>{o}</option>)}</select></span></label>
             <button type="submit" className="av-btn primary block" disabled={!form.domain.trim() || busy}>{busy ? "…" : "Autoriser le site"}</button>
             <div className="av-warn">
