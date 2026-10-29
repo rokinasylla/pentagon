@@ -761,7 +761,8 @@ def _make_orchestrator(engine: str, roe):
 
 def _run_campaign_job(job_id: str, target: str, actions: list[str],
                       operator: str, scan_profile: str,
-                      engine: str = "seq") -> None:
+                      engine: str = "seq",
+                      credentials: dict | None = None) -> None:
     """Exécute une campagne en tâche de fond, en streamant sa sortie."""
     import contextlib
     import sys
@@ -797,12 +798,17 @@ def _run_campaign_job(job_id: str, target: str, actions: list[str],
         orchestrator = _make_orchestrator(engine, roe)
         label = "LangGraph (parallèle)" if engine == "langgraph" else "séquentiel"
         job["log"].append(f"[web] Moteur d'orchestration : {label}")
+        if credentials:
+            job["log"].append(
+                f"[web] Connexion de test fournie ({credentials.get('username')}) "
+                f"→ exploration de la surface authentifiée")
 
         # langgraph est importé de façon différée (dans run_campaign) → une
         # absence ne se manifeste qu'ici. On la traduit en message clair.
         with contextlib.redirect_stdout(writer):
             state = orchestrator.run_campaign(
-                target=target, scan_profile=scan_profile)
+                target=target, scan_profile=scan_profile,
+                credentials=credentials)
             json_path = orchestrator.save_campaign(state)
 
         job["state"] = state.to_dict()
@@ -1053,6 +1059,21 @@ def api_start():
     if engine not in SELECTABLE_ENGINES:
         engine = "seq"
 
+    # Identifiants de test (surface authentifiée), optionnels : fournis par
+    # l'opérateur, jamais devinés. On exige identifiant + mot de passe ; le mot
+    # de passe n'est NI stocké dans le job NI journalisé (transmis au thread).
+    credentials = None
+    creds_in = data.get("credentials") or {}
+    if isinstance(creds_in, dict):
+        c_user = (creds_in.get("username") or "").strip()
+        c_pass = creds_in.get("password") or ""
+        if c_user and c_pass:
+            credentials = {"username": c_user, "password": c_pass}
+            for k in ("login_url", "username_field", "password_field"):
+                v = (creds_in.get(k) or "").strip()
+                if v:
+                    credentials[k] = v
+
     if not target:
         return jsonify({"error": "URL cible requise."}), 400
     if not actions:
@@ -1087,12 +1108,14 @@ def api_start():
 
     thread = threading.Thread(
         target=_run_campaign_job,
-        args=(job_id, target, actions, operator, scan_profile, engine),
+        args=(job_id, target, actions, operator, scan_profile, engine,
+              credentials),
         daemon=True,
     )
     thread.start()
     audit("campaign_start", target=target, requested_for=operator or "-",
-          categories="|".join(actions), engine=engine, job=job_id)
+          categories="|".join(actions), engine=engine, job=job_id,
+          authenticated="yes" if credentials else "no")
     return jsonify({"job_id": job_id})
 
 

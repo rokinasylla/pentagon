@@ -63,8 +63,9 @@ class GraphOrchestrator:
     métier). Seul l'enchaînement change (graphe au lieu d'une suite d'appels).
     """
 
-    def __init__(self, llm=None, roe_enforcer=None):
-        self._seq = Orchestrator(llm=llm, roe_enforcer=roe_enforcer)
+    def __init__(self, llm=None, roe_enforcer=None, credentials=None):
+        self._seq = Orchestrator(llm=llm, roe_enforcer=roe_enforcer,
+                                 credentials=credentials)
         self.roe = self._seq.roe
         self.osint_agent = self._seq.osint_agent
         self.scanning_agent = self._seq.scanning_agent
@@ -128,6 +129,7 @@ class GraphOrchestrator:
                 osint_context=osint_context,
                 scanning_context=None,
                 scope_check=self._seq.roe.check_target,
+                credentials=self._seq.credentials,
             )
             n = len(res.get("analysis", {}).get("vulnerabilities", []))
             return {
@@ -211,18 +213,23 @@ class GraphOrchestrator:
         return g
 
     def run_campaign(self, target: str, scan_profile: str = "web_focused",
-                     scope_authorizer=None) -> PentagonState:
+                     scope_authorizer=None, credentials=None) -> PentagonState:
         """
         Exécute une campagne via le graphe LangGraph.
 
         scope_authorizer est accepté pour la compatibilité de signature avec le
         moteur séquentiel, mais l'élargissement interactif n'est pas géré par ce
-        moteur (périmètre statique).
+        moteur (périmètre statique). credentials (identifiants de test opérateur)
+        est transmis au nœud Web App pour explorer la surface authentifiée.
 
         Returns:
             Un PentagonState consolidé (contrat identique au moteur séquentiel).
         """
         from langgraph.checkpoint.memory import MemorySaver
+
+        # Identifiants fournis à l'appel → priment sur ceux du constructeur.
+        if credentials is not None:
+            self._seq.credentials = credentials
 
         state0 = PentagonState(target=target)
         print("=" * 70)

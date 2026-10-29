@@ -129,6 +129,7 @@ class WebAppAgent:
         osint_context: dict[str, Any] | None = None,
         scanning_context: dict[str, Any] | None = None,
         scope_check: Any = None,
+        credentials: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Exécute l'agent Web App sur une cible.
@@ -141,6 +142,10 @@ class WebAppAgent:
                 Injecté par l'orchestrateur ; borne le périmètre des requêtes
                 (deny-by-default) — un « backend » hors périmètre n'est jamais
                 sondé, on retombe sur la cible.
+            credentials: identifiants de test FOURNIS par l'opérateur (autorisés
+                par le RoE) pour que le crawl dynamique se connecte et explore la
+                surface AUTHENTIFIÉE. Dict {username, password, login_url?,
+                username_field?, password_field?}. Absent → aucune connexion.
 
         Returns:
             Dictionnaire structuré avec les résultats.
@@ -192,8 +197,12 @@ class WebAppAgent:
         # rate. Borné au périmètre (deny-by-default) et tolérant si Playwright
         # est absent (on continue avec la seule découverte statique).
         print(f"[{self.name}] Crawl dynamique (navigateur)...")
+        if credentials:
+            print(f"[{self.name}]   → connexion opérateur fournie "
+                  f"(exploration de la surface authentifiée)")
         crawl_data = run_dynamic_crawl(
-            target_url, scope_check=scope_check, max_pages=15, max_depth=2)
+            target_url, scope_check=scope_check, max_pages=15, max_depth=2,
+            credentials=credentials)
         crawl_routes: list[str] = []
         if crawl_data.get("status") == "success":
             for pg in crawl_data.get("pages", []):
@@ -209,6 +218,12 @@ class WebAppAgent:
                   f"{len(crawl_data.get('api_calls', []))} appel(s) d'API dynamiques")
         else:
             print(f"[{self.name}]   → crawl dynamique indisponible : {crawl_data.get('error')}")
+
+        login_info = crawl_data.get("login") if isinstance(crawl_data, dict) else None
+        if login_info and login_info.get("attempted"):
+            etat = "réussie" if login_info.get("success") else "échouée"
+            print(f"[{self.name}]   → connexion {etat} "
+                  f"({login_info.get('login_url')}) : {login_info.get('evidence')}")
 
         # Endpoints à tester = routes statiques (bundle JS) ∪ routes dynamiques (crawl)
         endpoints_to_test = list(dict.fromkeys(

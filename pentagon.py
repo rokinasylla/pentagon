@@ -138,7 +138,8 @@ def _parse_actions(raw: str) -> list[str]:
 # ──────────────────────────── Récap & confirmation ─────────────────────────
 
 def _print_plan(targets: list[str], actions: list[str], operator: str,
-                scan_profile: str, interactive_scope: bool = False) -> None:
+                scan_profile: str, interactive_scope: bool = False,
+                credentials: dict | None = None) -> None:
     """Affiche le récapitulatif de mission avant lancement."""
     print("\n" + "=" * 70)
     print("RÉCAPITULATIF DE LA MISSION (à valider)")
@@ -149,6 +150,11 @@ def _print_plan(targets: list[str], actions: list[str], operator: str,
         print(f"  Périmètre étendu : {', '.join(targets[1:])}")
     print(f"  Profil de scan   : {scan_profile}")
     print(f"  Actions RoE      : {', '.join(actions)}")
+    if credentials:
+        # Jamais le mot de passe : seulement l'identifiant et l'URL de login.
+        login_loc = credentials.get("login_url") or "découverte auto"
+        print(f"  Connexion test   : {credentials.get('username')} "
+              f"(login: {login_loc}) → surface authentifiée")
     mode_scope = "interactif (supervisé après OSINT)" if interactive_scope else "statique (figé)"
     print(f"  Périmètre        : {mode_scope}")
 
@@ -236,7 +242,7 @@ def _print_summary(state, output_file: str | None) -> None:
 def run_mission(targets: list[str], actions: list[str], operator: str,
                 scan_profile: str, output_dir: str, save: bool,
                 scope_authorizer=None, report: bool = False,
-                engine: str = "seq"):
+                engine: str = "seq", credentials: dict | None = None):
     """
     Construit le RoE depuis la saisie opérateur puis lance la campagne.
 
@@ -264,6 +270,7 @@ def run_mission(targets: list[str], actions: list[str], operator: str,
         target=targets[0],
         scan_profile=scan_profile,
         scope_authorizer=scope_authorizer,
+        credentials=credentials,
     )
 
     output_file = orchestrator.save_campaign(state, output_dir=output_dir) if save else None
@@ -314,9 +321,43 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Moteur d'orchestration : 'seq' (séquentiel, défaut) ou "
                         "'langgraph' (parallèle Scanning∥Web App, routage "
                         "conditionnel, checkpointing).")
+    # Identifiants de test (surface authentifiée) — FOURNIS par l'opérateur,
+    # jamais devinés. Le crawl dynamique s'y connecte pour explorer la zone
+    # réservée aux utilisateurs connectés.
+    p.add_argument("--login-username",
+                   help="Identifiant de test autorisé (connexion du crawl à la "
+                        "surface authentifiée).")
+    p.add_argument("--login-password",
+                   help="Mot de passe de test associé (fourni par l'opérateur).")
+    p.add_argument("--login-url",
+                   help="URL de la page/endpoint de connexion (sinon découverte).")
+    p.add_argument("--login-user-field",
+                   help="Nom du champ identifiant du formulaire (optionnel).")
+    p.add_argument("--login-pass-field",
+                   help="Nom du champ mot de passe du formulaire (optionnel).")
     p.add_argument("--yes", "-y", action="store_true",
                    help="Confirmer automatiquement (mode non-interactif).")
     return p
+
+
+def _build_credentials(args) -> dict | None:
+    """
+    Construit le dict d'identifiants à partir des flags opérateur, ou None.
+
+    Exige au minimum identifiant + mot de passe ; les autres champs sont
+    optionnels (URL de login, noms de champs). Rien n'est deviné : sans ces
+    flags, aucune connexion n'est tentée.
+    """
+    if not (args.login_username and args.login_password):
+        return None
+    creds = {"username": args.login_username, "password": args.login_password}
+    if args.login_url:
+        creds["login_url"] = args.login_url
+    if args.login_user_field:
+        creds["username_field"] = args.login_user_field
+    if args.login_pass_field:
+        creds["password_field"] = args.login_pass_field
+    return creds
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -349,8 +390,10 @@ def main(argv: list[str] | None = None) -> int:
         operator = _prompt("Nom de l'opérateur (traçabilité)", "anonyme")
 
     scan_profile = args.scan_profile
+    credentials = _build_credentials(args)
 
-    _print_plan(targets, actions, operator, scan_profile, args.interactive_scope)
+    _print_plan(targets, actions, operator, scan_profile,
+                args.interactive_scope, credentials)
 
     if not _confirm(args.yes):
         print("Campagne annulée. Aucune action menée.")
@@ -369,6 +412,7 @@ def main(argv: list[str] | None = None) -> int:
             scope_authorizer=scope_authorizer,
             report=args.report,
             engine=args.engine,
+            credentials=credentials,
         )
     except Exception as e:
         print(f"\n❌ Échec de la campagne : {type(e).__name__}: {e}")

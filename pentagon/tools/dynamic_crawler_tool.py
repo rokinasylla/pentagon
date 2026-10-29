@@ -959,6 +959,12 @@ def run_dynamic_crawl(
                                 body = req.post_data
                             except Exception:
                                 body = None
+                            # Ne JAMAIS conserver le secret d'identifiant capté
+                            # dans un corps (ex. requête de login) : il finirait
+                            # dans le JSON/rapport de campagne.
+                            _pw = (credentials or {}).get("password")
+                            if _pw and body and _pw in body:
+                                body = body.replace(_pw, "***REDACTED***")
                             if body and len(body) > 500:
                                 body = body[:500] + "…"
                             ctype = None
