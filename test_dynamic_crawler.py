@@ -16,6 +16,9 @@ from pentagon.tools.dynamic_crawler_tool import (
     in_scope_links,
     build_fuzz_urls,
     classify_fuzz_response,
+    is_dangerous_label,
+    benign_value_for,
+    plan_form_fill,
     FUZZ_XSS_MARKER,
 )
 
@@ -177,6 +180,61 @@ def test_marker_present():
     print("✓ test_marker_present")
 
 
+# --- is_dangerous_label (garde-fou interaction non destructive) --------------
+
+def test_is_dangerous_label():
+    # Libellés/actions destructifs ou irréversibles → écartés (jamais cliqués).
+    for bad in ["Supprimer", "Delete account", "Se déconnecter", "Payer",
+                "Commander", "Checkout", "Réinitialiser", "Remove item",
+                "Confirmer la commande", "/account/delete", "Unsubscribe"]:
+        assert is_dangerous_label(bad), bad
+    # Libellés bénins → autorisés (y compris « se connecter » pour la surface
+    # authentifiée).
+    for ok in ["Rechercher", "Se connecter", "Voir le produit", "Ajouter un avis",
+               "Ajouter au panier", "Suivant", "Filtrer", ""]:
+        assert not is_dangerous_label(ok), ok
+    print("✓ test_is_dangerous_label")
+
+
+# --- benign_value_for --------------------------------------------------------
+
+def test_benign_value_for():
+    assert "@" in benign_value_for("email", "email")
+    assert "@" in benign_value_for("user_mail", "text")   # indice de nom
+    assert benign_value_for("password", "password")        # non vide
+    assert benign_value_for("pass", "text")                # indice de nom
+    assert benign_value_for("age", "number") == "1"
+    assert benign_value_for("q", "search") == "pentagon"
+    assert benign_value_for("whatever", "text") == "pentagon-test"
+    print("✓ test_benign_value_for")
+
+
+# --- plan_form_fill ----------------------------------------------------------
+
+def test_plan_form_fill():
+    # Formulaire de login : sûr → soumission avec valeurs bénignes (le bouton
+    # submit sans name est ignoré).
+    login = {"action": "https://exemple.com/api/auth/login", "method": "POST",
+             "inputs": [{"name": "username", "type": "text"},
+                        {"name": "password", "type": "password"},
+                        {"name": "", "type": "submit"}]}
+    plan = plan_form_fill(login)
+    assert plan["submit"] is True
+    assert set(plan["values"].keys()) == {"username", "password"}
+
+    # Action destructive → refusée.
+    danger = {"action": "https://exemple.com/account/delete", "method": "POST",
+              "inputs": [{"name": "id", "type": "text"}]}
+    plan2 = plan_form_fill(danger)
+    assert plan2["submit"] is False and plan2["reason"]
+
+    # Champs non remplissables seulement (jeton CSRF caché) → pas de soumission.
+    only_hidden = {"action": "https://exemple.com/x", "method": "POST",
+                   "inputs": [{"name": "csrf", "type": "hidden"}]}
+    assert plan_form_fill(only_hidden)["submit"] is False
+    print("✓ test_plan_form_fill")
+
+
 def main():
     print("=" * 70)
     print("TEST — Crawler/fuzzer dynamique (couche PURE)")
@@ -190,6 +248,9 @@ def main():
     test_classify_fuzz_response()
     test_classify_baseline_anti_faux_positif()
     test_marker_present()
+    test_is_dangerous_label()
+    test_benign_value_for()
+    test_plan_form_fill()
     print("=" * 70)
     print("✓ Tous les tests du crawler/fuzzer dynamique passent.")
     print("=" * 70)
