@@ -22,6 +22,7 @@ from pentagon.tools.dynamic_crawler_tool import (
     looks_like_login_path,
     pick_login_fields,
     login_success_signal,
+    extract_endpoints,
     FUZZ_XSS_MARKER,
 )
 
@@ -293,6 +294,42 @@ def test_login_success_signal():
     print("✓ test_login_success_signal")
 
 
+# --- extract_endpoints (étape 3 : alimenter l'exploitation en réel) ----------
+
+def test_extract_endpoints():
+    crawl = {
+        "api_calls": [
+            {"method": "POST", "url": "https://x/api/auth/login",
+             "body": "{}", "content_type": "application/json", "trigger": "login"},
+            {"method": "GET", "url": "https://x/api/orders/3",
+             "body": None, "content_type": None, "trigger": "clic:Mes commandes"},
+            {"method": "GET", "url": "https://x/api/orders/3",   # doublon d'URL
+             "body": None, "content_type": None, "trigger": "load"},
+        ],
+        "pages": [{"url": "https://x/compte"}, {"url": "https://x/produit/1"}],
+        "forms": [{"action": "https://x/api/newsletter", "method": "POST",
+                   "inputs": []}],
+        "login": {"login_url": "https://x/connexion", "success": True},
+    }
+    cat = extract_endpoints(crawl)
+    # api_endpoints dédupliqués, ordre préservé (réel observé)
+    assert cat["api_endpoints"] == [
+        "https://x/api/auth/login", "https://x/api/orders/3"]
+    # catalog conserve méthode / corps / déclencheur (le doublon y figure : 3)
+    assert len(cat["catalog"]) == 3
+    assert cat["catalog"][0]["method"] == "POST"
+    assert cat["catalog"][0]["trigger"] == "login"
+    # routes = pages visitées + actions de formulaire
+    assert "https://x/compte" in cat["app_routes"]
+    assert "https://x/api/newsletter" in cat["app_routes"]
+    # login_urls : déclencheur « login » + bloc login (connexion), dédupliqués
+    assert "https://x/api/auth/login" in cat["login_urls"]
+    assert "https://x/connexion" in cat["login_urls"]
+    # robustesse : entrée absente/invalide
+    assert extract_endpoints(None)["api_endpoints"] == []
+    print("✓ test_extract_endpoints")
+
+
 def main():
     print("=" * 70)
     print("TEST — Crawler/fuzzer dynamique (couche PURE)")
@@ -312,6 +349,7 @@ def main():
     test_looks_like_login_path()
     test_pick_login_fields()
     test_login_success_signal()
+    test_extract_endpoints()
     print("=" * 70)
     print("✓ Tous les tests du crawler/fuzzer dynamique passent.")
     print("=" * 70)

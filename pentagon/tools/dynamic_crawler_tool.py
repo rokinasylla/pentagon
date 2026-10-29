@@ -506,6 +506,76 @@ def login_success_signal(
             "evidence": "aucun signal de connexion réussie détecté"}
 
 
+def extract_endpoints(crawl_result: dict[str, Any]) -> dict[str, Any]:
+    """
+    Extrait (PUR) de la sortie de run_dynamic_crawl le catalogue d'endpoints
+    RÉELS observés en manipulant l'interface — prêt à alimenter l'exploitation
+    au lieu de deviner les endpoints statiquement.
+
+    - api_endpoints : URLs des appels XHR/fetch réellement émis (dédupliquées).
+    - app_routes    : chemins des pages visitées + actions de formulaire.
+    - login_urls    : endpoints d'authentification (déclencheur « login », allure
+                      de login, ou bloc `login` du crawl).
+    - catalog       : chaque appel observé, avec method/url/body/content_type/
+                      trigger (preuve : quelle action a révélé quel endpoint).
+
+    Returns:
+        {"api_endpoints", "app_routes", "login_urls", "catalog"}.
+    """
+    out: dict[str, Any] = {
+        "api_endpoints": [], "app_routes": [], "login_urls": [], "catalog": []}
+    if not isinstance(crawl_result, dict):
+        return out
+    seen_api: set[str] = set()
+    seen_route: set[str] = set()
+    seen_login: set[str] = set()
+
+    for call in crawl_result.get("api_calls", []) or []:
+        if not isinstance(call, dict):
+            continue
+        url = call.get("url")
+        if not url:
+            continue
+        if url not in seen_api:
+            seen_api.add(url)
+            out["api_endpoints"].append(url)
+        out["catalog"].append({
+            "method": call.get("method"),
+            "url": url,
+            "body": call.get("body"),
+            "content_type": call.get("content_type"),
+            "trigger": call.get("trigger"),
+        })
+        trig = (call.get("trigger") or "").lower()
+        if (trig.startswith("login") or looks_like_login_path(url)) \
+                and url not in seen_login:
+            seen_login.add(url)
+            out["login_urls"].append(url)
+
+    for pg in crawl_result.get("pages", []) or []:
+        u = pg.get("url") if isinstance(pg, dict) else None
+        if u and u not in seen_route:
+            seen_route.add(u)
+            out["app_routes"].append(u)
+
+    for f in crawl_result.get("forms", []) or []:
+        a = f.get("action") if isinstance(f, dict) else None
+        if a and a not in seen_route:
+            seen_route.add(a)
+            out["app_routes"].append(a)
+        if a and looks_like_login_path(a) and a not in seen_login:
+            seen_login.add(a)
+            out["login_urls"].append(a)
+
+    login = crawl_result.get("login") or {}
+    lu = login.get("login_url") if isinstance(login, dict) else None
+    if lu and lu not in seen_login:
+        seen_login.add(lu)
+        out["login_urls"].append(lu)
+
+    return out
+
+
 # =============================================================================
 # Couche NAVIGATEUR (Playwright, import différé → module importable hors-ligne)
 # =============================================================================
