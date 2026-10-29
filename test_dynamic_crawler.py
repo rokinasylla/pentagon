@@ -23,6 +23,7 @@ from pentagon.tools.dynamic_crawler_tool import (
     pick_login_fields,
     login_success_signal,
     extract_endpoints,
+    extract_bearer_token,
     FUZZ_XSS_MARKER,
 )
 
@@ -243,11 +244,35 @@ def test_plan_form_fill():
 
 def test_looks_like_login_path():
     for yes in ["/api/auth/login", "https://x/connexion", "Se connecter",
-                "Sign in", "/signin", "S'identifier"]:
+                "Sign in", "/signin", "S'identifier", "/rest/user/login"]:
         assert looks_like_login_path(yes), yes
     for no in ["/produits/42", "Accueil", "Ajouter au panier", ""]:
         assert not looks_like_login_path(no), no
+    # Bruit générique écarté même s'il contient « login » (socket.io, assets).
+    for noise in ["/login/socket.io/?EIO=4&transport=polling&t=abc",
+                  "/assets/login.js", "https://x/login.css",
+                  "https://x/ws/login?transport=websocket"]:
+        assert not looks_like_login_path(noise), noise
     print("✓ test_looks_like_login_path")
+
+
+# --- extract_bearer_token (détection universelle de jeton de session) --------
+
+def test_extract_bearer_token():
+    jwt = ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ."
+           "s5kx0Qd2mJ9aXk3Zq1mN7pQrStUvWxYz0123456789")
+    # chaîne directe
+    assert extract_bearer_token(jwt) == jwt
+    # niché dans un dict (ex. réponse de login Juice Shop : authentication.token)
+    assert extract_bearer_token({"authentication": {"token": jwt}}) == jwt
+    # niché dans une valeur JSON sérialisée (ex. localStorage)
+    assert extract_bearer_token({"L:token": '{"token":"' + jwt + '"}'}) == jwt
+    # dans une liste
+    assert extract_bearer_token(["x", {"t": jwt}]) == jwt
+    # rien de JWT → None
+    assert extract_bearer_token({"a": "pas-un-jeton", "b": 42}) is None
+    assert extract_bearer_token(None) is None
+    print("✓ test_extract_bearer_token")
 
 
 # --- pick_login_fields -------------------------------------------------------
@@ -309,9 +334,13 @@ def test_extract_endpoints():
         "pages": [{"url": "https://x/compte"}, {"url": "https://x/produit/1"}],
         "forms": [{"action": "https://x/api/newsletter", "method": "POST",
                    "inputs": []}],
-        "login": {"login_url": "https://x/connexion", "success": True},
+        "login": {"login_url": "https://x/connexion", "success": True,
+                  "session": {"token": "eyJa.eyJb.eyJc", "token_source": "web_storage",
+                              "cookies": {"sid": "abc"}}},
     }
     cat = extract_endpoints(crawl)
+    # la session captée (jeton/cookies) est exposée pour les testeurs
+    assert cat["session"] and cat["session"]["token"] == "eyJa.eyJb.eyJc"
     # api_endpoints dédupliqués, ordre préservé (réel observé)
     assert cat["api_endpoints"] == [
         "https://x/api/auth/login", "https://x/api/orders/3"]
@@ -347,6 +376,7 @@ def main():
     test_benign_value_for()
     test_plan_form_fill()
     test_looks_like_login_path()
+    test_extract_bearer_token()
     test_pick_login_fields()
     test_login_success_signal()
     test_extract_endpoints()

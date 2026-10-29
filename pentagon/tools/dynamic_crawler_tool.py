@@ -131,6 +131,20 @@ LOGIN_PATH_HINTS = (
     "connexion", "connect", "connecter", "auth", "identif", "identifier",
 )
 
+# Bruit à EXCLURE des candidats de login (générique, aucun site en dur) : les
+# URLs de transport temps réel et les assets statiques contiennent parfois
+# « login » sans être des endpoints d'authentification (ex. /login/socket.io/…).
+_LOGIN_NOISE = (
+    "socket.io", "transport=", "/polling", "/websocket", "sockjs",
+    ".js", ".css", ".map", ".png", ".jpg", ".jpeg", ".svg", ".ico",
+    ".woff", ".gif",
+)
+
+# Forme d'un JWT (3 segments base64url, en-tête commençant par « eyJ ») — sert à
+# repérer un jeton de session par sa FORME, sans connaître le nom du champ ni le
+# site. Utilisé pour la détection universelle de session après connexion.
+_JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}")
+
 
 # =============================================================================
 # Couche PURE (déterministe, sans réseau ni navigateur → testable hors-ligne)
@@ -416,8 +430,15 @@ def plan_form_fill(form: dict[str, Any]) -> dict[str, Any]:
 
 
 def looks_like_login_path(text: str) -> bool:
-    """True (PUR) si une URL ou un libellé évoque une page/un lien de connexion."""
+    """
+    True (PUR) si une URL/un libellé évoque une page/un lien de CONNEXION, en
+    écartant le bruit générique (transport temps réel socket.io/websocket,
+    assets statiques) qui contient parfois « login » sans être un endpoint
+    d'authentification. Générique : aucune URL propre à un site.
+    """
     low = (text or "").lower()
+    if any(n in low for n in _LOGIN_NOISE):
+        return False
     return any(h in low for h in LOGIN_PATH_HINTS)
 
 
@@ -506,6 +527,31 @@ def login_success_signal(
             "evidence": "aucun signal de connexion réussie détecté"}
 
 
+def extract_bearer_token(blob: Any) -> str | None:
+    """
+    Cherche (PUR) un jeton de forme JWT dans une chaîne, ou récursivement dans
+    les valeurs d'un dict/d'une liste (ex. localStorage sérialisé, réponse JSON
+    de login). GÉNÉRIQUE : repère le jeton par sa FORME (`_JWT_RE`), jamais par un
+    nom de champ propre à un site. Retourne le premier jeton trouvé, ou None.
+    """
+    if isinstance(blob, str):
+        m = _JWT_RE.search(blob)
+        return m.group(0) if m else None
+    if isinstance(blob, dict):
+        for v in blob.values():
+            t = extract_bearer_token(v)
+            if t:
+                return t
+        return None
+    if isinstance(blob, (list, tuple)):
+        for v in blob:
+            t = extract_bearer_token(v)
+            if t:
+                return t
+        return None
+    return None
+
+
 def extract_endpoints(crawl_result: dict[str, Any]) -> dict[str, Any]:
     """
     Extrait (PUR) de la sortie de run_dynamic_crawl le catalogue d'endpoints
@@ -523,7 +569,8 @@ def extract_endpoints(crawl_result: dict[str, Any]) -> dict[str, Any]:
         {"api_endpoints", "app_routes", "login_urls", "catalog"}.
     """
     out: dict[str, Any] = {
-        "api_endpoints": [], "app_routes": [], "login_urls": [], "catalog": []}
+        "api_endpoints": [], "app_routes": [], "login_urls": [], "catalog": [],
+        "session": None}
     if not isinstance(crawl_result, dict):
         return out
     seen_api: set[str] = set()
@@ -572,6 +619,11 @@ def extract_endpoints(crawl_result: dict[str, Any]) -> dict[str, Any]:
     if lu and lu not in seen_login:
         seen_login.add(lu)
         out["login_urls"].append(lu)
+
+    # Session authentifiée captée par le crawler (jeton Bearer / cookies).
+    sess = login.get("session") if isinstance(login, dict) else None
+    if isinstance(sess, dict) and (sess.get("token") or sess.get("cookies")):
+        out["session"] = sess
 
     return out
 
@@ -856,6 +908,32 @@ def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
         before_html, after_html, auth_cookie_added=bool(cookies_after - cookies_before))
     out["success"] = sig["success"]
     out["evidence"] = sig["evidence"]
+
+    # Session captée (GÉNÉRIQUE) pour la surface authentifiée : cookies + un
+    # éventuel jeton Bearer repéré par sa FORME (JWT) dans localStorage/
+    # sessionStorage — sans connaître le nom du champ ni le site. Les testeurs
+    # d'exploitation réutiliseront ce jeton pour tester la zone connectée.
+    session: dict[str, Any] = {"token": None, "token_source": None, "cookies": {}}
+    try:
+        session["cookies"] = {c.get("name"): c.get("value")
+                              for c in page.context.cookies() if c.get("name")}
+    except Exception:
+        pass
+    try:
+        store = page.evaluate(
+            "() => { const d={};"
+            " try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);"
+            "d['L:'+k]=localStorage.getItem(k);}}catch(e){}"
+            " try{for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);"
+            "d['S:'+k]=sessionStorage.getItem(k);}}catch(e){}"
+            " return d; }")
+        tok = extract_bearer_token(store)
+        if tok:
+            session["token"] = tok
+            session["token_source"] = "web_storage"
+    except Exception:
+        pass
+    out["session"] = session
     return out
 
 
@@ -979,6 +1057,22 @@ def run_dynamic_crawl(
                                 "content_type": ctype,
                                 "trigger": ctx["trigger"],
                             })
+                        # Backfill GÉNÉRIQUE d'un jeton de session : une requête
+                        # in-scope portant « Authorization: Bearer » révèle le
+                        # jeton de la surface authentifiée (hors dédup des appels,
+                        # pour les SPA qui gardent le jeton en mémoire).
+                        try:
+                            authz = req.headers.get("authorization")
+                            if authz and authz.lower().startswith("bearer ") \
+                                    and isinstance(result.get("login"), dict):
+                                sess = result["login"].setdefault(
+                                    "session",
+                                    {"token": None, "token_source": None, "cookies": {}})
+                                if not sess.get("token"):
+                                    sess["token"] = authz.split(" ", 1)[1].strip()
+                                    sess["token_source"] = "authorization_header"
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
