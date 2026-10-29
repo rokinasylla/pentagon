@@ -12,10 +12,12 @@ ne révèle sa vraie surface qu'À L'EXÉCUTION :
 
 Cet outil pilote un VRAI navigateur (Playwright) pour explorer l'application
 comme un utilisateur (crawler dynamique) : il ne se contente pas de CHARGER les
-pages, il MANIPULE l'interface — clique les contrôles (boutons, onglets, menus)
-et soumet les formulaires avec des valeurs bénignes — pour forcer l'application
-à révéler ses VRAIS points d'entrée (XHR/fetch), avec leur méthode et leur
-corps, au lieu de les deviner statiquement. Il injecte ensuite des charges de
+pages, il MANIPULE l'interface — clique les contrôles (boutons, onglets, menus),
+soumet les formulaires avec des valeurs bénignes et, si l'opérateur fournit des
+identifiants (autorisés par le RoE), se connecte pour explorer la surface
+AUTHENTIFIÉE — pour forcer l'application à révéler ses VRAIS points d'entrée
+(XHR/fetch), avec leur méthode et leur corps, au lieu de les deviner
+statiquement. Il injecte ensuite des charges de
 test dans les points d'entrée découverts et observe la réaction rendue (fuzzing
 dynamique). Il cartographie ainsi la surface réelle et lève les faux négatifs
 dus aux inputs et aux appels jamais déclenchés sans interaction.
@@ -120,6 +122,13 @@ DANGEROUS_LABEL_PATTERNS = (
 CLICK_SELECTOR = (
     "button:not([type=submit]), [role=button], [role=tab], [role=menuitem], "
     "[onclick]"
+)
+
+# Indices (FR + EN) d'un lien/bouton/chemin de CONNEXION — sert à trouver la
+# page de login quand l'opérateur n'en fournit pas l'URL explicite.
+LOGIN_PATH_HINTS = (
+    "login", "log in", "log-in", "signin", "sign in", "sign-in",
+    "connexion", "connect", "connecter", "auth", "identif", "identifier",
 )
 
 
@@ -406,6 +415,97 @@ def plan_form_fill(form: dict[str, Any]) -> dict[str, Any]:
     return {"submit": True, "values": values, "reason": None}
 
 
+def looks_like_login_path(text: str) -> bool:
+    """True (PUR) si une URL ou un libellé évoque une page/un lien de connexion."""
+    low = (text or "").lower()
+    return any(h in low for h in LOGIN_PATH_HINTS)
+
+
+def pick_login_fields(forms: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """
+    Choisit (PUR) le formulaire de connexion parmi des formulaires extraits.
+
+    Le formulaire de login est celui qui porte un champ `password` ; l'identifiant
+    est le premier champ texte/e-mail (ou au nom évocateur : user/email/login…)
+    du même formulaire. Les champs cachés (jeton CSRF) sont ignorés.
+
+    Returns:
+        {"action", "method", "username_field", "password_field"} ou None si aucun
+        formulaire ne contient de champ mot de passe.
+    """
+    for f in forms or []:
+        inputs = f.get("inputs", []) or []
+        pw = next((i for i in inputs
+                   if (i.get("type") or "").lower() == "password"), None)
+        if not pw:
+            continue
+        uname = None
+        for i in inputs:
+            if i is pw:
+                continue
+            t = (i.get("type") or "text").lower()
+            n = (i.get("name") or "").lower()
+            if t in ("hidden", "submit", "button", "checkbox", "radio", "file"):
+                continue
+            if t in ("text", "email", "tel") or any(
+                    h in n for h in ("user", "email", "mail", "login",
+                                     "identif", "pseudo")):
+                uname = i.get("name")
+                break
+        return {
+            "action": f.get("action"),
+            "method": (f.get("method") or "POST").upper(),
+            "username_field": uname,
+            "password_field": pw.get("name"),
+        }
+    return None
+
+
+# Indices d'un contrôle de DÉCONNEXION (apparaît une fois connecté) — signal fort
+# de connexion réussie.
+_LOGOUT_HINTS = (
+    "logout", "log out", "sign out", "déconnex", "deconnex",
+    "se déconnecter", "se deconnecter",
+)
+
+
+def login_success_signal(
+    before_html: str,
+    after_html: str,
+    auth_cookie_added: bool = False,
+) -> dict[str, Any]:
+    """
+    Juge (PUR) si une tentative de connexion a RÉUSSI, par signaux observables.
+
+    Ordre de priorité :
+      1. un cookie de session est apparu après soumission (`auth_cookie_added`),
+      2. un contrôle de déconnexion apparaît (absent avant, présent après),
+      3. le formulaire de connexion (champ mot de passe) a disparu.
+
+    Returns:
+        {"success": bool, "evidence": str}.
+    """
+    b = (before_html or "").lower()
+    a = (after_html or "").lower()
+
+    if auth_cookie_added:
+        return {"success": True,
+                "evidence": "un cookie de session est apparu après soumission"}
+
+    if any(h in a for h in _LOGOUT_HINTS) and not any(h in b for h in _LOGOUT_HINTS):
+        return {"success": True,
+                "evidence": "un contrôle de déconnexion est apparu après connexion"}
+
+    had_pw = 'type="password"' in b or "type='password'" in b
+    has_pw = 'type="password"' in a or "type='password'" in a
+    if had_pw and not has_pw:
+        return {"success": True,
+                "evidence": "le formulaire de connexion a disparu après soumission"}
+
+    return {"success": False,
+            "evidence": "aucun signal de connexion réussie détecté"}
+
+
 # =============================================================================
 # Couche NAVIGATEUR (Playwright, import différé → module importable hors-ligne)
 # =============================================================================
@@ -545,6 +645,150 @@ def _fill_and_submit_forms(page, page_url, forms, target_url, scope_check, ctx,
     ctx["trigger"] = "load"
 
 
+def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
+                   settle_ms):
+    """
+    (NAVIGATEUR) Connecte le navigateur avec les identifiants FOURNIS par
+    l'opérateur (autorisés par le RoE), pour débloquer la surface authentifiée.
+    La session (cookie) persiste dans le contexte → tout le crawl qui suit est
+    authentifié. Ne tente rien sans identifiants ; reste borné au périmètre.
+
+    Étapes : trouver la page de login (URL fournie, sinon lien d'allure login,
+    sinon la cible), afficher le formulaire (clic d'un lien « connexion » si SPA),
+    remplir identifiant + mot de passe, soumettre, puis juger le succès par
+    signaux observables (cookie apparu / déconnexion visible / formulaire parti).
+
+    Returns:
+        {"attempted", "success", "login_url", "evidence"}.
+    """
+    out = {"attempted": False, "success": False, "login_url": None,
+           "evidence": None}
+    if not creds:
+        return out
+    username = creds.get("username")
+    password = creds.get("password")
+    if not username or not password:
+        out["evidence"] = "identifiants incomplets (username/password requis)"
+        return out
+
+    # 1) Déterminer l'URL de login (bornée au périmètre).
+    login_url = creds.get("login_url")
+    if not login_url:
+        try:
+            html0 = page.content()
+        except Exception:
+            html0 = ""
+        for href in extract_links(html0, page.url):
+            if looks_like_login_path(href) and \
+                    host_in_scope(href, target_url, scope_check):
+                login_url = href
+                break
+    if not login_url:
+        login_url = target_url  # SPA : le formulaire peut vivre sur l'accueil
+    if not host_in_scope(login_url, target_url, scope_check):
+        out["evidence"] = "URL de login hors périmètre (refusée)"
+        return out
+    out["login_url"] = login_url
+    out["attempted"] = True
+
+    # 2) Aller sur la page de login.
+    try:
+        page.goto(login_url, wait_until="load", timeout=nav_timeout_ms)
+        page.wait_for_timeout(settle_ms)
+    except Exception:
+        out["evidence"] = "navigation vers la page de login échouée"
+        return out
+
+    # 2bis) SPA : afficher le formulaire via un lien/bouton « connexion ».
+    try:
+        if not page.query_selector("input[type=password]"):
+            for el in page.query_selector_all("a, button, [role=button]"):
+                try:
+                    lab = (el.inner_text() or el.get_attribute("aria-label")
+                           or "").strip()
+                except Exception:
+                    continue
+                if looks_like_login_path(lab) and not is_dangerous_label(lab):
+                    try:
+                        el.click(timeout=3000)
+                        page.wait_for_timeout(settle_ms)
+                    except Exception:
+                        pass
+                    break
+    except Exception:
+        pass
+
+    # 3) Repérer les champs (par nom si connu, sinon par type).
+    try:
+        before_html = page.content()
+    except Exception:
+        before_html = ""
+    try:
+        cookies_before = {c.get("name") for c in page.context.cookies()}
+    except Exception:
+        cookies_before = set()
+
+    picked = pick_login_fields(extract_forms(before_html, page.url)) or {}
+    uname_field = creds.get("username_field") or picked.get("username_field")
+    pw_field = creds.get("password_field") or picked.get("password_field")
+
+    try:
+        if uname_field:
+            page.locator(f'[name="{uname_field}"]').first.fill(
+                username, timeout=3000)
+        else:
+            loc = page.locator("input[type=email], input[type=text]").first
+            if loc.count() > 0:
+                loc.fill(username, timeout=3000)
+    except Exception:
+        pass
+
+    filled_pw = False
+    try:
+        if pw_field:
+            page.locator(f'[name="{pw_field}"]').first.fill(password, timeout=3000)
+            filled_pw = True
+        else:
+            loc = page.locator("input[type=password]").first
+            if loc.count() > 0:
+                loc.fill(password, timeout=3000)
+                filled_pw = True
+    except Exception:
+        filled_pw = False
+    if not filled_pw:
+        out["evidence"] = "champ de mot de passe introuvable"
+        return out
+
+    # 4) Soumettre (l'appel d'auth réel est capté, étiqueté « login »).
+    ctx["trigger"] = "login"
+    try:
+        btn = page.locator(
+            "button[type=submit], input[type=submit], form button").first
+        if btn.count() > 0:
+            btn.click(timeout=3000)
+        else:
+            page.locator("input[type=password]").first.press("Enter", timeout=3000)
+        page.wait_for_timeout(settle_ms)
+    except Exception:
+        pass
+    ctx["trigger"] = "load"
+
+    # 5) Juger le succès.
+    try:
+        after_html = page.content()
+    except Exception:
+        after_html = ""
+    try:
+        cookies_after = {c.get("name") for c in page.context.cookies()}
+    except Exception:
+        cookies_after = set()
+    sig = login_success_signal(
+        before_html, after_html, auth_cookie_added=bool(cookies_after - cookies_before))
+    out["success"] = sig["success"]
+    out["evidence"] = sig["evidence"]
+    return out
+
+
 def run_dynamic_crawl(
     target_url: str,
     scope_check=None,
@@ -557,6 +801,7 @@ def run_dynamic_crawl(
     max_clicks: int = 8,
     submit_forms: bool = True,
     max_form_submits: int = 5,
+    credentials: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Explore dynamiquement l'application en pilotant un navigateur réel.
@@ -583,17 +828,23 @@ def run_dynamic_crawl(
             soumet pour capter le vrai endpoint (méthode + corps) derrière. Les
             formulaires destructifs sont ignorés (plan_form_fill).
         max_form_submits: nombre maximal de formulaires soumis par page.
+        credentials: identifiants FOURNIS par l'opérateur (autorisés par le RoE)
+            pour se connecter AVANT le crawl et explorer la surface authentifiée.
+            Dict {"username", "password", optionnel "login_url",
+            "username_field", "password_field"}. Absent → aucune connexion.
 
     Returns:
-        Dict : status, target_url, pages_visited, pages, forms, api_calls (chaque
-        appel : method, url, body, content_type, trigger), interactions (trace
-        des clics/soumissions), out_of_scope_skipped, duration_seconds, error.
+        Dict : status, target_url, login (résultat de la connexion), pages_visited,
+        pages, forms, api_calls (chaque appel : method, url, body, content_type,
+        trigger), interactions (trace des clics/soumissions), out_of_scope_skipped,
+        duration_seconds, error.
     """
     started_at = datetime.now(timezone.utc)
     result: dict[str, Any] = {
         "tool": "dynamic_crawler",
         "status": "success",
         "target_url": target_url,
+        "login": None,
         "pages_visited": 0,
         "pages": [],
         "forms": [],
@@ -656,6 +907,19 @@ def run_dynamic_crawl(
                     pass
 
             page.on("request", _on_request)
+
+            # Connexion préalable (si identifiants fournis) : la session persiste
+            # dans le contexte → tout le crawl qui suit explore la surface
+            # AUTHENTIFIÉE. On part de la cible, désormais connecté.
+            if credentials:
+                try:
+                    page.goto(target_url, wait_until="load", timeout=nav_timeout_ms)
+                    page.wait_for_timeout(settle_ms)
+                except Exception:
+                    pass
+                result["login"] = _perform_login(
+                    page, target_url, scope_check, credentials, ctx,
+                    nav_timeout_ms, settle_ms)
 
             queue: list[tuple[str, int]] = [(target_url, 0)]
             visited: set[str] = set()

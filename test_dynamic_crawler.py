@@ -19,6 +19,9 @@ from pentagon.tools.dynamic_crawler_tool import (
     is_dangerous_label,
     benign_value_for,
     plan_form_fill,
+    looks_like_login_path,
+    pick_login_fields,
+    login_success_signal,
     FUZZ_XSS_MARKER,
 )
 
@@ -235,6 +238,61 @@ def test_plan_form_fill():
     print("✓ test_plan_form_fill")
 
 
+# --- looks_like_login_path (étape 2 : surface authentifiée) ------------------
+
+def test_looks_like_login_path():
+    for yes in ["/api/auth/login", "https://x/connexion", "Se connecter",
+                "Sign in", "/signin", "S'identifier"]:
+        assert looks_like_login_path(yes), yes
+    for no in ["/produits/42", "Accueil", "Ajouter au panier", ""]:
+        assert not looks_like_login_path(no), no
+    print("✓ test_looks_like_login_path")
+
+
+# --- pick_login_fields -------------------------------------------------------
+
+def test_pick_login_fields():
+    forms = [
+        {"action": "https://x/search", "method": "GET",
+         "inputs": [{"name": "q", "type": "text"}]},
+        {"action": "https://x/api/auth/login", "method": "POST",
+         "inputs": [{"name": "username", "type": "text"},
+                    {"name": "password", "type": "password"},
+                    {"name": "csrf", "type": "hidden"}]},
+    ]
+    picked = pick_login_fields(forms)
+    assert picked is not None
+    assert picked["password_field"] == "password"
+    assert picked["username_field"] == "username"
+    assert picked["method"] == "POST"
+    # Aucun formulaire avec champ mot de passe → None.
+    assert pick_login_fields([forms[0]]) is None
+    print("✓ test_pick_login_fields")
+
+
+# --- login_success_signal ----------------------------------------------------
+
+def test_login_success_signal():
+    # 1) Cookie de session apparu → succès (signal le plus fort).
+    s = login_success_signal('<input type="password">', "<div>ok</div>",
+                             auth_cookie_added=True)
+    assert s["success"] is True
+
+    # 2) Contrôle de déconnexion apparu (absent avant, présent après).
+    s = login_success_signal("<a>Se connecter</a>", "<a>Se déconnecter</a>")
+    assert s["success"] is True
+
+    # 3) Formulaire de connexion (mot de passe) disparu.
+    s = login_success_signal('<input type="password">', "<div>Bienvenue</div>")
+    assert s["success"] is True
+
+    # 4) Mot de passe toujours là, pas de déconnexion → échec.
+    s = login_success_signal('<input type="password">',
+                             '<input type="password"> identifiants invalides')
+    assert s["success"] is False
+    print("✓ test_login_success_signal")
+
+
 def main():
     print("=" * 70)
     print("TEST — Crawler/fuzzer dynamique (couche PURE)")
@@ -251,6 +309,9 @@ def main():
     test_is_dangerous_label()
     test_benign_value_for()
     test_plan_form_fill()
+    test_looks_like_login_path()
+    test_pick_login_fields()
+    test_login_success_signal()
     print("=" * 70)
     print("✓ Tous les tests du crawler/fuzzer dynamique passent.")
     print("=" * 70)
