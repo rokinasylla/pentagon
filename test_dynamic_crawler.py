@@ -20,6 +20,7 @@ from pentagon.tools.dynamic_crawler_tool import (
     benign_value_for,
     plan_form_fill,
     looks_like_login_path,
+    is_search_field,
     pick_login_fields,
     login_success_signal,
     extract_endpoints,
@@ -275,6 +276,21 @@ def test_extract_bearer_token():
     print("✓ test_extract_bearer_token")
 
 
+# --- is_search_field ---------------------------------------------------------
+
+def test_is_search_field():
+    # type=search → boîte de recherche.
+    assert is_search_field({"type": "search", "name": "q"}) is True
+    # Indices dans name/id/placeholder/aria-label (générique, pas de site en dur).
+    assert is_search_field({"type": "text", "name": "searchQuery"}) is True
+    assert is_search_field({"type": "text", "placeholder": "Rechercher…"}) is True
+    assert is_search_field({"type": "text", "aria_label": "Search"}) is True
+    # Un vrai champ identifiant n'est PAS une boîte de recherche.
+    assert is_search_field({"type": "email", "name": "email"}) is False
+    assert is_search_field({"type": "text", "name": "username"}) is False
+    print("✓ test_is_search_field")
+
+
 # --- pick_login_fields -------------------------------------------------------
 
 def test_pick_login_fields():
@@ -293,29 +309,48 @@ def test_pick_login_fields():
     assert picked["method"] == "POST"
     # Aucun formulaire avec champ mot de passe → None.
     assert pick_login_fields([forms[0]]) is None
+
+    # Une boîte de recherche dans le même formulaire est IGNORÉE comme identifiant
+    # (générique : évite de prendre la barre de recherche pour l'e-mail).
+    form_with_search = [{
+        "action": "/login", "method": "POST",
+        "inputs": [{"name": "searchQuery", "type": "text"},
+                   {"name": "email", "type": "email"},
+                   {"name": "password", "type": "password"}],
+    }]
+    picked2 = pick_login_fields(form_with_search)
+    assert picked2["username_field"] == "email"
     print("✓ test_pick_login_fields")
 
 
 # --- login_success_signal ----------------------------------------------------
 
 def test_login_success_signal():
-    # 1) Cookie de session apparu → succès (signal le plus fort).
+    # 1) Jeton capté → succès (signal le plus fort, générique Bearer/JWT).
+    s = login_success_signal('<input type="password">', "<div>ok</div>",
+                             token_found=True)
+    assert s["success"] is True
+
+    # 2) Cookie de session apparu → succès.
     s = login_success_signal('<input type="password">', "<div>ok</div>",
                              auth_cookie_added=True)
     assert s["success"] is True
 
-    # 2) Contrôle de déconnexion apparu (absent avant, présent après).
+    # 3) Contrôle de déconnexion apparu (absent avant, présent après).
     s = login_success_signal("<a>Se connecter</a>", "<a>Se déconnecter</a>")
     assert s["success"] is True
 
-    # 3) Formulaire de connexion (mot de passe) disparu.
+    # 4) Formulaire disparu MAIS aucun artefact d'auth → PAS un succès (faux
+    #    positif SPA observé sur Juice Shop). Signal faible exposé pour diagnostic.
     s = login_success_signal('<input type="password">', "<div>Bienvenue</div>")
-    assert s["success"] is True
+    assert s["success"] is False
+    assert s["weak_form_gone"] is True
 
-    # 4) Mot de passe toujours là, pas de déconnexion → échec.
+    # 5) Mot de passe toujours là, pas de déconnexion → échec.
     s = login_success_signal('<input type="password">',
                              '<input type="password"> identifiants invalides')
     assert s["success"] is False
+    assert s["weak_form_gone"] is False
     print("✓ test_login_success_signal")
 
 
@@ -377,6 +412,7 @@ def main():
     test_plan_form_fill()
     test_looks_like_login_path()
     test_extract_bearer_token()
+    test_is_search_field()
     test_pick_login_fields()
     test_login_success_signal()
     test_extract_endpoints()

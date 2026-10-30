@@ -145,6 +145,15 @@ _LOGIN_NOISE = (
 # site. Utilisé pour la détection universelle de session après connexion.
 _JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}")
 
+# Indices qu'un champ texte est une BOÎTE DE RECHERCHE (et non l'identifiant du
+# login) — générique, aucun site en dur. Sur une SPA, la barre de recherche de
+# l'en-tête est souvent le premier `input[type=text]` de la page : la remplir à
+# la place de l'e-mail casse la connexion. On l'écarte par ces indices.
+_SEARCH_HINTS = (
+    "search", "recherche", "rechercher", "query", "find", "filter", "filtre",
+    "keyword", "mot-cl", "lookup",
+)
+
 
 # =============================================================================
 # Couche PURE (déterministe, sans réseau ni navigateur → testable hors-ligne)
@@ -442,13 +451,30 @@ def looks_like_login_path(text: str) -> bool:
     return any(h in low for h in LOGIN_PATH_HINTS)
 
 
+def is_search_field(field: dict[str, Any]) -> bool:
+    """
+    Dit (PUR) si un champ de saisie est une BOÎTE DE RECHERCHE plutôt qu'un
+    identifiant de connexion. GÉNÉRIQUE : se fonde sur le type `search` ou sur des
+    indices de nom/id/placeholder/aria-label (`_SEARCH_HINTS`), jamais sur un site
+    en dur. Sert à ne pas confondre la barre de recherche d'en-tête d'une SPA avec
+    le champ e-mail du login.
+    """
+    if (field.get("type") or "").lower() == "search":
+        return True
+    hay = " ".join(str(field.get(k) or "") for k in (
+        "name", "id", "placeholder", "aria_label", "aria-label",
+        "formcontrolname", "autocomplete")).lower()
+    return any(h in hay for h in _SEARCH_HINTS)
+
+
 def pick_login_fields(forms: list[dict[str, Any]]) -> dict[str, Any] | None:
     """
     Choisit (PUR) le formulaire de connexion parmi des formulaires extraits.
 
     Le formulaire de login est celui qui porte un champ `password` ; l'identifiant
     est le premier champ texte/e-mail (ou au nom évocateur : user/email/login…)
-    du même formulaire. Les champs cachés (jeton CSRF) sont ignorés.
+    du même formulaire, en écartant toute boîte de recherche. Les champs cachés
+    (jeton CSRF) sont ignorés.
 
     Returns:
         {"action", "method", "username_field", "password_field"} ou None si aucun
@@ -467,6 +493,8 @@ def pick_login_fields(forms: list[dict[str, Any]]) -> dict[str, Any] | None:
             t = (i.get("type") or "text").lower()
             n = (i.get("name") or "").lower()
             if t in ("hidden", "submit", "button", "checkbox", "radio", "file"):
+                continue
+            if is_search_field(i):
                 continue
             if t in ("text", "email", "tel") or any(
                     h in n for h in ("user", "email", "mail", "login",
@@ -494,36 +522,50 @@ def login_success_signal(
     before_html: str,
     after_html: str,
     auth_cookie_added: bool = False,
+    token_found: bool = False,
 ) -> dict[str, Any]:
     """
     Juge (PUR) si une tentative de connexion a RÉUSSI, par signaux observables.
 
-    Ordre de priorité :
-      1. un cookie de session est apparu après soumission (`auth_cookie_added`),
-      2. un contrôle de déconnexion apparaît (absent avant, présent après),
-      3. le formulaire de connexion (champ mot de passe) a disparu.
+    Seuls comptent des ARTEFACTS D'AUTHENTIFICATION positifs — jamais la simple
+    disparition du formulaire, qui, sur une SPA, se produit à chaque changement de
+    route sans qu'aucune connexion n'ait eu lieu (faux positif observé sur Juice
+    Shop : formulaire parti, mais 0 requête de login et aucun jeton). Ordre :
+      1. un jeton de session a été capté (`token_found`, p. ex. Bearer JWT),
+      2. un cookie de session est apparu après soumission (`auth_cookie_added`),
+      3. un contrôle de déconnexion apparaît (absent avant, présent après).
+
+    La disparition du champ mot de passe est renvoyée comme signal FAIBLE
+    (`weak_form_gone`) à des fins de diagnostic, mais ne vaut PAS succès.
 
     Returns:
-        {"success": bool, "evidence": str}.
+        {"success": bool, "evidence": str, "weak_form_gone": bool}.
     """
     b = (before_html or "").lower()
     a = (after_html or "").lower()
 
+    had_pw = 'type="password"' in b or "type='password'" in b
+    has_pw = 'type="password"' in a or "type='password'" in a
+    weak_form_gone = had_pw and not has_pw
+
+    if token_found:
+        return {"success": True, "weak_form_gone": weak_form_gone,
+                "evidence": "un jeton de session a été capté après connexion"}
+
     if auth_cookie_added:
-        return {"success": True,
+        return {"success": True, "weak_form_gone": weak_form_gone,
                 "evidence": "un cookie de session est apparu après soumission"}
 
     if any(h in a for h in _LOGOUT_HINTS) and not any(h in b for h in _LOGOUT_HINTS):
-        return {"success": True,
+        return {"success": True, "weak_form_gone": weak_form_gone,
                 "evidence": "un contrôle de déconnexion est apparu après connexion"}
 
-    had_pw = 'type="password"' in b or "type='password'" in b
-    has_pw = 'type="password"' in a or "type='password'" in a
-    if had_pw and not has_pw:
-        return {"success": True,
-                "evidence": "le formulaire de connexion a disparu après soumission"}
+    if weak_form_gone:
+        return {"success": False, "weak_form_gone": True,
+                "evidence": "le formulaire a disparu mais aucun artefact "
+                            "d'authentification (jeton/cookie) — succès non prouvé"}
 
-    return {"success": False,
+    return {"success": False, "weak_form_gone": False,
             "evidence": "aucun signal de connexion réussie détecté"}
 
 
@@ -767,6 +809,56 @@ def _fill_and_submit_forms(page, page_url, forms, target_url, scope_check, ctx,
     ctx["trigger"] = "load"
 
 
+# (NAVIGATEUR) Sélection de l'identifiant par le DOM — robuste sur les SPA où les
+# champs n'ont pas d'attribut `name` (Angular/React : id, placeholder,
+# aria-label, formcontrolname). GÉNÉRIQUE : s'ancre sur le champ mot de passe,
+# écarte les boîtes de recherche, et préfère le type e-mail puis le champ texte
+# le plus PROCHE EN AMONT du mot de passe (évite la barre de recherche d'en-tête,
+# premier `input[type=text]` de la page sur beaucoup de SPA). Marque le champ
+# retenu d'un attribut repère → rempli ensuite par Playwright (vrais events).
+_USERNAME_PICKER_JS = r"""
+() => {
+  const SEARCH = /search|recherche|rechercher|query|\bfind\b|filter|filtre|keyword|lookup/i;
+  const SKIP = ['password','hidden','submit','button','checkbox','radio','file','range','color','image','reset'];
+  const pw = document.querySelector('input[type=password]');
+  const all = Array.from(document.querySelectorAll('input, textarea'));
+  const pwIdx = pw ? all.indexOf(pw) : all.length;
+  const visible = (e) => { const r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
+  const isSearch = (e) => {
+    if ((e.type || '').toLowerCase() === 'search') return true;
+    const hay = [e.id, e.name, e.placeholder, e.getAttribute('aria-label'),
+                 e.getAttribute('formcontrolname'), e.autocomplete].join(' ').toLowerCase();
+    return SEARCH.test(hay);
+  };
+  const cand = [];
+  all.forEach((e, i) => {
+    if (e === pw) return;
+    const t = (e.type || 'text').toLowerCase();
+    if (e.tagName === 'INPUT' && SKIP.includes(t)) return;
+    if (!visible(e)) return;
+    if (isSearch(e)) return;
+    cand.push({ e, i, t });
+  });
+  if (!cand.length) return false;
+  const score = (c) => {
+    let s = 0;
+    if (c.t === 'email') s += 1000;                 // e-mail = identifiant le plus probable
+    const hay = [c.e.id, c.e.name, c.e.placeholder,
+                 c.e.getAttribute('aria-label'), c.e.autocomplete].join(' ').toLowerCase();
+    if (/user|email|mail|login|identif|pseudo|account|compte/.test(hay)) s += 500;
+    if (c.i < pwIdx) s += 200 - (pwIdx - c.i);       // le plus proche EN AMONT du mot de passe
+    else s += -(c.i - pwIdx);
+    return s;
+  };
+  cand.sort((a, b) => score(b) - score(a));
+  const chosen = cand[0].e;
+  chosen.setAttribute('data-pentagon-uname', '1');
+  return true;
+}
+"""
+
+
 def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
                    settle_ms):
     """
@@ -821,7 +913,13 @@ def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
         out["evidence"] = "navigation vers la page de login échouée"
         return out
 
-    # 2bis) SPA : afficher le formulaire via un lien/bouton « connexion ».
+    # 2bis) SPA : laisser le formulaire se rendre (Angular/React) ; s'il n'apparaît
+    # pas, cliquer un lien/bouton « connexion » pour l'afficher.
+    try:
+        page.wait_for_selector("input[type=password]",
+                               timeout=min(nav_timeout_ms, 5000))
+    except Exception:
+        pass
     try:
         if not page.query_selector("input[type=password]"):
             for el in page.query_selector_all("a, button, [role=button]"):
@@ -833,14 +931,29 @@ def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
                 if looks_like_login_path(lab) and not is_dangerous_label(lab):
                     try:
                         el.click(timeout=3000)
-                        page.wait_for_timeout(settle_ms)
+                        page.wait_for_selector("input[type=password]", timeout=3000)
                     except Exception:
                         pass
                     break
     except Exception:
         pass
 
-    # 3) Repérer les champs (par nom si connu, sinon par type).
+    # Lecture (NAVIGATEUR) du web storage → jeton Bearer par FORME (JWT).
+    def _read_storage_token():
+        try:
+            store = page.evaluate(
+                "() => { const d={};"
+                " try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);"
+                "d['L:'+k]=localStorage.getItem(k);}}catch(e){}"
+                " try{for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);"
+                "d['S:'+k]=sessionStorage.getItem(k);}}catch(e){}"
+                " return d; }")
+        except Exception:
+            store = {}
+        return extract_bearer_token(store), store
+
+    # 3) Repérer les champs. Priorité : nom fourni par l'opérateur > nom détecté
+    #    dans un <form> parsé > sélection DOM (robuste sur les SPA sans `name`).
     try:
         before_html = page.content()
     except Exception:
@@ -854,16 +967,29 @@ def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
     uname_field = creds.get("username_field") or picked.get("username_field")
     pw_field = creds.get("password_field") or picked.get("password_field")
 
+    uname_filled = False
     try:
         if uname_field:
             page.locator(f'[name="{uname_field}"]').first.fill(
                 username, timeout=3000)
-        else:
-            loc = page.locator("input[type=email], input[type=text]").first
+            uname_filled = True
+        elif page.evaluate(_USERNAME_PICKER_JS):
+            page.locator('[data-pentagon-uname="1"]').first.fill(
+                username, timeout=3000)
+            uname_filled = True
+    except Exception:
+        uname_filled = False
+    if not uname_filled:
+        # Dernier recours : 1er champ e-mail, sinon 1er champ texte (peut viser
+        # une barre de recherche — d'où la sélection DOM privilégiée au-dessus).
+        try:
+            loc = page.locator("input[type=email]").first
+            if loc.count() == 0:
+                loc = page.locator("input[type=text]").first
             if loc.count() > 0:
                 loc.fill(username, timeout=3000)
-    except Exception:
-        pass
+        except Exception:
+            pass
 
     filled_pw = False
     try:
@@ -881,21 +1007,66 @@ def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
         out["evidence"] = "champ de mot de passe introuvable"
         return out
 
-    # 4) Soumettre (l'appel d'auth réel est capté, étiqueté « login »).
+    # 4) Soumettre (l'appel d'auth réel est capté, étiqueté « login »). On vise le
+    #    bouton d'envoi DU FORMULAIRE du mot de passe (pas n'importe quel bouton),
+    #    en écartant les libellés dangereux ; à défaut, Entrée dans le mot de passe.
     ctx["trigger"] = "login"
+    submitted = False
     try:
-        btn = page.locator(
-            "button[type=submit], input[type=submit], form button").first
-        if btn.count() > 0:
-            btn.click(timeout=3000)
-        else:
-            page.locator("input[type=password]").first.press("Enter", timeout=3000)
-        page.wait_for_timeout(settle_ms)
+        pw_loc = page.locator("input[type=password]").first
+        btn = None
+        try:
+            form = pw_loc.locator("xpath=ancestor::form[1]")
+            if form.count() > 0:
+                cand = form.locator(
+                    "button[type=submit], input[type=submit], button:not([type])")
+                if cand.count() > 0:
+                    btn = cand.first
+        except Exception:
+            btn = None
+        if btn is None:
+            cand = page.locator("button[type=submit], input[type=submit]")
+            if cand.count() > 0:
+                btn = cand.first
+        if btn is not None:
+            try:
+                lab = (btn.inner_text() or btn.get_attribute("aria-label") or "")
+            except Exception:
+                lab = ""
+            if not is_dangerous_label(lab):
+                try:
+                    btn.click(timeout=3000)
+                    submitted = True
+                except Exception:
+                    submitted = False
+        if not submitted:
+            pw_loc.press("Enter", timeout=3000)
+            submitted = True
     except Exception:
         pass
+    # Laisser partir l'appel d'auth et le jeton s'écrire dans le storage.
+    page.wait_for_timeout(max(settle_ms, 1500))
     ctx["trigger"] = "load"
 
-    # 5) Juger le succès.
+    # 5) Capter la session AVANT de juger : cookies + jeton Bearer (forme JWT) dans
+    #    localStorage/sessionStorage — générique, sans nom de champ ni site en dur.
+    session: dict[str, Any] = {"token": None, "token_source": None, "cookies": {}}
+    try:
+        session["cookies"] = {c.get("name"): c.get("value")
+                              for c in page.context.cookies() if c.get("name")}
+    except Exception:
+        pass
+    tok, _store = _read_storage_token()
+    if not tok:
+        # Le jeton peut s'écrire avec un léger décalage après la réponse d'auth.
+        page.wait_for_timeout(settle_ms)
+        tok, _store = _read_storage_token()
+    if tok:
+        session["token"] = tok
+        session["token_source"] = "web_storage"
+
+    # 6) Juger le succès sur des ARTEFACTS d'auth (jeton/cookie/déconnexion),
+    #    jamais sur la seule disparition du formulaire (faux positif SPA).
     try:
         after_html = page.content()
     except Exception:
@@ -905,34 +1076,11 @@ def _perform_login(page, target_url, scope_check, creds, ctx, nav_timeout_ms,
     except Exception:
         cookies_after = set()
     sig = login_success_signal(
-        before_html, after_html, auth_cookie_added=bool(cookies_after - cookies_before))
+        before_html, after_html,
+        auth_cookie_added=bool(cookies_after - cookies_before),
+        token_found=bool(tok))
     out["success"] = sig["success"]
     out["evidence"] = sig["evidence"]
-
-    # Session captée (GÉNÉRIQUE) pour la surface authentifiée : cookies + un
-    # éventuel jeton Bearer repéré par sa FORME (JWT) dans localStorage/
-    # sessionStorage — sans connaître le nom du champ ni le site. Les testeurs
-    # d'exploitation réutiliseront ce jeton pour tester la zone connectée.
-    session: dict[str, Any] = {"token": None, "token_source": None, "cookies": {}}
-    try:
-        session["cookies"] = {c.get("name"): c.get("value")
-                              for c in page.context.cookies() if c.get("name")}
-    except Exception:
-        pass
-    try:
-        store = page.evaluate(
-            "() => { const d={};"
-            " try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);"
-            "d['L:'+k]=localStorage.getItem(k);}}catch(e){}"
-            " try{for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);"
-            "d['S:'+k]=sessionStorage.getItem(k);}}catch(e){}"
-            " return d; }")
-        tok = extract_bearer_token(store)
-        if tok:
-            session["token"] = tok
-            session["token_source"] = "web_storage"
-    except Exception:
-        pass
     out["session"] = session
     return out
 
